@@ -7,7 +7,12 @@ use Illuminate\Support\Facades\Http;
 
 class ProductController extends Controller
 {
-    private string $coreApiUrl = 'http://localhost:8080/api/products';
+    private string $coreApiUrl;
+
+    public function __construct()
+    {
+        $this->coreApiUrl = config('services.amazia_core.url');
+    }
 
     public function index()
     {
