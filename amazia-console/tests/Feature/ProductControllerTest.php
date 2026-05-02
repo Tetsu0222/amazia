@@ -59,6 +59,20 @@ class ProductControllerTest extends TestCase
                  ->assertJsonFragment(['name' => '商品A']);
     }
 
+    public function test_商品1件をCoreのAPIから取得できること(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products/1' => Http::response([
+                'id' => 1, 'name' => '商品A', 'description' => '説明A', 'price' => 1000, 'stock' => 100,
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/products/1');
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['name' => '商品A']);
+    }
+
     public function test_商品更新リクエストがCoreのAPIに飛ぶこと(): void
     {
         Http::fake([

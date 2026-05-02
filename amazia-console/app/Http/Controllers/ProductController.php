@@ -20,6 +20,12 @@ class ProductController extends Controller
         return response()->json($response->json(), $response->status());
     }
 
+    public function show(int $id)
+    {
+        $response = Http::get("{$this->coreApiUrl}/{$id}");
+        return response()->json($response->json(), $response->status());
+    }
+
     public function store(Request $request)
     {
         if (empty($request->input('name')) || is_null($request->input('price')) || is_null($request->input('stock'))) {

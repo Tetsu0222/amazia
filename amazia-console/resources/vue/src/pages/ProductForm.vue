@@ -61,7 +61,7 @@ const router = useRouter();
 const formRef = ref();
 const submitting = ref(false);
 
-const isEdit = computed(() => route.params.id !== 'new');
+const isEdit = computed(() => route.path !== '/products/new');
 
 const form = ref({ name: '', description: '', price: null, stock: null });
 
