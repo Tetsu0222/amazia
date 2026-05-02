@@ -12,3 +12,5 @@ Route::get('/sales/inventory', [\App\Http\Controllers\SalesController::class, 'c
 
 Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 Route::post('/products', [\App\Http\Controllers\ProductController::class, 'store']);
+Route::put('/products/{id}', [\App\Http\Controllers\ProductController::class, 'update']);
+Route::delete('/products/{id}', [\App\Http\Controllers\ProductController::class, 'destroy']);

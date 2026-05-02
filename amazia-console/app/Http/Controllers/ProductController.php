@@ -30,4 +30,27 @@ class ProductController extends Controller
 
         return response()->json($response->json(), $response->status());
     }
+
+    public function update(Request $request, int $id)
+    {
+        $response = Http::put("{$this->coreApiUrl}/{$id}", [
+            'name'        => $request->input('name'),
+            'description' => $request->input('description'),
+            'price'       => $request->input('price'),
+            'stock'       => $request->input('stock'),
+        ]);
+
+        return response()->json($response->json(), $response->status());
+    }
+
+    public function destroy(int $id)
+    {
+        $response = Http::delete("{$this->coreApiUrl}/{$id}");
+
+        if ($response->status() === 204) {
+            return response()->noContent();
+        }
+
+        return response()->json($response->json(), $response->status());
+    }
 }

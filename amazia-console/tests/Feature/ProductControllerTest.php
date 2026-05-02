@@ -58,4 +58,74 @@ class ProductControllerTest extends TestCase
         $response->assertStatus(200)
                  ->assertJsonFragment(['name' => '商品A']);
     }
+
+    public function test_商品更新リクエストがCoreのAPIに飛ぶこと(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products/1' => Http::response([
+                'id' => 1,
+                'name' => '商品A改',
+                'description' => '説明A改',
+                'price' => 2000,
+                'stock' => 50,
+            ], 200),
+        ]);
+
+        $response = $this->putJson('/api/products/1', [
+            'name'        => '商品A改',
+            'description' => '説明A改',
+            'price'       => 2000,
+            'stock'       => 50,
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['name' => '商品A改']);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://localhost:8080/api/products/1'
+                && $request['name'] === '商品A改';
+        });
+    }
+
+    public function test_存在しない商品を更新しようとしたとき404が返ること(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products/999' => Http::response([], 404),
+        ]);
+
+        $response = $this->putJson('/api/products/999', [
+            'name'  => '商品X',
+            'price' => 1000,
+            'stock' => 10,
+        ]);
+
+        $response->assertStatus(404);
+    }
+
+    public function test_商品削除リクエストがCoreのAPIに飛ぶこと(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products/1' => Http::response(null, 204),
+        ]);
+
+        $response = $this->deleteJson('/api/products/1');
+
+        $response->assertStatus(204);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://localhost:8080/api/products/1'
+                && $request->method() === 'DELETE';
+        });
+    }
+
+    public function test_存在しない商品を削除しようとしたとき404が返ること(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products/999' => Http::response([], 404),
+        ]);
+
+        $response = $this->deleteJson('/api/products/999');
+
+        $response->assertStatus(404);
+    }
 }
