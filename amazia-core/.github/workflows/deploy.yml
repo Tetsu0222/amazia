@@ -1,0 +1,56 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: テスト実行
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17セットアップ
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Mavenテスト実行
+        run: mvn clean test
+
+  deploy:
+    name: EC2へデプロイ
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AWSクレデンシャル設定
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: S3にzipをアップロード
+        run: |
+          zip -r demo.zip . -x "*.git*" -x "target/*"
+          aws s3 cp demo.zip s3://fullstack-renaissance-demo/demo.zip
+
+      - name: EC2でDockerビルド＆再起動
+        run: |
+          aws ssm send-command \
+            --instance-ids i-024a0748df78fc93e \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "aws s3 cp s3://fullstack-renaissance-demo/demo.zip /home/ssm-user/demo.zip",
+              "cd /home/ssm-user && unzip -o demo.zip -d demo",
+              "cd /home/ssm-user/demo && sudo docker build -t spring-demo .",
+              "sudo docker stop spring-demo || true",
+              "sudo docker rm spring-demo || true",
+              "sudo docker run -d -p 8080:8080 --name spring-demo spring-demo"
+            ]' \
+            --region ap-southeast-2
