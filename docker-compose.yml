@@ -1,0 +1,48 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: amazia-mysql
+    environment:
+      MYSQL_DATABASE: amazia
+      MYSQL_USER: amazia
+      MYSQL_PASSWORD: amazia_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  amazia-core:
+    build: ./amazia-core
+    container_name: amazia-core
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  amazia-console:
+    build: ./amazia-console
+    container_name: amazia-console
+    ports:
+      - "8000:8000"
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: amazia
+      DB_USERNAME: amazia
+      DB_PASSWORD: amazia_pass
+      CORE_API_URL: http://amazia-core:8080/api/products
+    depends_on:
+      - amazia-core
+
+volumes:
+  mysql_data:
