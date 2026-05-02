@@ -12,7 +12,9 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(
                     "http://localhost:5173",
-                    "http://localhost:3000"
+                    "http://localhost:3000",
+                    "http://3.26.116.197:5173",
+                    "http://3.26.116.197"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE")
                 .allowedHeaders("*");
