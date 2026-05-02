@@ -57,4 +57,56 @@ public class ProductControllerTest {
         mockMvc.perform(get("/api/products/999"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void 商品が更新できること() throws Exception {
+        // 事前登録
+        String created = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品A\",\"description\":\"説明A\",\"price\":1000,\"stock\":100}"))
+                .andReturn().getResponse().getContentAsString();
+
+        // id を取り出す（簡易パース）
+        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(put("/api/products/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品A改\",\"description\":\"説明A改\",\"price\":2000,\"stock\":50}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("商品A改"))
+                .andExpect(jsonPath("$.price").value(2000))
+                .andExpect(jsonPath("$.stock").value(50));
+    }
+
+    @Test
+    void 存在しない商品を更新しようとしたとき404が返ること() throws Exception {
+        mockMvc.perform(put("/api/products/999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品X\",\"description\":\"説明X\",\"price\":1000,\"stock\":10}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 商品が削除できること() throws Exception {
+        // 事前登録
+        String created = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品A\",\"description\":\"説明A\",\"price\":1000,\"stock\":100}"))
+                .andReturn().getResponse().getContentAsString();
+
+        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(delete("/api/products/" + id))
+                .andExpect(status().isNoContent());
+
+        // 削除後は404
+        mockMvc.perform(get("/api/products/" + id))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 存在しない商品を削除しようとしたとき404が返ること() throws Exception {
+        mockMvc.perform(delete("/api/products/999"))
+                .andExpect(status().isNotFound());
+    }
 }
