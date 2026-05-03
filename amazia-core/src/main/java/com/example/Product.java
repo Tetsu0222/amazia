@@ -25,6 +25,12 @@ public class Product {
     @NotNull
     private Integer stock;
 
+    private String statusCode;
+
+    private LocalDateTime publishStart;
+
+    private LocalDateTime publishEnd;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,6 +45,13 @@ public class Product {
         updatedAt = LocalDateTime.now();
     }
 
+    public boolean isPublished() {
+        LocalDateTime now = LocalDateTime.now();
+        if (publishStart != null && now.isBefore(publishStart)) return false;
+        if (publishEnd != null && now.isAfter(publishEnd)) return false;
+        return true;
+    }
+
     public Long getId() { return id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -48,6 +61,12 @@ public class Product {
     public void setPrice(Integer price) { this.price = price; }
     public Integer getStock() { return stock; }
     public void setStock(Integer stock) { this.stock = stock; }
+    public String getStatusCode() { return statusCode; }
+    public void setStatusCode(String statusCode) { this.statusCode = statusCode; }
+    public LocalDateTime getPublishStart() { return publishStart; }
+    public void setPublishStart(LocalDateTime publishStart) { this.publishStart = publishStart; }
+    public LocalDateTime getPublishEnd() { return publishEnd; }
+    public void setPublishEnd(LocalDateTime publishEnd) { this.publishEnd = publishEnd; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

@@ -13,6 +13,8 @@ Route::get('/sales/inventory', [\App\Http\Controllers\SalesController::class, 'c
 Route::post('/products/import', [\App\Http\Controllers\ImportController::class, 'importProducts']);
 
 Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
+Route::get('/admin/products', [\App\Http\Controllers\ProductController::class, 'adminIndex']);
+Route::get('/product-statuses', [\App\Http\Controllers\ProductController::class, 'statuses']);
 Route::get('/products/{id}', [\App\Http\Controllers\ProductController::class, 'show']);
 Route::post('/products', [\App\Http\Controllers\ProductController::class, 'store']);
 Route::put('/products/{id}', [\App\Http\Controllers\ProductController::class, 'update']);

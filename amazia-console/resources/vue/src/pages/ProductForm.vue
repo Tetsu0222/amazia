@@ -1,5 +1,5 @@
 <template>
-  <div style="padding: 24px; max-width: 600px">
+  <div style="padding: 24px; max-width: 640px">
     <a-page-header
       :title="isEdit ? '商品編集' : '商品登録'"
       @back="$router.push('/')"
@@ -38,6 +38,50 @@
         />
       </a-form-item>
 
+      <a-form-item label="ステータス" name="statusCode">
+        <a-select
+          v-model:value="form.statusCode"
+          placeholder="ステータスを選択"
+          :loading="statusesLoading"
+          allow-clear
+        >
+          <a-select-option
+            v-for="s in statuses"
+            :key="s.code"
+            :value="s.code"
+          >
+            {{ s.name }}
+          </a-select-option>
+        </a-select>
+      </a-form-item>
+
+      <a-row :gutter="16">
+        <a-col :span="12">
+          <a-form-item label="公開開始日時" name="publishStart">
+            <a-date-picker
+              v-model:value="form.publishStart"
+              show-time
+              format="YYYY-MM-DD HH:mm"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="未設定 = 即時公開"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="公開終了日時" name="publishEnd">
+            <a-date-picker
+              v-model:value="form.publishEnd"
+              show-time
+              format="YYYY-MM-DD HH:mm"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="未設定 = 恒久公開"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
       <a-form-item>
         <a-space>
           <a-button type="primary" html-type="submit" :loading="submitting">
@@ -54,16 +98,26 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
-import { getProduct, createProduct, updateProduct } from '../api/products';
+import { getProduct, createProduct, updateProduct, getProductStatuses } from '../api/products';
 
 const route = useRoute();
 const router = useRouter();
 const formRef = ref();
 const submitting = ref(false);
+const statuses = ref([]);
+const statusesLoading = ref(false);
 
 const isEdit = computed(() => route.path !== '/products/new');
 
-const form = ref({ name: '', description: '', price: null, stock: null });
+const form = ref({
+  name: '',
+  description: '',
+  price: null,
+  stock: null,
+  statusCode: null,
+  publishStart: null,
+  publishEnd: null,
+});
 
 const rules = {
   name:  [{ required: true, message: '商品名は必須です' }],
@@ -72,14 +126,26 @@ const rules = {
 };
 
 onMounted(async () => {
+  statusesLoading.value = true;
+  try {
+    statuses.value = await getProductStatuses();
+  } catch {
+    message.warning('ステータス一覧の取得に失敗しました');
+  } finally {
+    statusesLoading.value = false;
+  }
+
   if (isEdit.value) {
     try {
       const product = await getProduct(route.params.id);
       form.value = {
-        name:        product.name,
-        description: product.description ?? '',
-        price:       product.price,
-        stock:       product.stock,
+        name:         product.name,
+        description:  product.description ?? '',
+        price:        product.price,
+        stock:        product.stock,
+        statusCode:   product.statusCode ?? null,
+        publishStart: product.publishStart ?? null,
+        publishEnd:   product.publishEnd ?? null,
       };
     } catch {
       message.error('商品データの取得に失敗しました');

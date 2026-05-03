@@ -36,7 +36,8 @@ return [
     ],
 
     'amazia_core' => [
-        'url' => env('CORE_API_URL', 'http://localhost:8080/api/products'),
+        'url'      => env('CORE_API_URL', 'http://localhost:8080/api/products'),
+        'base_url' => env('CORE_BASE_URL', 'http://localhost:8080/api'),
     ],
 
 ];

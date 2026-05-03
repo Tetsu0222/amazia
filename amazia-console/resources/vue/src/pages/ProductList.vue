@@ -1,6 +1,6 @@
 <template>
   <div style="padding: 24px">
-    <a-page-header title="商品管理" sub-title="Amazia Console" />
+    <a-page-header title="商品マスタ" sub-title="Amazia Console" />
 
     <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
       <a-space>
@@ -42,6 +42,17 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'price'">
           {{ record.price.toLocaleString() }} 円
+        </template>
+        <template v-if="column.key === 'status'">
+          <a-tag :color="statusColor(record.statusCode)">
+            {{ statusLabel(record.statusCode) }}
+          </a-tag>
+        </template>
+        <template v-if="column.key === 'published'">
+          <a-badge
+            :status="isPublished(record) ? 'success' : 'default'"
+            :text="isPublished(record) ? '公開中' : '非公開'"
+          />
         </template>
         <template v-if="column.key === 'action'">
           <a-space>
@@ -94,7 +105,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { getProducts, deleteProduct, bulkDeleteProducts, bulkUpdateStock } from '../api/products';
+import { getAdminProducts, deleteProduct, bulkDeleteProducts, bulkUpdateStock } from '../api/products';
 
 const products = ref([]);
 const loading = ref(false);
@@ -104,24 +115,42 @@ const bulkEditVisible = ref(false);
 const bulkEditLoading = ref(false);
 const bulkEditItems = ref([]);
 
+const STATUS_MAP = {
+  WAITING:     { label: '入荷待',    color: 'default' },
+  RESERVATION: { label: '予約受付中', color: 'blue' },
+  ON_SALE:     { label: '販売中',    color: 'green' },
+};
+
+const statusLabel = (code) => STATUS_MAP[code]?.label ?? '未設定';
+const statusColor = (code) => STATUS_MAP[code]?.color ?? 'default';
+
+const isPublished = (product) => {
+  const now = new Date();
+  if (product.publishStart && new Date(product.publishStart) > now) return false;
+  if (product.publishEnd   && new Date(product.publishEnd)   < now) return false;
+  return true;
+};
+
 const columns = [
-  { title: 'ID',   dataIndex: 'id',    key: 'id',    width: 80 },
-  { title: '商品名', dataIndex: 'name',  key: 'name' },
-  { title: '価格',  dataIndex: 'price', key: 'price', width: 140 },
-  { title: '在庫数', dataIndex: 'stock', key: 'stock', width: 100 },
-  { title: '操作',  key: 'action',      width: 160 },
+  { title: 'ID',     dataIndex: 'id',    key: 'id',        width: 70 },
+  { title: '商品名',  dataIndex: 'name',  key: 'name' },
+  { title: '価格',   dataIndex: 'price', key: 'price',     width: 130 },
+  { title: '在庫数',  dataIndex: 'stock', key: 'stock',     width: 90 },
+  { title: 'ステータス', key: 'status',                      width: 120 },
+  { title: '公開状態', key: 'published',                     width: 100 },
+  { title: '操作',   key: 'action',                         width: 140 },
 ];
 
 const bulkEditColumns = [
-  { title: '商品名', dataIndex: 'name', key: 'name' },
+  { title: '商品名',    dataIndex: 'name',  key: 'name' },
   { title: '現在の在庫', dataIndex: 'stock', key: 'currentStock', width: 120 },
-  { title: '変更後の在庫', key: 'stock', width: 140 },
+  { title: '変更後の在庫', key: 'stock',                          width: 140 },
 ];
 
 const fetchProducts = async () => {
   loading.value = true;
   try {
-    products.value = await getProducts();
+    products.value = await getAdminProducts();
   } catch {
     message.error('商品の取得に失敗しました');
   } finally {

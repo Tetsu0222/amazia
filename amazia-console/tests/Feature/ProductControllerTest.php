@@ -179,4 +179,68 @@ class ProductControllerTest extends TestCase
                 && $request->method() === 'PATCH';
         });
     }
+
+    public function test_管理画面向け全件取得がCoreのAPIに飛ぶこと(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/admin/products' => Http::response([
+                ['id' => 1, 'name' => '公開中商品', 'price' => 1000, 'stock' => 10, 'statusCode' => 'ON_SALE'],
+                ['id' => 2, 'name' => '終了商品', 'price' => 2000, 'stock' => 0, 'statusCode' => 'ON_SALE',
+                 'publishEnd' => '2020-12-31T23:59:59'],
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/admin/products');
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(2);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://localhost:8080/api/admin/products';
+        });
+    }
+
+    public function test_ステータスマスタ一覧が取得できること(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/product-statuses' => Http::response([
+                ['code' => 'WAITING',     'name' => '入荷待',    'sortOrder' => 1],
+                ['code' => 'RESERVATION', 'name' => '予約受付中', 'sortOrder' => 2],
+                ['code' => 'ON_SALE',     'name' => '販売中',    'sortOrder' => 3],
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/product-statuses');
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(3);
+    }
+
+    public function test_公開期間を含む商品登録リクエストがCoreのAPIに飛ぶこと(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products' => Http::response([
+                'id' => 1, 'name' => '商品A', 'price' => 1000, 'stock' => 100,
+                'statusCode' => 'ON_SALE',
+                'publishStart' => '2026-01-01T00:00:00',
+                'publishEnd' => null,
+            ], 201),
+        ]);
+
+        $response = $this->postJson('/api/products', [
+            'name'         => '商品A',
+            'price'        => 1000,
+            'stock'        => 100,
+            'statusCode'   => 'ON_SALE',
+            'publishStart' => '2026-01-01T00:00:00',
+        ]);
+
+        $response->assertStatus(201);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://localhost:8080/api/products'
+                && $request['statusCode'] === 'ON_SALE'
+                && $request['publishStart'] === '2026-01-01T00:00:00';
+        });
+    }
 }
