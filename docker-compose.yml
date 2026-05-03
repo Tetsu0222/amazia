@@ -18,7 +18,7 @@ services:
       retries: 5
 
   amazia-core:
-    build: ./amazia-core
+    image: 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-core:latest
     container_name: amazia-core
     ports:
       - "8080:8080"
@@ -30,7 +30,7 @@ services:
         condition: service_healthy
 
   amazia-console:
-    build: ./amazia-console
+    image: 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-console:latest
     container_name: amazia-console
     ports:
       - "8000:8000"
