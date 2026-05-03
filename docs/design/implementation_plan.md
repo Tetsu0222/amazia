@@ -13,6 +13,7 @@
 | Phase 7 | 一括削除・一括編集 | 🔲 未着手 | [phase7/](phase7/) |
 | Phase 8 | 商品マスタ機能 | 🔲 未着手 | [phase8/](phase8/) |
 | Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 | [phase9/](phase9/) |
+| Phase X | デプロイパイプライン高速化 | 🔲 未着手（随時） | [phaseX/](phaseX/) |
 
 ---
 
