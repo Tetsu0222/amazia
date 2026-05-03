@@ -98,7 +98,8 @@ const handleUpload = async () => {
   if (fileList.value.length === 0) return;
 
   const formData = new FormData();
-  formData.append('file', fileList.value[0]);
+  const file = fileList.value[0].originFileObj ?? fileList.value[0];
+  formData.append('file', file);
 
   uploading.value = true;
   result.value = null;

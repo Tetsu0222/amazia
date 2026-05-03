@@ -18,7 +18,7 @@ class ImportController extends Controller
     public function importProducts(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls',
+            'file' => 'required|file|mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/octet-stream',
         ]);
 
         $spreadsheet = IOFactory::load($request->file('file')->getPathname());
