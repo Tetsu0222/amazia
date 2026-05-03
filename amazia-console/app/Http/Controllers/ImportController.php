@@ -4,20 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\Concerns\ToCollection;
-use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Illuminate\Support\Collection;
-
-class ProductImportSheet implements ToCollection, WithHeadingRow
-{
-    public Collection $rows;
-
-    public function collection(Collection $rows)
-    {
-        $this->rows = $rows;
-    }
-}
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ImportController extends Controller
 {
@@ -34,25 +21,35 @@ class ImportController extends Controller
             'file' => 'required|file|mimes:xlsx,xls',
         ]);
 
-        $sheet = new ProductImportSheet();
-        Excel::import($sheet, $request->file('file'));
+        $spreadsheet = IOFactory::load($request->file('file')->getPathname());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return response()->json(['succeeded' => 0, 'failed' => []]);
+        }
+
+        // 1行目をヘッダーとしてキーに変換
+        $headers = array_map('strtolower', array_map('trim', $rows[0]));
+        $dataRows = array_slice($rows, 1);
 
         $succeeded = 0;
         $failed = [];
 
-        foreach ($sheet->rows as $row) {
-            $name  = trim($row['name']  ?? '');
-            $price = $row['price'] ?? null;
-            $stock = $row['stock'] ?? null;
+        foreach ($dataRows as $row) {
+            $data = array_combine($headers, $row);
+
+            $name  = trim($data['name']  ?? '');
+            $price = $data['price'] ?? null;
+            $stock = $data['stock'] ?? null;
 
             if ($name === '' || is_null($price) || is_null($stock)) {
-                $failed[] = ['row' => $row->toArray(), 'reason' => '必須項目(name/price/stock)が不足'];
+                $failed[] = ['row' => $data, 'reason' => '必須項目(name/price/stock)が不足'];
                 continue;
             }
 
             $response = Http::post($this->coreApiUrl, [
                 'name'        => $name,
-                'description' => trim($row['description'] ?? ''),
+                'description' => trim($data['description'] ?? ''),
                 'price'       => (int) $price,
                 'stock'       => (int) $stock,
             ]);
@@ -60,7 +57,7 @@ class ImportController extends Controller
             if ($response->successful()) {
                 $succeeded++;
             } else {
-                $failed[] = ['row' => $row->toArray(), 'reason' => $response->body()];
+                $failed[] = ['row' => $data, 'reason' => $response->body()];
             }
         }
 

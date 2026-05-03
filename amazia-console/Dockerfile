@@ -2,12 +2,15 @@ FROM php:8.2-cli-alpine
 
 RUN apk add --no-cache \
         libpng-dev \
+        libjpeg-turbo-dev \
+        freetype-dev \
         oniguruma-dev \
         libxml2-dev \
         libzip-dev \
         zip \
         unzip \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip gd
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
