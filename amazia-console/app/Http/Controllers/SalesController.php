@@ -2,28 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\SalesService;
 
 class SalesController extends Controller
 {
+    private SalesService $salesService;
+
+    public function __construct(SalesService $salesService)
+    {
+        $this->salesService = $salesService;
+    }
+
     public function index()
     {
-        $sales = [
-            ['id' => 1, 'product' => '商品A', 'amount' => 5000, 'quantity' => 3],
-            ['id' => 2, 'product' => '商品B', 'amount' => 3000, 'quantity' => 1],
-            ['id' => 3, 'product' => '商品C', 'amount' => 8000, 'quantity' => 2],
-        ];
-
-        return response()->json($sales);
+        return response()->json($this->salesService->getSales());
     }
 
     public function checkInventory()
     {
-        $response = Http::get('http://localhost:8080/api/inventory');
-
         return response()->json([
-            'message' => '在庫情報を取得しました',
-            'inventory' => $response->json(),
+            'message'   => '在庫情報を取得しました',
+            'inventory' => $this->salesService->getInventory(),
         ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 }

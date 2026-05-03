@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { CssBaseline } from '@mui/material';
-import ProductList from './pages/ProductList';
-import ProductDetail from './pages/ProductDetail';
+import ProductList from './features/products/pages/ProductList';
+import ProductDetail from './features/products/pages/ProductDetail';
 
 export default function App() {
   return (

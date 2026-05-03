@@ -1,4 +1,4 @@
-package com.example;
+package com.example.inventory;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,12 +11,14 @@ import java.util.Map;
 @RequestMapping("/api/inventory")
 public class InventoryController {
 
+    private final InventoryService inventoryService;
+
+    public InventoryController(InventoryService inventoryService) {
+        this.inventoryService = inventoryService;
+    }
+
     @GetMapping
     public List<Map<String, Object>> getInventory() {
-        return List.of(
-            Map.of("id", 1, "name", "商品A", "quantity", 100),
-            Map.of("id", 2, "name", "商品B", "quantity", 50),
-            Map.of("id", 3, "name", "商品C", "quantity", 200)
-        );
+        return inventoryService.getInventory();
     }
 }

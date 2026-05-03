@@ -2,77 +2,51 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ProductService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class ProductController extends Controller
 {
-    private string $coreApiUrl;
-    private string $coreBaseUrl;
+    private ProductService $productService;
 
-    public function __construct()
+    public function __construct(ProductService $productService)
     {
-        $this->coreApiUrl  = config('services.amazia_core.url');
-        $this->coreBaseUrl = config('services.amazia_core.base_url');
+        $this->productService = $productService;
     }
 
-    /** Market向け：公開期間内のみ */
     public function index()
     {
-        $response = Http::get($this->coreApiUrl);
+        $response = $this->productService->getPublished();
         return response()->json($response->json(), $response->status());
     }
 
-    /** Console向け：全件（公開期間外も含む） */
     public function adminIndex()
     {
-        $response = Http::get("{$this->coreBaseUrl}/admin/products");
+        $response = $this->productService->getAll();
         return response()->json($response->json(), $response->status());
     }
 
     public function show(int $id)
     {
-        $response = Http::get("{$this->coreApiUrl}/{$id}");
+        $response = $this->productService->getById($id);
         return response()->json($response->json(), $response->status());
     }
 
     public function store(Request $request)
     {
-        if (empty($request->input('name')) || is_null($request->input('price')) || is_null($request->input('stock'))) {
-            return response()->json(['message' => '必須項目が不足しています'], 400);
-        }
-
-        $response = Http::post($this->coreApiUrl, [
-            'name'         => $request->input('name'),
-            'description'  => $request->input('description'),
-            'price'        => $request->input('price'),
-            'stock'        => $request->input('stock'),
-            'statusCode'   => $request->input('statusCode'),
-            'publishStart' => $request->input('publishStart'),
-            'publishEnd'   => $request->input('publishEnd'),
-        ]);
-
+        $response = $this->productService->create($request->all());
         return response()->json($response->json(), $response->status());
     }
 
     public function update(Request $request, int $id)
     {
-        $response = Http::put("{$this->coreApiUrl}/{$id}", [
-            'name'         => $request->input('name'),
-            'description'  => $request->input('description'),
-            'price'        => $request->input('price'),
-            'stock'        => $request->input('stock'),
-            'statusCode'   => $request->input('statusCode'),
-            'publishStart' => $request->input('publishStart'),
-            'publishEnd'   => $request->input('publishEnd'),
-        ]);
-
+        $response = $this->productService->update($id, $request->all());
         return response()->json($response->json(), $response->status());
     }
 
     public function destroy(int $id)
     {
-        $response = Http::delete("{$this->coreApiUrl}/{$id}");
+        $response = $this->productService->delete($id);
 
         if ($response->status() === 204) {
             return response()->noContent();
@@ -83,8 +57,7 @@ class ProductController extends Controller
 
     public function bulkDestroy(Request $request)
     {
-        $ids = $request->input('ids');
-        $response = Http::withOptions(['query' => ['ids' => $ids]])->delete($this->coreApiUrl);
+        $response = $this->productService->bulkDelete($request->input('ids'));
 
         if ($response->status() === 204) {
             return response()->noContent();
@@ -95,13 +68,13 @@ class ProductController extends Controller
 
     public function bulkUpdateStock(Request $request)
     {
-        $response = Http::patch("{$this->coreApiUrl}/bulk-stock", $request->all());
+        $response = $this->productService->bulkUpdateStock($request->all());
         return response()->json($response->json(), $response->status());
     }
 
     public function statuses()
     {
-        $response = Http::get("{$this->coreBaseUrl}/product-statuses");
+        $response = $this->productService->getStatuses();
         return response()->json($response->json(), $response->status());
     }
 }

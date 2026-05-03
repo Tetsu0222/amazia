@@ -1,0 +1,159 @@
+# コーディング規約
+
+大規模開発および AI 駆動開発を前提とした、変更に強く文脈が閉じた設計を標準とする。
+
+---
+
+## 1. 共通原則
+
+### 1-1. 不要ファイルの削除
+
+呼ばれていないファイルは削除する。コードベースのノイズは AI の推論精度を下げ、人間のレビューコストも増やす。
+
+### 1-2. Controller にビジネスロジックを書かない
+
+Controller の責務は「入力受け取り → Service 呼び出し → 出力」のみ。
+
+| 層 | 責務 |
+|---|---|
+| Controller | リクエスト受付・レスポンス整形 |
+| Service | ビジネスロジック |
+| Model / Entity | データ構造・DB アクセス |
+
+**PHP（Laravel）：** ビジネスロジックは Service に寄せる。Fat Model を避ける。  
+**Java（Spring）：** ビジネスロジックは Service に寄せる。Spring 慣習（by-layer）と整合させる。
+
+### 1-3. バリデーションは config 駆動で共通化
+
+独自定義したバリデーションルールを config に記述し、フレームワークのバリデーション機能から参照する。フレームワーク標準機能（Laravel FormRequest / Spring @Valid）を置き換えるのではなく、補完する形で使う。
+
+**PHP（Laravel）：** config にルール定義 → FormRequest が読み込む  
+**Java（Spring）：** application.yml にルール定義 → @Validated / Validator が参照する
+
+---
+
+## 2. フォルダ構成
+
+### 2-1. ユースケース単位でフォルダを切る
+
+```
+第1層: ユースケースフォルダ（例: CreateProduct / UpdateProduct）
+第2層: Controller / Service / Model / Trait（言語慣習に合わせる）
+第3層: 実ファイル
+```
+
+これ以上ネストしない。階層が深いほど AI の文脈理解コストが上がる。
+
+**PHP の例：**
+```
+/CreateProduct
+    /Controller
+    /Service
+    /Model
+    config.php
+```
+
+**Java（Spring）の例：**
+```
+/CreateProduct
+    /controller
+    /service
+    /entity
+    /repository
+```
+
+### 2-2. ユースケースの粒度基準
+
+**NG（粒度が粗い）：** `User`、`Product`（複数操作を含む集約）
+
+**OK（ユースケースとして適切）：**
+```
+RegisterUser / UpdateUserProfile / DeleteUser
+CreateProduct / UpdateProduct / CancelProduct
+```
+
+ユースケース = 動詞 + 名詞。フォルダ名もこの形式に統一する。
+
+### 2-3. Shared の扱い
+
+複数のユースケースで使う共通処理は `Shared/` にまとめる。
+
+**Shared に入れる条件：**
+- 2つ以上のユースケースで使う
+- ドメインに依存しない
+
+**Shared に入れてはいけないもの：**
+- ドメイン固有のロジック
+- ユースケース固有のルール
+- 特定の集約に依存する処理
+
+**依存方向：** `Shared` → 各ユースケース（逆は禁止）
+
+---
+
+## 3. config 駆動設計
+
+### 3-1. config 化すべきもの
+
+- 外部 API のエンドポイント
+- バリデーションルール（独自定義分）
+- 権限・ロール定義
+- 機能フラグ（ON/OFF）
+- 定数・閾値
+- メールテンプレート
+
+### 3-2. 条件付きで config 化してよいもの
+
+- 分岐条件（if の判定値）
+- 画面表示の切り替え
+- ワークフローのステップ定義
+
+### 3-3. config 化すべきでないもの
+
+- ビジネスロジック
+- 複雑な計算
+- ドメインルール
+- モデルの振る舞い
+
+---
+
+## 4. テスト規約
+
+### 4-1. 環境変数はテストにも明示する
+
+新規環境変数を追加したら `phpunit.xml`（PHP）/ `application-test.properties`（Java）に必ずテスト用の値を追記する。テスト内で URL や設定値をハードコードせず、`config()` / `@Value` 経由で取得する。
+
+### 4-2. 異常系テストを書く
+
+正常系だけでなく以下を必ずカバーする。
+
+- 外部 API が 500 / 404 を返す場合
+- 必須項目が欠けている場合
+- 不正な値が入力された場合
+
+### 4-3. 新規環境変数追加時のチェックリスト
+
+- [ ] `docker-compose.yml` の該当サービスに追記
+- [ ] `phpunit.xml` または `application-test.properties` にテスト用値を追記
+- [ ] テストコードが `config()` / `@Value` 経由で値を参照していることを確認
+
+---
+
+## 5. 言語・フレームワーク別の補足
+
+### PHP（Laravel）
+
+- `Model` にロジックを寄せすぎると Fat Model になる → Service に寄せる
+- バリデーションは `FormRequest` を使い Controller をシンプルに保つ
+- 外部 API エンドポイントは `config/services.php` で一元管理する
+
+### Java（Spring）
+
+- Spring は by-layer 構成が慣習 → ユースケース単位で切る場合はパッケージ戦略を最初に決める
+- バリデーションは `@Valid` / `@Validated` を使い Controller に直接書かない
+- 外部設定は `application.yml` または `@ConfigurationProperties` で一元管理する
+
+### React / Vue（フロントエンド）
+
+- API エンドポイントは `src/api/` 配下に集約し、コンポーネントから直接 fetch しない
+- コンポーネントにビジネスロジックを書かない（表示ロジックのみ）

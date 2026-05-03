@@ -61,10 +61,19 @@ flowchart TD
 
 ---
 
+## コーディング規約
+
+全システム共通の設計方針・コーディング規約は [docs/coding_guidelines.md](docs/coding_guidelines.md) を参照。
+
+フォルダ構成・責務分離・config 駆動設計・テスト規約について定める。
+
+---
+
 ## ドキュメントマップ
 
 ```
 docs/
+├── coding_guidelines.md      # コーディング規約（全システム共通）
 ├── architecture.svg          # システムアーキテクチャ図（全体構成）
 ├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
 ├── analysis/                 # 分析レポート
@@ -76,16 +85,10 @@ docs/
 │   ├── phase8/               # フェーズ8：商品マスタ機能
 │   ├── phase9/               # フェーズ9：商品画像登録
 │   ├── phaseX/               # フェーズX-1：デプロイパイプライン高速化（随時）
-│   └── phaseX/               # フェーズX-2：デプロイパイプライン再設計（即時対応）
+│   └── phaseX/               # フェーズX-2：デプロイパイプライン再設計（完了）
 └── troubles/                 # 不具合記録
     ├── README.md             # 不具合一覧・再発防止アクション
-    ├── 001_ssm_connection_lost.md
-    ├── 002_mysql_host_not_allowed.md
-    ├── 003_ssm_command_queue_stuck.md
-    ├── 004_ec2_ip_changed_after_restart.md
-    ├── 005_nginx_console_403.md
-    ├── 006_composer_platform_ext_missing.md
-    └── 007_excel_import_422.md
+    └── 001〜009_*.md         # 個別不具合ドキュメント
 ```
 
 ---

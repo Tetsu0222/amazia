@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import ProductList from '../pages/ProductList.vue';
-import ProductForm from '../pages/ProductForm.vue';
-import ProductImport from '../pages/ProductImport.vue';
+import ProductList from '../features/products/pages/ProductList.vue';
+import ProductForm from '../features/products/pages/ProductForm.vue';
+import ProductImport from '../features/products/pages/ProductImport.vue';
 
 export default createRouter({
   history: createWebHistory(),
