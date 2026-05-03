@@ -85,6 +85,8 @@ jobs:
 
       - name: S3にzipをアップロード
         run: |
+          ls amazia-console/resources/vue/dist/ || echo "WARNING: vue dist not found"
+          ls amazia-market/dist/ || echo "WARNING: market dist not found"
           zip -r amazia.zip . \
             -x "*.git*" \
             -x "amazia-core/target/*" \
