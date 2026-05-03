@@ -1,4 +1,4 @@
-package com.example.product;
+package com.example.shared.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -48,7 +48,7 @@ public class Product {
     public boolean isPublished() {
         LocalDateTime now = LocalDateTime.now();
         if (publishStart != null && now.isBefore(publishStart)) return false;
-        if (publishEnd != null && now.isAfter(publishEnd)) return false;
+        if (publishEnd   != null && now.isAfter(publishEnd))    return false;
         return true;
     }
 

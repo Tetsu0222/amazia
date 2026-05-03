@@ -1,4 +1,4 @@
-package com.example.product;
+package com.example.BulkUpdateStock.entity;
 
 public class BulkStockRequest {
     private Long id;

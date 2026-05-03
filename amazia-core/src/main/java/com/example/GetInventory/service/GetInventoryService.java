@@ -1,4 +1,4 @@
-package com.example.inventory;
+package com.example.GetInventory.service;
 
 import org.springframework.stereotype.Service;
 
@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class InventoryService {
+public class GetInventoryService {
 
     public List<Map<String, Object>> getInventory() {
         return List.of(
