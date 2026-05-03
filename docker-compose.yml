@@ -2,6 +2,7 @@ services:
   mysql:
     image: mysql:8.0
     container_name: amazia-mysql
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: amazia
       MYSQL_USER: amazia
@@ -20,6 +21,7 @@ services:
   amazia-core:
     image: 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-core:latest
     container_name: amazia-core
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
@@ -32,6 +34,7 @@ services:
   amazia-console:
     image: 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-console:latest
     container_name: amazia-console
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
