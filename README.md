@@ -8,7 +8,56 @@
 
 ## CI/CD パイプライン
 
-![CI/CDパイプライン](docs/cicd_pipeline.svg)
+```mermaid
+flowchart TD
+    DEV([開発者]) -->|git push| GH[GitHub\nmain branch]
+
+    GH --> TC[test-core\nmvn clean test\nJUnit]
+    GH --> TP[test-console\nphp artisan test\nPHPUnit]
+    GH --> TM[test-market\nnpm run build\nビルド確認]
+
+    TC --> DJ
+    TP --> DJ
+    TM --> DJ
+
+    subgraph DJ[deploy ジョブ — 全グリーン後]
+        direction TB
+        S1[① docker build amazia-core\n   docker build amazia-console\n   → ECR push]
+        S2[② amazia-market npm build\n   console Vue npm build\n   → dist 生成]
+        S3[③ zip -r amazia.zip\n   → S3 upload]
+        S4["④ SSM send-command ①（ポーリング待機）\nECR login → docker pull\n→ S3 unzip → docker-compose up -d"]
+        S5["⑤ SSM send-command ②（ポーリング待機）\nnginx.conf コピー → dist コピー\n→ nginx reload"]
+        S1 --> S4
+        S2 --> S4
+        S3 --> S4
+        S4 --> S5
+    end
+
+    S1 -->|docker push| ECR[(Amazon ECR\namazia-core:latest\namazia-console:latest)]
+    S3 -->|aws s3 cp| S3B[(Amazon S3\namazia.zip)]
+
+    subgraph EC2[AWS EC2  13.54.203.95 Elastic IP]
+        direction TB
+        NGX[Nginx\n:80 → amazia-market\n:8001 → amazia-console UI]
+        subgraph DC[Docker Compose]
+            CORE[amazia-core\nSpring Boot :8080]
+            CON[amazia-console\nLaravel :8000]
+            DB[(MySQL :3306)]
+            CORE --> DB
+            CON --> DB
+            CON --> CORE
+        end
+        NGX --> DC
+    end
+
+    ECR -->|docker pull| DC
+    S3B -->|unzip| EC2
+    S5 -->|SSM| EC2
+
+    EC2 --> BM([Amazia Market\nhttp://13.54.203.95])
+    EC2 --> BC([Amazia Console UI\nhttp://13.54.203.95:8001])
+    EC2 --> BA([Amazia Core API\nhttp://13.54.203.95:8080])
+```
 
 ---
 
