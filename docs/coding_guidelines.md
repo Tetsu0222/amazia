@@ -43,106 +43,114 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 **PHP の例：**
 ```
 /app
-    /Product
-        /Controller
-            /実ファイル群
-        /Service
-            /実ファイル群
-        /...
-    /Shared(補足1)
-        /Exception
-            /実ファイル群
-        /Util
-            /実ファイル群
-        /...
-    /Model(補足2)
-        /Product
-            /実ファイル群
-        /...
-    /...
+├── Product
+│   ├── Controller
+│   │   └── /実ファイル群
+│   ├── Service
+│   │   └── /実ファイル群
+│   └── ...etc
+├── Shared (補足1)
+│   ├── Exception
+│   │   └── /実ファイル群
+│   ├── Util
+│   │   └── /実ファイル群
+│   └── ...etc
+├── Model (補足2)
+│   └── Product
+│       └── /実ファイル群
+└── ...etc
+
 /config
-    /app
-        /{ドメイン名}.php(実ファイル群)
-    /app.php(補足3)
-    /...実ファイル群
+├── app
+│   └── {ドメイン名}.php (/実ファイル群)
+├── app.php (補足3)
+└── ...実ファイル群
+
 /resources
-    /vue
-        /features
-            /Product
-                /api
-                    /実ファイル群(js)
-                /pages
-                    /実ファイル群(vue)
-            /...
+└── vue
+    └── features
+        ├── Product
+        │   ├── api
+        │   │   └── /実ファイル群(js)
+        │   └── pages
+        │       └── /実ファイル群(vue)
+        └── ...etc
+
 /routes
-    /api
-        /{ドメイン名}.php(実ファイル群)
-    /api.php(補足4)
-    /web.php
-    /console.php
+├── api
+│   └── {ドメイン名}.php (/実ファイル群)
+├── api.php (補足4)
+├── web.php
+└── console.php
+
 /storage
-    /Product
-        /images
-            /{id} (補足5)
-                /実ファイル群
-        /excles
-            /実ファイル群
-        /...
-    /...
+└── Product
+    ├── images
+    │   └── {id} (補足5)
+    │       └── /実ファイル群
+    ├── excles
+    │   └── /実ファイル群
+    └── ...etc
+
 ```
 
 **補足**
 - 1.Shared に入れる条件は 2-3 を参照。
-- 2.Laravel の慣習に合わせて Model は /app/Models に置くが、中層でドメイン単位にまとめることでユースケースとの関連性を保つ。
+- 2.Laravel の慣習に合わせて Model は /app/Models に置く。
+    - 中層でドメイン単位にまとめることでユースケースとの関連性を保つ。
     - coreでDB接続を行うためモデルを必要とするケースは少ないと想定
 - 3.app.phpでドメインごとの config を読み込む。
-    return ['product' => require __DIR__.'/app/Product.php',];のように明示的な記載を必須とし、自動的に読み込みを行わない。
-    - 自動読み込みだと「どこで読み込まれているか」を推測する必要があり、文脈理解コストが上がる。
-    - 人間にとっても“全体像”が一目で分かる。
+    - return ['product' => require __DIR__.'/app/Product.php',];のように明示的な記載を必須とし、自動的に読み込みを行わない。
+        - 自動読み込みだと「どこで読み込まれているか」を推測する必要があり、文脈理解コストが上がる。
+        - 人間にとっても“全体像”が一目で分かる。
 - 4.api.phpでドメインごとの routes を読み込む。
-    require __DIR__.'/api/Product.php'のように明示的な記載を必須とし、自動的に読み込みを行わない。
+    - require __DIR__.'/api/Product.php'のように明示的な記載を必須とし、自動的に読み込みを行わない。
 - 5.商品画像などのアップロードファイルは、/storage/Product/images/{id}/ のように、DB の ID をフォルダ名として保存する。
-    1レコード＝1フォルダの構造にすることで、ファイル管理がシンプルになる。
+    - 1レコード＝1フォルダの構造にすることで、ファイル管理がシンプルになる。
 
 
 **Java（Spring）の例：**
 ```
 /main
-    /java
-        /com.example.project
-            /product
-                /controller
-                    /実ファイル群
-                /service
-                    /実ファイル群
-                /entity
-                    /実ファイル群
-                /repository
-                    /実ファイル群
-                /validator
-                    /実ファイル群
-            /inventory
-                /controller
-                    /実ファイル群
-                /service
-                    /実ファイル群
-            /shared(補足1)
-                /exception
-                    /実ファイル群
-                /util
-                    /実ファイル群
-                /entity(補足2)
-                    /実ファイル群
-                /repository(補足2)
-                    /実ファイル群
-            /...
-        /Main.java
-        /WebConfig.java
+└── /java
+    └── /com.example.project
+        ├── product
+        │   ├── controller
+        │   │   └── /実ファイル群
+        │   ├── service
+        │   │   └── /実ファイル群
+        │   ├── entity
+        │   │   └── /実ファイル群
+        │   ├── repository
+        │   │   └── /実ファイル群
+        │   └── validator
+        │       └── /実ファイル群
+        │
+        ├── inventory
+        │   ├── controller
+        │   │   └── /実ファイル群
+        │   └── service
+        │       └── /実ファイル群
+        │
+        ├── shared (補足1)
+        │   ├── exception
+        │   │   └── /実ファイル群
+        │   ├── util
+        │   │   └── /実ファイル群
+        │   ├── entity (補足2)
+        │   │   └── /実ファイル群
+        │   └── repository (補足2)
+        │       └── /実ファイル群
+        │
+        └── ...etc
+    /Main.java
+    /WebConfig.java
 ```
+
 **補足**
-- 1.Shared に入れる条件は 2-3 を参照。特定ドメイン固有の Entity・Repository・Validator はそのドメイン配下に置く。
+- 1.Shared に入れる条件は 2-3 を参照。
+  - 特定ドメイン固有の Entity・Repository・Validator はそのドメイン配下に置く。
 - 2.Entity / Repository の配置基準：
-  - 特定ドメインに属する Entity / Repository → ドメイン配下に置く
   - 複数ドメインで利用される横断的な Entity / Repository → shared 配下に置く
 
 ### 2-2. ユースケースの粒度基準
