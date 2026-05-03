@@ -14,6 +14,7 @@
 | 006 | [Composer platform ext missing](006_composer_platform_ext_missing.md) | ローカルでcomposer updateがext-gd/zipエラーで失敗 | ✅ 解決済 | - |
 | 007 | [Excel一括インポート 422エラー](007_excel_import_422.md) | Excelアップロード時に422 Unprocessable Content | ✅ 解決済 | - |
 | 008 | [EC2再起動後にコンテナが自動起動しない](008_containers_not_restart_after_ec2_reboot.md) | stop/start後にDockerコンテナがExitedのまま→502 | ✅ 解決済 | - |
+| 009 | [CORE_BASE_URL未設定による500エラー](009_core_base_url_missing.md) | Phase8デプロイ後に/api/admin/productsが500（環境変数漏れ） | ✅ 解決済 | - |
 
 ## 再発防止アクション（未対応）
 

@@ -48,6 +48,7 @@ services:
       DB_USERNAME: amazia
       DB_PASSWORD: amazia_pass
       CORE_API_URL: http://amazia-core:8080/api/products
+      CORE_BASE_URL: http://amazia-core:8080/api
     depends_on:
       - amazia-core
 
