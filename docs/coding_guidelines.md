@@ -49,13 +49,20 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
         /Service
             /実ファイル群
         /...
+    /Shared
+        /Exception
+            /実ファイル群
+        /Util
+            /実ファイル群
+        /...
     /Model(補足1)
         /Product
             /実ファイル群
         /...
+    /...
 /config
     /app
-        /{ドメイン名}.php
+        /{ドメイン名}.php(実ファイル群)
     /app.php(補足2)
     /...実ファイル群
 /resources
@@ -66,9 +73,10 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
                     /実ファイル群(js)
                 /pages
                     /実ファイル群(vue)
+            /...
 /routes
     /api
-        /{ドメイン名}.php
+        /{ドメイン名}.php(実ファイル群)
     /api.php(補足3)
     /web.php
     /console.php
@@ -80,6 +88,7 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
         /excles
             /実ファイル群
         /...
+    /...
 ```
 
 **補足**
@@ -97,12 +106,36 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 
 **Java（Spring）の例：**
 ```
-/Product
-    /controller
-    /service
-    /entity
-    /repository
+/main
+    /java
+        /com.example.project
+            /product
+                /controller
+                    /実ファイル群
+                /service
+                    /実ファイル群
+                /entity
+                    /実ファイル群
+                /repository
+                    /実ファイル群
+                /validator
+                    /実ファイル群
+            /inventory
+                /controller
+                    /実ファイル群
+                /service
+                    /実ファイル群
+            /shared(補足1)
+                /exception
+                    /実ファイル群
+                /util
+                    /実ファイル群
+            /...
+        /Main.java
+        /WebConfig.java
 ```
+**補足**
+- 1.Shared に入れる条件は 2-3 を参照。特定ドメイン固有の Entity・Repository・Validator はそのドメイン配下に置く。
 
 ### 2-2. ユースケースの粒度基準
 
@@ -121,6 +154,29 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
         CreateProductService.php
         UpdateProductService.php
         DeleteProductService.php
+```
+
+**Java の実例：**
+```
+/product
+    /controller
+        ListProductController.java
+        GetProductController.java
+        CreateProductController.java
+        UpdateProductController.java
+        DeleteProductController.java
+        BulkDeleteProductController.java
+        BulkUpdateStockController.java
+        GetProductStatusController.java
+    /service
+        ListProductService.java
+        GetProductService.java
+        CreateProductService.java
+        UpdateProductService.java
+        DeleteProductService.java
+        BulkDeleteProductService.java
+        BulkUpdateStockService.java
+        GetProductStatusService.java
 ```
 
 **ルール**
