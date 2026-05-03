@@ -54,7 +54,10 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
             /実ファイル群
         /...
 /config
-    /実ファイル群({ドメイン名}.php)
+    /app
+        /{ドメイン名}.php
+    /app.php(補足2)
+    /...実ファイル群
 /resources
     /vue
         /features
@@ -65,14 +68,14 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
                     /実ファイル群(vue)
 /routes
     /api
-        /実ファイル群({ドメイン名}.php)
-    /api.php(補足2)
+        /{ドメイン名}.php
+    /api.php(補足3)
     /web.php
     /console.php
 /storage
     /Product
         /images
-            /{id} (補足3)
+            /{id} (補足4)
                 /実ファイル群
         /excles
             /実ファイル群
@@ -82,11 +85,13 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 **補足**
 - 1.Laravel の慣習に合わせて Model は /app/Models に置くが、中層でドメイン単位にまとめることでユースケースとの関連性を保つ。
     ※coreでDB接続を行うためモデルを必要とするケースは少ないと想定
-- 2.api.phpでドメインごとの routes を読み込む。
-    require __DIR__.'/api/Product.php'のように明示的な記載を必須とし、自動的に読み込みを行わない。
+- 2.app.phpでドメインごとの config を読み込む。
+    return ['product' => require __DIR__.'/app/Product.php',];のように明示的な記載を必須とし、自動的に読み込みを行わない。
     自動読み込みだと「どこで読み込まれているか」を推測する必要があり、文脈理解コストが上がる。
     人間にとっても“全体像”が一目で分かる。
-- 3.商品画像などのアップロードファイルは、/storage/Product/images/{id}/ のように、DB の ID をフォルダ名として保存する。
+- 3.api.phpでドメインごとの routes を読み込む。
+    require __DIR__.'/api/Product.php'のように明示的な記載を必須とし、自動的に読み込みを行わない。
+- 4.商品画像などのアップロードファイルは、/storage/Product/images/{id}/ のように、DB の ID をフォルダ名として保存する。
     1レコード＝1フォルダの構造にすることで、ファイル管理がシンプルになる。
 
 
