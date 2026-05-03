@@ -73,6 +73,55 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
+      - name: SSMキュー健全性確認・自動リカバリ
+        run: |
+          # 15分以上前からInProgressのコマンドを詰まりと判定
+          # JMESPathは&&未対応のため、jqで2段階フィルタ
+          THRESHOLD=$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%S 2>/dev/null \
+            || date -u -v-15M +%Y-%m-%dT%H:%M:%S)
+
+          STUCK=$(aws ssm list-commands \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
+            --region ap-southeast-2 \
+            --query "Commands[?Status=='InProgress']" \
+            --output json \
+            | jq --arg threshold "$THRESHOLD" \
+              '[.[] | select(.RequestedDateTime < $threshold)] | length')
+
+          echo "15分超InProgressコマンド数: $STUCK"
+
+          if [ "$STUCK" -gt 0 ]; then
+            echo "SSMキューが詰まっています。EC2を再起動してクリアします..."
+            aws ec2 stop-instances \
+              --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
+            aws ec2 wait instance-stopped \
+              --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
+            aws ec2 start-instances \
+              --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
+
+            ONLINE=false
+            for i in $(seq 1 18); do
+              sleep 10
+              STATUS=$(aws ssm describe-instance-information \
+                --region ap-southeast-2 \
+                --query "InstanceInformationList[?InstanceId=='${{ secrets.EC2_INSTANCE_ID }}'].PingStatus" \
+                --output text)
+              echo "[$i] SSM: $STATUS"
+              if [ "$STATUS" = "Online" ]; then
+                ONLINE=true
+                break
+              fi
+            done
+
+            if [ "$ONLINE" = "false" ]; then
+              echo "ERROR: SSM Online確認タイムアウト（180秒）"
+              exit 1
+            fi
+            echo "SSM Online確認。デプロイを継続します。"
+          else
+            echo "SSMキュー正常。デプロイを開始します。"
+          fi
+
       - name: ECRログイン
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
