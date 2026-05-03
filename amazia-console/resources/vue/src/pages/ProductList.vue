@@ -3,9 +3,14 @@
     <a-page-header title="商品管理" sub-title="Amazia Console" />
 
     <div style="margin-bottom: 16px; text-align: right">
-      <a-button type="primary" @click="$router.push('/products/new')">
-        + 新規登録
-      </a-button>
+      <a-space>
+        <a-button @click="$router.push('/products/import')">
+          一括登録（Excel）
+        </a-button>
+        <a-button type="primary" @click="$router.push('/products/new')">
+          + 新規登録
+        </a-button>
+      </a-space>
     </div>
 
     <a-table

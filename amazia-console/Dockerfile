@@ -4,9 +4,10 @@ RUN apk add --no-cache \
         libpng-dev \
         oniguruma-dev \
         libxml2-dev \
+        libzip-dev \
         zip \
         unzip \
-    && docker-php-ext-install pdo pdo_mysql mbstring
+    && docker-php-ext-install pdo pdo_mysql mbstring zip
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
