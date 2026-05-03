@@ -213,7 +213,26 @@ Java は型安全性・エコシステム・実行速度・信頼性の面で非
 - 編集フォームに既存データが初期表示されること
 - 削除操作後に一覧画面にリダイレクトされること
 
-### フェーズ5：エクセルアップロードによる一括登録
+### フェーズ5：フロントエンドのEC2公開（Nginx）
+#### 範囲
+- Amazia Market
+- Amazia Console UI
+- AWS EC2（Nginx）
+
+#### 機能概要
+1. EC2 に Nginx をインストール・設定
+2. amazia-market を `npm run build` → EC2 に配置 → `http://<EC2-IP>` で配信
+3. Console UI（Vue）を `npm run build` → EC2 に配置 → `http://<EC2-IP>:8001` で配信
+4. GitHub Actions のデプロイ時に自動ビルド＆配置
+
+#### 完了条件
+- URLをブラウザに入力するだけで全サービスにアクセスできる
+- `http://<EC2-IP>` → amazia-market（会員向け）
+- `http://<EC2-IP>:8000` → amazia-console API
+- `http://<EC2-IP>:8001` → Console UI（管理者向け）
+- `http://<EC2-IP>:8080` → amazia-core API
+
+### フェーズ6：エクセルアップロードによる一括登録
 #### 範囲
 - Amazia Console
 - Amazia Core
