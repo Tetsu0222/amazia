@@ -63,16 +63,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: amazia-market ビルド
+      - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install && npm run build
+
+      - name: amazia-market ビルド
         working-directory: amazia-market
+        run: npm install && npm run build
 
       - name: amazia-console Vue ビルド
-        run: npm install && npm run build
         working-directory: amazia-console/resources/vue
+        run: npm install && npm run build
 
       - name: AWSクレデンシャル設定
         uses: aws-actions/configure-aws-credentials@v4
@@ -101,7 +103,7 @@ jobs:
               "cd /home/ssm-user && unzip -o amazia.zip -d amazia",
               "cd /home/ssm-user/amazia && docker-compose down || true",
               "export APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" && cd /home/ssm-user/amazia && APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" docker-compose up --build -d",
-              "sudo cp /home/ssm-user/amazia/nginx/amazia.conf /etc/nginx/conf.d/amazia.conf",
+              "sudo cp /home/ssm-user/amazia/nginx/amazia.conf /etc/nginx/conf.d/amazia.conf && sudo rm -f /etc/nginx/conf.d/default.conf",
               "sudo cp -r /home/ssm-user/amazia/amazia-market/dist/. /var/www/amazia-market/",
               "sudo cp -r /home/ssm-user/amazia/amazia-console/resources/vue/dist/. /var/www/amazia-console/",
               "sudo chown -R nginx:nginx /var/www/amazia-market /var/www/amazia-console",
