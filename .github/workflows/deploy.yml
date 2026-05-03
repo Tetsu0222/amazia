@@ -85,7 +85,7 @@ jobs:
 
       - name: S3にzipをアップロード
         run: |
-          ls amazia-console/resources/vue/dist/ || echo "WARNING: vue dist not found"
+          ls amazia-console/public/vue/ || echo "WARNING: vue dist not found"
           ls amazia-market/dist/ || echo "WARNING: market dist not found"
           zip -r amazia.zip . \
             -x "*.git*" \
@@ -132,7 +132,7 @@ jobs:
             --parameters commands='[
               "sudo cp /home/ssm-user/amazia/nginx/amazia.conf /etc/nginx/conf.d/amazia.conf && sudo rm -f /etc/nginx/conf.d/default.conf",
               "sudo cp -r /home/ssm-user/amazia/amazia-market/dist/. /var/www/amazia-market/",
-              "sudo cp -r /home/ssm-user/amazia/amazia-console/resources/vue/dist/. /var/www/amazia-console/",
+              "sudo cp -r /home/ssm-user/amazia/amazia-console/public/vue/. /var/www/amazia-console/",
               "sudo chown -R nginx:nginx /var/www/amazia-market /var/www/amazia-console",
               "sudo nginx -t && sudo systemctl reload nginx"
             ]' \
