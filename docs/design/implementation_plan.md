@@ -14,7 +14,7 @@
 | Phase 8 | 商品マスタ機能 | 🔲 未着手 | [phase8/](phase8/) |
 | Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 | [phase9/](phase9/) |
 | Phase X-1 | デプロイパイプライン高速化 | 🔲 未着手（随時） | [phaseX/](phaseX/phaseX-1_deploy_optimization.md) |
-| Phase X-2 | デプロイパイプライン再設計 | 🟡 一部完了（④③残） | [phaseX/](phaseX/phaseX-2_deploy_pipeline_redesign.md) |
+| Phase X-2 | デプロイパイプライン再設計 | ✅ 完了（2026-05-03） | [phaseX/](phaseX/phaseX-2_deploy_pipeline_redesign.md) |
 
 ---
 
