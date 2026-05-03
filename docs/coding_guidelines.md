@@ -37,7 +37,7 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 ### 2-1. ユースケース単位でフォルダを切る
 
 ```
-第1層: ユースケースフォルダ（例: CreateProduct / UpdateProduct）
+第1層: ユースケースフォルダ（例: Product / User）
 第2層: Controller / Service / Model / Trait（言語慣習に合わせる）
 第3層: 実ファイル
 ```
@@ -46,7 +46,7 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 
 **PHP の例：**
 ```
-/CreateProduct
+/Product
     /Controller
     /Service
     /Model
@@ -55,7 +55,7 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 
 **Java（Spring）の例：**
 ```
-/CreateProduct
+/Product
     /controller
     /service
     /entity
@@ -64,15 +64,24 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 
 ### 2-2. ユースケースの粒度基準
 
-**NG（粒度が粗い）：** `User`、`Product`（複数操作を含む集約）
+第1層は**ドメイン名（名詞）**、第3層の実ファイルが**ユースケース単位（動詞+名詞）**となる。
 
-**OK（ユースケースとして適切）：**
+**PHP の実例：**
 ```
-RegisterUser / UpdateUserProfile / DeleteUser
-CreateProduct / UpdateProduct / CancelProduct
+/Product
+    /Controller
+        ListProductController.php
+        CreateProductController.php
+        UpdateProductController.php
+        DeleteProductController.php
+    /Service
+        ListProductService.php
+        CreateProductService.php
+        UpdateProductService.php
+        DeleteProductService.php
 ```
 
-ユースケース = 動詞 + 名詞。フォルダ名もこの形式に統一する。
+ファイル名 = 動詞 + ドメイン名。1ファイル1ユースケースを守る。
 
 ### 2-3. Shared の扱い
 

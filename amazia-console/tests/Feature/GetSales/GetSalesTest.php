@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\GetSales;
 
 use Tests\TestCase;
 
-class SalesControllerTest extends TestCase
+class GetSalesTest extends TestCase
 {
     public function test_売上一覧が取得できること(): void
     {

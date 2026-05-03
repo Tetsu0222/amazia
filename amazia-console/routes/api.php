@@ -7,17 +7,17 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::get('/sales', [\App\Http\Controllers\SalesController::class, 'index']);
-Route::get('/sales/inventory', [\App\Http\Controllers\SalesController::class, 'checkInventory']);
+Route::get('/sales',           \App\Sales\Controller\GetSalesController::class);
+Route::get('/sales/inventory', \App\Sales\Controller\GetInventoryController::class);
 
-Route::post('/products/import', [\App\Http\Controllers\ImportController::class, 'importProducts']);
+Route::post('/products/import', \App\Import\Controller\ImportProductController::class);
 
-Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
-Route::get('/admin/products', [\App\Http\Controllers\ProductController::class, 'adminIndex']);
-Route::get('/product-statuses', [\App\Http\Controllers\ProductController::class, 'statuses']);
-Route::get('/products/{id}', [\App\Http\Controllers\ProductController::class, 'show']);
-Route::post('/products', [\App\Http\Controllers\ProductController::class, 'store']);
-Route::put('/products/{id}', [\App\Http\Controllers\ProductController::class, 'update']);
-Route::delete('/products/{id}', [\App\Http\Controllers\ProductController::class, 'destroy']);
-Route::delete('/products', [\App\Http\Controllers\ProductController::class, 'bulkDestroy']);
-Route::patch('/products/bulk-stock', [\App\Http\Controllers\ProductController::class, 'bulkUpdateStock']);
+Route::get('/products',              \App\Product\Controller\ListProductController::class);
+Route::get('/admin/products',        \App\Product\Controller\AdminListProductController::class);
+Route::get('/product-statuses',      \App\Product\Controller\GetProductStatusesController::class);
+Route::get('/products/{id}',         \App\Product\Controller\GetProductController::class);
+Route::post('/products',             \App\Product\Controller\CreateProductController::class);
+Route::put('/products/{id}',         \App\Product\Controller\UpdateProductController::class);
+Route::delete('/products/{id}',      \App\Product\Controller\DeleteProductController::class);
+Route::delete('/products',           \App\Product\Controller\BulkDeleteProductController::class);
+Route::patch('/products/bulk-stock', \App\Product\Controller\BulkUpdateStockController::class);
