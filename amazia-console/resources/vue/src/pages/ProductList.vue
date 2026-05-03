@@ -2,7 +2,26 @@
   <div style="padding: 24px">
     <a-page-header title="商品管理" sub-title="Amazia Console" />
 
-    <div style="margin-bottom: 16px; text-align: right">
+    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
+      <a-space>
+        <a-popconfirm
+          title="選択した商品を削除しますか？"
+          ok-text="削除"
+          cancel-text="キャンセル"
+          :disabled="selectedRowKeys.length === 0"
+          @confirm="handleBulkDelete"
+        >
+          <a-button danger :disabled="selectedRowKeys.length === 0">
+            一括削除（{{ selectedRowKeys.length }}件）
+          </a-button>
+        </a-popconfirm>
+        <a-button
+          :disabled="selectedRowKeys.length === 0"
+          @click="openBulkEditModal"
+        >
+          一括編集（在庫数）
+        </a-button>
+      </a-space>
       <a-space>
         <a-button @click="$router.push('/products/import')">
           一括登録（Excel）
@@ -18,6 +37,7 @@
       :data-source="products"
       :loading="loading"
       row-key="id"
+      :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'price'">
@@ -40,16 +60,49 @@
         </template>
       </template>
     </a-table>
+
+    <!-- 一括編集モーダル -->
+    <a-modal
+      v-model:open="bulkEditVisible"
+      title="在庫数 一括編集"
+      ok-text="保存"
+      cancel-text="キャンセル"
+      :confirm-loading="bulkEditLoading"
+      @ok="handleBulkEditSave"
+    >
+      <a-table
+        :columns="bulkEditColumns"
+        :data-source="bulkEditItems"
+        row-key="id"
+        :pagination="false"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'stock'">
+            <a-input-number
+              v-model:value="record.newStock"
+              :min="0"
+              style="width: 100px"
+            />
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { getProducts, deleteProduct } from '../api/products';
+import { getProducts, deleteProduct, bulkDeleteProducts, bulkUpdateStock } from '../api/products';
 
 const products = ref([]);
 const loading = ref(false);
+const selectedRowKeys = ref([]);
+
+const bulkEditVisible = ref(false);
+const bulkEditLoading = ref(false);
+const bulkEditItems = ref([]);
 
 const columns = [
   { title: 'ID',   dataIndex: 'id',    key: 'id',    width: 80 },
@@ -57,6 +110,12 @@ const columns = [
   { title: '価格',  dataIndex: 'price', key: 'price', width: 140 },
   { title: '在庫数', dataIndex: 'stock', key: 'stock', width: 100 },
   { title: '操作',  key: 'action',      width: 160 },
+];
+
+const bulkEditColumns = [
+  { title: '商品名', dataIndex: 'name', key: 'name' },
+  { title: '現在の在庫', dataIndex: 'stock', key: 'currentStock', width: 120 },
+  { title: '変更後の在庫', key: 'stock', width: 140 },
 ];
 
 const fetchProducts = async () => {
@@ -70,13 +129,52 @@ const fetchProducts = async () => {
   }
 };
 
+const onSelectChange = (keys) => {
+  selectedRowKeys.value = keys;
+};
+
 const handleDelete = async (id) => {
   try {
     await deleteProduct(id);
     message.success('削除しました');
+    selectedRowKeys.value = selectedRowKeys.value.filter(k => k !== id);
     await fetchProducts();
   } catch {
     message.error('削除に失敗しました');
+  }
+};
+
+const handleBulkDelete = async () => {
+  try {
+    await bulkDeleteProducts(selectedRowKeys.value);
+    message.success(`${selectedRowKeys.value.length}件 削除しました`);
+    selectedRowKeys.value = [];
+    await fetchProducts();
+  } catch {
+    message.error('一括削除に失敗しました');
+  }
+};
+
+const openBulkEditModal = () => {
+  bulkEditItems.value = products.value
+    .filter(p => selectedRowKeys.value.includes(p.id))
+    .map(p => ({ ...p, newStock: p.stock }));
+  bulkEditVisible.value = true;
+};
+
+const handleBulkEditSave = async () => {
+  bulkEditLoading.value = true;
+  try {
+    const updates = bulkEditItems.value.map(item => ({ id: item.id, stock: item.newStock }));
+    await bulkUpdateStock(updates);
+    message.success('在庫数を更新しました');
+    bulkEditVisible.value = false;
+    selectedRowKeys.value = [];
+    await fetchProducts();
+  } catch {
+    message.error('一括編集に失敗しました');
+  } finally {
+    bulkEditLoading.value = false;
   }
 };
 

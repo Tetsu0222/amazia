@@ -109,4 +109,42 @@ public class ProductControllerTest {
         mockMvc.perform(delete("/api/products/999"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void 複数商品IDを指定して一括削除できること() throws Exception {
+        String created1 = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品A\",\"description\":\"説明A\",\"price\":1000,\"stock\":100}"))
+                .andReturn().getResponse().getContentAsString();
+        String created2 = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品B\",\"description\":\"説明B\",\"price\":2000,\"stock\":50}"))
+                .andReturn().getResponse().getContentAsString();
+
+        long id1 = Long.parseLong(created1.replaceAll(".*\"id\":(\\d+).*", "$1"));
+        long id2 = Long.parseLong(created2.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(delete("/api/products")
+                .param("ids", id1 + "," + id2))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/products/" + id1)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/products/" + id2)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 一括在庫更新が反映されること() throws Exception {
+        String created = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"商品A\",\"description\":\"説明A\",\"price\":1000,\"stock\":100}"))
+                .andReturn().getResponse().getContentAsString();
+
+        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(patch("/api/products/bulk-stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[{\"id\":" + id + ",\"stock\":999}]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].stock").value(999));
+    }
 }

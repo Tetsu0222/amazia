@@ -142,4 +142,41 @@ class ProductControllerTest extends TestCase
 
         $response->assertStatus(404);
     }
+
+    public function test_一括削除リクエストがCoreのAPIに飛ぶこと(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products*' => Http::response(null, 204),
+        ]);
+
+        $response = $this->deleteJson('/api/products', ['ids' => '1,2,3']);
+
+        $response->assertStatus(204);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'http://localhost:8080/api/products')
+                && $request->method() === 'DELETE';
+        });
+    }
+
+    public function test_一括在庫更新リクエストがCoreのAPIに飛ぶこと(): void
+    {
+        Http::fake([
+            'http://localhost:8080/api/products/bulk-stock' => Http::response([
+                ['id' => 1, 'name' => '商品A', 'price' => 1000, 'stock' => 999],
+            ], 200),
+        ]);
+
+        $response = $this->patchJson('/api/products/bulk-stock', [
+            ['id' => 1, 'stock' => 999],
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['stock' => 999]);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://localhost:8080/api/products/bulk-stock'
+                && $request->method() === 'PATCH';
+        });
+    }
 }

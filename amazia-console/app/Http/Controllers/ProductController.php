@@ -64,4 +64,22 @@ class ProductController extends Controller
 
         return response()->json($response->json(), $response->status());
     }
+
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $request->input('ids');
+        $response = Http::withOptions(['query' => ['ids' => $ids]])->delete($this->coreApiUrl);
+
+        if ($response->status() === 204) {
+            return response()->noContent();
+        }
+
+        return response()->json($response->json(), $response->status());
+    }
+
+    public function bulkUpdateStock(Request $request)
+    {
+        $response = Http::patch("{$this->coreApiUrl}/bulk-stock", $request->all());
+        return response()->json($response->json(), $response->status());
+    }
 }
