@@ -42,7 +42,18 @@ done
 - Actions のログで各ステップの実行状況が確認できるようになった
 - Console UIのdistが正しくEC2に配置された
 
+## 恒久対策（2026-05-03 実施）
+`--build` 除去・コマンド分割・ポーリング待機の対応後も、`docker-compose.yml` に `build:` ディレクティブが残っていたため、ソースコード変更時に `docker-compose up -d` が再ビルドを実行しSSMが再びConnectionLostになった。
+
+根本解決として **DockerイメージのビルドをGitHub Actions側に完全移行し、ECRを経由してEC2へデプロイする構成に変更**した。
+
+変更内容：
+- `docker-compose.yml` の `build:` を `image:` （ECR URL）に変更
+- `deploy.yml` に ECRへのビルド・push ステップを追加
+- EC2上では `docker pull` → `docker-compose up -d` のみ実行（ビルドゼロ）
+- EC2のIAMロールに `AmazonEC2ContainerRegistryReadOnly` を追加
+
 ## 補足
 - SSM send-command のデフォルトタイムアウトは3600秒（1時間）
 - SSMコマンドキューは詰まると後続がすべてブロックされるため、重いコマンドは分割するのが正しい設計
-- EC2上でのDockerビルドはCI/CDのアンチパターン。ビルドはCIサーバー（Actions）で行い、成果物だけをデプロイするのが正しい
+- EC2上でのDockerビルドはCI/CDのアンチパターン。ビルドはCIサーバー（Actions）で行い、イメージをレジストリ（ECR）経由でデプロイするのが正しい
