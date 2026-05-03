@@ -9,7 +9,7 @@
 | Phase 3 | Amaziaの骨格実装（フェーズ1＋2の統合） | ✅ 完了 | [↓ 詳細](#フェーズ3amaziaの骨格実装フェーズ12の統合) |
 | Phase 4 | 商品情報CRUD（Amaziaの基本機能） | ✅ 完了 | [↓ 詳細](#フェーズ4商品情報crudamaziaの基本機能) |
 | Phase 5 | フロントエンドのEC2公開（Nginx） | ✅ 完了 | [↓ 詳細](#フェーズ5フロントエンドのec2公開nginx) |
-| Phase 6 | エクセルアップロードによる一括登録 | ✅ 完了 | [phase6/](phase6/phase6_excel_import.md) |
+| Phase 6 | エクセルアップロードによる一括登録 | ✅ 完了（動作確認済 2026-05-03） | [phase6/](phase6/phase6_excel_import.md) |
 | Phase 7 | 一括削除・一括編集 | 🔲 未着手 | [phase7/](phase7/) |
 | Phase 8 | 商品マスタ機能 | 🔲 未着手 | [phase8/](phase8/) |
 | Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 | [phase9/](phase9/) |
