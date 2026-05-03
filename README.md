@@ -10,7 +10,8 @@
 
 ```
 docs/
-├── architecture.svg          # システムアーキテクチャ図
+├── architecture.svg          # システムアーキテクチャ図（全体構成）
+├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
 ├── analysis/                 # 分析レポート
 │   └── 20260503_trouble_analysis.md
 ├── design/                   # 設計・実装計画
