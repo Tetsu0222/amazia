@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Import\Controller;
+namespace App\Product\Controller;
 
 use App\Http\Controllers\Controller;
-use App\Import\Service\ImportProductService;
+use App\Product\Service\ImportProductService;
 use Illuminate\Http\Request;
 
 class ImportProductController extends Controller

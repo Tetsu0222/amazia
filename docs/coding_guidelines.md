@@ -6,11 +6,7 @@
 
 ## 1. 共通原則
 
-### 1-1. 不要ファイルの削除
-
-呼ばれていないファイルは削除する。コードベースのノイズは AI の推論精度を下げ、人間のレビューコストも増やす。
-
-### 1-2. Controller にビジネスロジックを書かない
+### 1-1. Controller にビジネスロジックを書かない
 
 Controller の責務は「入力受け取り → Service 呼び出し → 出力」のみ。
 
@@ -23,7 +19,7 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 **PHP（Laravel）：** ビジネスロジックは Service に寄せる。Fat Model を避ける。  
 **Java（Spring）：** ビジネスロジックは Service に寄せる。Spring 慣習（by-layer）と整合させる。
 
-### 1-3. バリデーションは config 駆動で共通化
+### 1-2. バリデーションは config 駆動で共通化
 
 独自定義したバリデーションルールを config に記述し、フレームワークのバリデーション機能から参照する。フレームワーク標準機能（Laravel FormRequest / Spring @Valid）を置き換えるのではなく、補完する形で使う。
 
@@ -37,21 +33,62 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
 ### 2-1. ユースケース単位でフォルダを切る
 
 ```
-第1層: ユースケースフォルダ（例: Product / User）
-第2層: Controller / Service / Model / Trait（言語慣習に合わせる）
-第3層: 実ファイル
+上層: ドメイン名（例: Product / User）
+中層: Controller / Service / Model / Trait（言語慣習に合わせる）
+下層: 実ファイル
 ```
 
 これ以上ネストしない。階層が深いほど AI の文脈理解コストが上がる。
 
 **PHP の例：**
 ```
-/Product
-    /Controller
-    /Service
-    /Model
-    config.php
+/app
+    /Product
+        /Controller
+            /実ファイル群
+        /Service
+            /実ファイル群
+        /...
+    /Model(補足1)
+        /Product
+            /実ファイル群
+        /...
+/config
+    /実ファイル群({ドメイン名}.php)
+/resources
+    /vue
+        /features
+            /Product
+                /api
+                    /実ファイル群(js)
+                /pages
+                    /実ファイル群(vue)
+/routes
+    /api
+        /実ファイル群({ドメイン名}.php)
+    /api.php(補足2)
+    /web.php
+    /console.php
+/storage
+    /Product
+        /images
+            /{id} (補足3)
+                /実ファイル群
+        /excles
+            /実ファイル群
+        /...
 ```
+
+**補足**
+- 1.Laravel の慣習に合わせて Model は /app/Models に置くが、中層でドメイン単位にまとめることでユースケースとの関連性を保つ。
+    ※coreでDB接続を行うためモデルを必要とするケースは少ないと想定
+- 2.api.phpでドメインごとの routes を読み込む。
+    require __DIR__.'/api/Product.php'のように明示的な記載を必須とし、自動的に読み込みを行わない。
+    自動読み込みだと「どこで読み込まれているか」を推測する必要があり、文脈理解コストが上がる。
+    人間にとっても“全体像”が一目で分かる。
+- 3.商品画像などのアップロードファイルは、/storage/Product/images/{id}/ のように、DB の ID をフォルダ名として保存する。
+    1レコード＝1フォルダの構造にすることで、ファイル管理がシンプルになる。
+
 
 **Java（Spring）の例：**
 ```
@@ -81,7 +118,12 @@ Controller の責務は「入力受け取り → Service 呼び出し → 出力
         DeleteProductService.php
 ```
 
-ファイル名 = 動詞 + ドメイン名。1ファイル1ユースケースを守る。
+**ルール**
+- 1ファイル = 1ユースケース
+- ファイル名にドメイン名を含める（冗長でもOK）
+    AI が「Product のサービス」を検索しやすくなる。
+    フォルダ名にドメイン名があるので、人間も迷わない。
+
 
 ### 2-3. Shared の扱い
 

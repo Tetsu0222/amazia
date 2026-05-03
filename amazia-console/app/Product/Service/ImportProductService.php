@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Import\Service;
+namespace App\Product\Service;
 
 use Illuminate\Support\Facades\Http;
 use PhpOffice\PhpSpreadsheet\IOFactory;

@@ -7,17 +7,5 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::get('/sales',           \App\Sales\Controller\GetSalesController::class);
-Route::get('/sales/inventory', \App\Sales\Controller\GetInventoryController::class);
-
-Route::post('/products/import', \App\Import\Controller\ImportProductController::class);
-
-Route::get('/products',              \App\Product\Controller\ListProductController::class);
-Route::get('/admin/products',        \App\Product\Controller\AdminListProductController::class);
-Route::get('/product-statuses',      \App\Product\Controller\GetProductStatusesController::class);
-Route::get('/products/{id}',         \App\Product\Controller\GetProductController::class);
-Route::post('/products',             \App\Product\Controller\CreateProductController::class);
-Route::put('/products/{id}',         \App\Product\Controller\UpdateProductController::class);
-Route::delete('/products/{id}',      \App\Product\Controller\DeleteProductController::class);
-Route::delete('/products',           \App\Product\Controller\BulkDeleteProductController::class);
-Route::patch('/products/bulk-stock', \App\Product\Controller\BulkUpdateStockController::class);
+require __DIR__.'/api/Product.php';
+require __DIR__.'/api/Sales.php';
