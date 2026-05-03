@@ -63,6 +63,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: amazia-market ビルド
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && npm run build
+        working-directory: amazia-market
+
+      - name: amazia-console Vue ビルド
+        run: npm install && npm run build
+        working-directory: amazia-console/resources/vue
+
       - name: AWSクレデンシャル設定
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -77,8 +88,7 @@ jobs:
             -x "amazia-core/target/*" \
             -x "amazia-console/vendor/*" \
             -x "amazia-console/resources/vue/node_modules/*" \
-            -x "amazia-market/node_modules/*" \
-            -x "amazia-market/dist/*"
+            -x "amazia-market/node_modules/*"
           aws s3 cp amazia.zip s3://fullstack-renaissance-demo/amazia.zip
 
       - name: EC2でデプロイ実行
@@ -90,6 +100,11 @@ jobs:
               "aws s3 cp s3://fullstack-renaissance-demo/amazia.zip /home/ssm-user/amazia.zip",
               "cd /home/ssm-user && unzip -o amazia.zip -d amazia",
               "cd /home/ssm-user/amazia && docker-compose down || true",
-              "export APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" && cd /home/ssm-user/amazia && APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" docker-compose up --build -d"
+              "export APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" && cd /home/ssm-user/amazia && APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" docker-compose up --build -d",
+              "sudo cp /home/ssm-user/amazia/nginx/amazia.conf /etc/nginx/conf.d/amazia.conf",
+              "sudo cp -r /home/ssm-user/amazia/amazia-market/dist/. /var/www/amazia-market/",
+              "sudo cp -r /home/ssm-user/amazia/amazia-console/resources/vue/dist/. /var/www/amazia-console/",
+              "sudo chown -R nginx:nginx /var/www/amazia-market /var/www/amazia-console",
+              "sudo nginx -t && sudo systemctl reload nginx"
             ]' \
             --region ap-southeast-2
