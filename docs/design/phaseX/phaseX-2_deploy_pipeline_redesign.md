@@ -169,11 +169,15 @@ S3に前バージョンを保持するバージョニングは将来対応とす
     THRESHOLD=$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%S 2>/dev/null \
       || date -u -v-15M +%Y-%m-%dT%H:%M:%S)
 
+    # 注意：JMESPathは && をサポートしないため2段階フィルタで実装する
+    # （--query内で && を使うと構文エラーになる）
     STUCK=$(aws ssm list-commands \
       --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
       --region ap-southeast-2 \
-      --query "length(Commands[?Status=='InProgress' && RequestedDateTime<'${THRESHOLD}'])" \
-      --output text)
+      --query "Commands[?Status=='InProgress']" \
+      --output json \
+      | jq --arg threshold "$THRESHOLD" \
+        '[.[] | select(.RequestedDateTime < $threshold)] | length')
 
     echo "15分超InProgressコマンド数: $STUCK"
 
