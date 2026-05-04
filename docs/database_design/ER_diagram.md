@@ -43,14 +43,14 @@ erDiagram
         TIMESTAMP updated_at
     }
 
-    users ||--o{ sessions : "1:N"
-    users ||--o{ personal_access_tokens : "1:N (Polymorphic)"
+    users ||--o| sessions : "1:N"
+    users ||--o| personal_access_tokens : "1:N (Polymorphic)"
     users ||--o| password_reset_tokens : "1:0..1"
 ```
 
 ## システム：Core
 
-```mermaid
+```
 erDiagram
     products {
         BIGINT id PK
