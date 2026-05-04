@@ -52,14 +52,6 @@ services:
     depends_on:
       - amazia-core
 
-  amazia-market:
-    image: 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-market:latest
-    container_name: amazia-market
-    restart: unless-stopped
-    ports:
-      - "5173:80"
-    depends_on:
-      - amazia-core
 
 volumes:
   mysql_data:
