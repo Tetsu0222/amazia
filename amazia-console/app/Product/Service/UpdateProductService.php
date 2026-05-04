@@ -24,8 +24,6 @@ class UpdateProductService
         return [
             'name'         => $data['name']        ?? null,
             'description'  => $data['description'] ?? null,
-            'price'        => $data['price']        ?? null,
-            'stock'        => $data['stock']        ?? null,
             'statusCode'   => $data['statusCode']   ?? null,
             'publishStart' => $data['publishStart'] ?? null,
             'publishEnd'   => $data['publishEnd']   ?? null,

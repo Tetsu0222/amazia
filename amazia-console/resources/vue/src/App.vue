@@ -13,9 +13,6 @@
         >
           <a-menu-item key="/">商品マスタ</a-menu-item>
           <a-menu-item key="/skus">SKU管理</a-menu-item>
-          <a-menu-item key="/sku-prices">SKU価格管理</a-menu-item>
-          <a-menu-item key="/sku-stocks">SKU在庫管理</a-menu-item>
-          <a-menu-item key="/sku-images">SKU画像管理</a-menu-item>
         </a-menu>
       </a-layout-sider>
       <a-layout>
