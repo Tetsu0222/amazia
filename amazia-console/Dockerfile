@@ -22,4 +22,4 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 EXPOSE 8000
 
 # 起動時に config:cache を実行（環境変数が揃った状態でキャッシュする）
-CMD ["sh", "-c", "php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=8000"]
+CMD ["sh", "-c", "php artisan config:cache && php artisan route:cache && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"]

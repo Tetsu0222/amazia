@@ -50,7 +50,10 @@ services:
       CORE_API_URL: http://amazia-core:8080/api/products
       CORE_BASE_URL: http://amazia-core:8080/api
     depends_on:
-      - amazia-core
+      mysql:
+        condition: service_healthy
+      amazia-core:
+        condition: service_started
 
 volumes:
   mysql_data:
