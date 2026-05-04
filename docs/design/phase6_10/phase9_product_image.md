@@ -2,7 +2,16 @@
 # フェーズ9：商品マスタへの画像登録（複数画像対応・別テーブル版）
 
 ## ステータス
-🔲 未着手
+✅ 完了（2026-05-04）
+
+### 実装済み内容
+- **amazia-core**: ProductImage エンティティ・リポジトリ・API（TDD: JUnit 9件グリーン）
+  - GET /api/products/{id}/images
+  - POST /api/products/{id}/images（PNG・200KB・バリデーション）
+  - PUT /api/product-images/{id}/sort
+  - DELETE /api/product-images/{id}
+- **amazia-console**: 画像アップロードAPI（TDD: PHPUnit 8件グリーン）
+  - Core へのリクエストプロキシ実装
 
 ## 範囲
 - Amazia Console（管理画面）

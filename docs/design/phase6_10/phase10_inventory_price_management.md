@@ -2,7 +2,26 @@
 # フェーズ10：在庫管理・価格管理・SKU対応・商品一覧改修
 
 ## ステータス
-🔲 未着手
+✅ 完了（2026-05-04）
+
+### 実装済み内容
+- **amazia-core**: SKU・価格・在庫エンティティ・API（TDD: JUnit 11件グリーン）
+  - POST /api/products/{id}/skus（SKU登録・重複チェック）
+  - GET /api/products/{id}/skus（SKU一覧）
+  - POST /api/skus/{id}/prices（価格登録）
+  - GET /api/skus/{id}/prices（現行価格取得）
+  - POST /api/skus/{id}/stocks/receive（入荷・加算）
+  - GET /api/skus/{id}/stocks（現在在庫）
+  - GET /api/skus/{id}/stocks/history（入荷履歴）
+- **amazia-console**: SKU管理API（TDD: PHPUnit 11件グリーン）
+  - Core へのリクエストプロキシ・バリデーション実装
+- **amazia-core**: SKU集約API（TDD: JUnit 5件グリーン）
+  - GET /api/products/market（min_price・mainImage・totalStock）
+  - GET /api/products/{id}/market（SKU詳細＋価格＋在庫＋画像）
+  - 在庫0・SKUなし商品は一覧から除外
+- **amazia-market**: SKU対応UI改修（ビルド確認済み）
+  - 商品一覧：カード型・最低価格・SKUメイン画像・在庫表示
+  - 商品詳細：色→サイズのSKU選択UI・価格/在庫チップ・画像サムネイル切り替え
 
 ## 範囲
 - Amazia Console  
