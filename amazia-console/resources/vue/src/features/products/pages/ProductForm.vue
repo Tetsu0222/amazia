@@ -20,24 +20,6 @@
         <a-textarea v-model:value="form.description" :rows="3" placeholder="説明を入力（任意）" />
       </a-form-item>
 
-      <a-form-item label="価格（円）" name="price">
-        <a-input-number
-          v-model:value="form.price"
-          :min="0"
-          style="width: 100%"
-          placeholder="価格を入力"
-        />
-      </a-form-item>
-
-      <a-form-item label="在庫数" name="stock">
-        <a-input-number
-          v-model:value="form.stock"
-          :min="0"
-          style="width: 100%"
-          placeholder="在庫数を入力"
-        />
-      </a-form-item>
-
       <a-form-item label="ステータス" name="statusCode">
         <a-select
           v-model:value="form.statusCode"
@@ -91,6 +73,43 @@
         </a-space>
       </a-form-item>
     </a-form>
+
+    <!-- 画像管理（編集モードのみ） -->
+    <template v-if="isEdit">
+      <a-divider>商品画像</a-divider>
+      <a-form-item label="画像をアップロード（PNG・200KB以下）">
+        <a-upload
+          accept=".png,image/png"
+          :show-upload-list="false"
+          :custom-request="handleImageUpload"
+          :disabled="imageUploading"
+        >
+          <a-button :loading="imageUploading">画像を選択</a-button>
+        </a-upload>
+      </a-form-item>
+      <a-space wrap style="margin-top: 8px">
+        <div
+          v-for="img in images"
+          :key="img.id"
+          style="display: flex; flex-direction: column; align-items: center; gap: 4px"
+        >
+          <div style="position: relative; width: 80px; height: 80px">
+            <img
+              :src="`/storage/Product/images/${img.imagePath}`"
+              style="width: 80px; height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px"
+            />
+            <a-tag
+              v-if="img.sortOrder === 1"
+              color="blue"
+              style="position: absolute; top: 2px; left: 2px; font-size: 10px; padding: 0 4px"
+            >
+              メイン
+            </a-tag>
+          </div>
+          <a-button size="small" danger @click="handleImageDelete(img.id)">削除</a-button>
+        </div>
+      </a-space>
+    </template>
   </div>
 </template>
 
@@ -98,7 +117,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
-import { getProduct, createProduct, updateProduct, getProductStatuses } from '../api/products';
+import {
+  getProduct, createProduct, updateProduct, getProductStatuses,
+  getProductImages, uploadProductImage, deleteProductImage,
+} from '../api/products';
 
 const route = useRoute();
 const router = useRouter();
@@ -106,23 +128,21 @@ const formRef = ref();
 const submitting = ref(false);
 const statuses = ref([]);
 const statusesLoading = ref(false);
+const images = ref([]);
+const imageUploading = ref(false);
 
 const isEdit = computed(() => route.path !== '/products/new');
 
 const form = ref({
   name: '',
   description: '',
-  price: null,
-  stock: null,
   statusCode: null,
   publishStart: null,
   publishEnd: null,
 });
 
 const rules = {
-  name:  [{ required: true, message: '商品名は必須です' }],
-  price: [{ required: true, message: '価格は必須です' }],
-  stock: [{ required: true, message: '在庫数は必須です' }],
+  name: [{ required: true, message: '商品名は必須です' }],
 };
 
 onMounted(async () => {
@@ -141,8 +161,6 @@ onMounted(async () => {
       form.value = {
         name:         product.name,
         description:  product.description ?? '',
-        price:        product.price,
-        stock:        product.stock,
         statusCode:   product.statusCode ?? null,
         publishStart: product.publishStart ?? null,
         publishEnd:   product.publishEnd ?? null,
@@ -151,8 +169,38 @@ onMounted(async () => {
       message.error('商品データの取得に失敗しました');
       router.push('/');
     }
+    await fetchImages();
   }
 });
+
+const fetchImages = async () => {
+  try {
+    images.value = await getProductImages(route.params.id);
+  } catch {
+    message.warning('画像一覧の取得に失敗しました');
+  }
+};
+
+const handleImageUpload = async ({ file }) => {
+  imageUploading.value = true;
+  try {
+    await uploadProductImage(route.params.id, file);
+    await fetchImages();
+  } catch {
+    message.error('画像のアップロードに失敗しました');
+  } finally {
+    imageUploading.value = false;
+  }
+};
+
+const handleImageDelete = async (imageId) => {
+  try {
+    await deleteProductImage(imageId);
+    await fetchImages();
+  } catch {
+    message.error('画像の削除に失敗しました');
+  }
+};
 
 const handleSubmit = async () => {
   submitting.value = true;

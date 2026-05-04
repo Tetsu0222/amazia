@@ -13,3 +13,13 @@ export const deleteProduct    = (id) => client.delete(`/products/${id}`);
 export const bulkDeleteProducts = (ids) => client.delete('/products', { data: { ids: ids.join(',') } });
 export const bulkUpdateStock    = (updates) => client.patch('/products/bulk-stock', updates).then(r => r.data);
 export const getProductStatuses = () => client.get('/product-statuses').then(r => r.data);
+
+export const getProductImages    = (id) => client.get(`/products/${id}/images`).then(r => r.data);
+export const uploadProductImage  = (id, file) => {
+  const form = new FormData();
+  form.append('image', file);
+  return client.post(`/products/${id}/images`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+export const deleteProductImage  = (imageId) => client.delete(`/product-images/${imageId}`);
