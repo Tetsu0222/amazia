@@ -9,10 +9,21 @@
 | Phase 3 | Amaziaの骨格実装（フェーズ1＋2の統合） | ✅ 完了 | [↓ 詳細](#フェーズ3amaziaの骨格実装フェーズ12の統合) |
 | Phase 4 | 商品情報CRUD（Amaziaの基本機能） | ✅ 完了 | [↓ 詳細](#フェーズ4商品情報crudamaziaの基本機能) |
 | Phase 5 | フロントエンドのEC2公開（Nginx） | ✅ 完了 | [↓ 詳細](#フェーズ5フロントエンドのec2公開nginx) |
-| Phase 6 | エクセルアップロードによる一括登録 | ✅ 完了（動作確認済 2026-05-03） | [phase6/](phase6/phase6_excel_import.md) |
-| Phase 7 | 一括削除・一括編集 | ✅ 完了（2026-05-03） | [phase7/](phase7/phase7_bulk_edit_delete.md) |
-| Phase 8 | 商品マスタ機能 | 🔲 未着手 | [phase8/](phase8/) |
-| Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 | [phase9/](phase9/) |
+| Phase 6 | エクセルアップロードによる一括登録 | ✅ 完了（動作確認済 2026-05-03） | [phase6/](phase6_10/phase6_excel_import.md) |
+| Phase 7 | 一括削除・一括編集 | ✅ 完了（2026-05-03） | [phase7/](phase6_10/phase7_bulk_edit_delete.md) |
+| Phase 8 | 商品マスタ機能 | 🔲 未着手 | [phase8/](phase6_10/phase8_product_master.md) |
+| Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 | [phase9/](phase6_10/phase9_product_image.md) |
+| Phase 10 | 在庫管理・価格管理・商品一覧改修 | 🔲 未着手 | [phase10/](phase6_10/phase10_inventory_price_management.md) |
+| Phase 11 | Amazia Console ログイン画面 | 🔲 未着手 | [phase11/](phase11_20/phase11_console_auth.md) |
+| Phase 12 | ワークフロー機能（承認フロー）| 🔲 未着手 | [phase12/](phase11_20/phase12_workflow_approval.md) |
+| Phase 13 | Amazia Market ログイン・会員登録機能 | 🔲 未着手 | [phase13/](phase11_20/phase13_market_auth.md) |
+| Phase 14 | 購入機能 | 🔲 未着手 | [phase14/](phase11_20/phase14_shipping.md) |
+| Phase 15 | 配送管理 | 🔲 未着手 | [phase15/](phase11_20/phase15_delivery_management.md) |
+| Phase 16 | UIデザイン改善 | 🔲 未着手 | [phase16/](phase11_20/phase16_ui_ux_improvement.md) |
+| Phase 17 | バッチ処理 | 🔲 未着手 | [phase17/](phase11_20/phase17_batch_processing.md) |
+| Phase 18 | 問い合わせ機能 | 🔲 未着手 | [phase18/](phase11_20/phase18_inquiry_management.md) |
+| Phase 19 | お知らせ機能 | 🔲 未着手 | [phase19/](phase11_20/phase19_notice_management.md) |
+| Phase 20 | ドキュメント整理 | 🔲 未着手 | [phase20/](phase11_20/phase20_documentation_overhaul.md) |
 | Phase X-1 | デプロイパイプライン高速化 | 🔲 未着手（随時） | [phaseX/](phaseX/phaseX-1_deploy_optimization.md) |
 | Phase X-2 | デプロイパイプライン再設計 | ✅ 完了（2026-05-03） | [phaseX/](phaseX/phaseX-2_deploy_pipeline_redesign.md) |
 

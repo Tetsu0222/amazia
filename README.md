@@ -1,95 +1,26 @@
 # Amazia
 
+## プロジェクト概要（Amazia）
+
+Amazia は、**商品管理・在庫管理・EC フロントを一体化した学習用 EC システム**です。
+React / Vue / Java / PHP といった複数の技術スタックを組み合わせ、
+**実践的なアーキテクチャ設計・CI/CD・AWS 運用を体系的に学ぶこと**を目的としています。
+
+一般的な EC システムと同様に、会員向けサイト（Market）、管理画面（Console）、
+在庫・バッチ処理を担うコアシステム（Core）の 3 つで構成されます。
+
+それぞれが独立した技術で実装されているため、フロントエンド・バックエンド・インフラを横断して学習できるのが特徴です。
+
+なお、技術選定に関しては「色々触ってみたい」という開発者の純粋な欲求が多少にじみ出ていますが、
+構成自体は実務でも通用する堅実なものを意識しています。
+
+Amazia は、**学習・検証・改善を繰り返しながら成長していくプロジェクト**として設計されています。
+
+---
+
 ## アーキテクチャ図
 
 ![アーキテクチャ図](docs/architecture.svg)
-
----
-
-## CI/CD パイプライン
-
-```mermaid
-flowchart TD
-    DEV([開発者]) -->|git push| GH[GitHub\nmain branch]
-
-    GH --> TC[test-core\nmvn clean test\nJUnit]
-    GH --> TP[test-console\nphp artisan test\nPHPUnit]
-    GH --> TM[test-market\nnpm run build\nビルド確認]
-
-    TC --> DJ
-    TP --> DJ
-    TM --> DJ
-
-    subgraph DJ[deploy ジョブ — 全グリーン後]
-        direction TB
-        S1[① docker build amazia-core\n   docker build amazia-console\n   → ECR push]
-        S2[② amazia-market npm build\n   console Vue npm build\n   → dist 生成]
-        S3[③ zip -r amazia.zip\n   → S3 upload]
-        S4["④ SSM send-command ①（ポーリング待機）\nECR login → docker pull\n→ S3 unzip → docker-compose up -d"]
-        S5["⑤ SSM send-command ②（ポーリング待機）\nnginx.conf コピー → dist コピー\n→ nginx reload"]
-        S1 --> S4
-        S2 --> S4
-        S3 --> S4
-        S4 --> S5
-    end
-
-    S1 -->|docker push| ECR[(Amazon ECR\namazia-core:latest\namazia-console:latest)]
-    S3 -->|aws s3 cp| S3B[(Amazon S3\namazia.zip)]
-
-    subgraph EC2[AWS EC2  13.54.203.95 Elastic IP]
-        direction TB
-        NGX[Nginx\n:80 → amazia-market\n:8001 → amazia-console UI]
-        subgraph DC[Docker Compose]
-            CORE[amazia-core\nSpring Boot :8080]
-            CON[amazia-console\nLaravel :8000]
-            DB[(MySQL :3306)]
-            CORE --> DB
-            CON --> DB
-            CON --> CORE
-        end
-        NGX --> DC
-    end
-
-    ECR -->|docker pull| DC
-    S3B -->|unzip| EC2
-    S5 -->|SSM| EC2
-
-    EC2 --> BM([Amazia Market\nhttp://13.54.203.95])
-    EC2 --> BC([Amazia Console UI\nhttp://13.54.203.95:8001])
-    EC2 --> BA([Amazia Core API\nhttp://13.54.203.95:8080])
-```
-
----
-
-## コーディング規約
-
-全システム共通の設計方針・コーディング規約は [docs/coding_guidelines.md](docs/coding_guidelines.md) を参照。
-
-フォルダ構成・責務分離・config 駆動設計・テスト規約について定める。
-
----
-
-## ドキュメントマップ
-
-```
-docs/
-├── coding_guidelines.md      # コーディング規約（全システム共通）
-├── architecture.svg          # システムアーキテクチャ図（全体構成）
-├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
-├── analysis/                 # 分析レポート
-│   └── 20260503_trouble_analysis.md
-├── design/                   # 設計・実装計画
-│   ├── implementation_plan.md    # フェーズ別実装計画（全体）
-│   ├── phase6/               # フェーズ6：Excel一括登録
-│   ├── phase7/               # フェーズ7：一括削除・一括編集
-│   ├── phase8/               # フェーズ8：商品マスタ機能
-│   ├── phase9/               # フェーズ9：商品画像登録
-│   ├── phaseX/               # フェーズX-1：デプロイパイプライン高速化（随時）
-│   └── phaseX/               # フェーズX-2：デプロイパイプライン再設計（完了）
-└── troubles/                 # 不具合記録
-    ├── README.md             # 不具合一覧・再発防止アクション
-    └── 001〜009_*.md         # 個別不具合ドキュメント
-```
 
 ---
 
@@ -134,8 +65,36 @@ Java は型安全性・エコシステム・実行速度・信頼性の面で非
 
 ---
 
-## まとめ
-今回は学習目的で複数技術を採用しています。
+## ドキュメントマップ
+
+```
+docs/
+├── coding_guidelines.md      # コーディング規約（全システム共通）
+├── architecture.svg          # システムアーキテクチャ図（全体構成）
+├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
+├── analysis/                 # 分析レポート
+│   └── 20260503_trouble_analysis.md
+├── design/                   # 設計・実装計画
+│   ├── implementation_plan.md    # フェーズ別実装計画（全体）
+│   ├── phase6_10             # フェーズ6から10のドキュメント ※フェーズ1～5は仮実装のため割愛
+│   ├── phase11_20/           # フェーズ11から20のドキュメント
+│   └── phaseX/               # フェーズX：
+└── troubles/                 # 不具合記録
+    ├── README.md             # 不具合一覧・再発防止アクション
+    └── 001〜009_*.md         # 個別不具合ドキュメント
+```
+
+> 画面遷移図、リポジトリ構成を作成予定
+
+---
+
+## セットアップ手順
+** 工事中 ** 
+
+---
+
+## 環境変数について
+** 工事中 ** 
 
 ---
 
@@ -235,6 +194,60 @@ Java は型安全性・エコシステム・実行速度・信頼性の面で非
 
 ---
 
+## CI/CD パイプライン
+
+```mermaid
+flowchart TD
+    DEV([開発者]) -->|git push| GH[GitHub\nmain branch]
+
+    GH --> TC[test-core\nmvn clean test\nJUnit]
+    GH --> TP[test-console\nphp artisan test\nPHPUnit]
+    GH --> TM[test-market\nnpm run build\nビルド確認]
+
+    TC --> DJ
+    TP --> DJ
+    TM --> DJ
+
+    subgraph DJ[deploy ジョブ — 全グリーン後]
+        direction TB
+        S1[① docker build amazia-core\n   docker build amazia-console\n   → ECR push]
+        S2[② amazia-market npm build\n   console Vue npm build\n   → dist 生成]
+        S3[③ zip -r amazia.zip\n   → S3 upload]
+        S4["④ SSM send-command ①（ポーリング待機）\nECR login → docker pull\n→ S3 unzip → docker-compose up -d"]
+        S5["⑤ SSM send-command ②（ポーリング待機）\nnginx.conf コピー → dist コピー\n→ nginx reload"]
+        S1 --> S4
+        S2 --> S4
+        S3 --> S4
+        S4 --> S5
+    end
+
+    S1 -->|docker push| ECR[(Amazon ECR\namazia-core:latest\namazia-console:latest)]
+    S3 -->|aws s3 cp| S3B[(Amazon S3\namazia.zip)]
+
+    subgraph EC2[AWS EC2  13.54.203.95 Elastic IP]
+        direction TB
+        NGX[Nginx\n:80 → amazia-market\n:8001 → amazia-console UI]
+        subgraph DC[Docker Compose]
+            CORE[amazia-core\nSpring Boot :8080]
+            CON[amazia-console\nLaravel :8000]
+            DB[(MySQL :3306)]
+            CORE --> DB
+            CON --> DB
+            CON --> CORE
+        end
+        NGX --> DC
+    end
+
+    ECR -->|docker pull| DC
+    S3B -->|unzip| EC2
+    S5 -->|SSM| EC2
+
+    EC2 --> BM([Amazia Market\nhttp://13.54.203.95])
+    EC2 --> BC([Amazia Console UI\nhttp://13.54.203.95:8001])
+    EC2 --> BA([Amazia Core API\nhttp://13.54.203.95:8080])
+```
+---
+
 ## 実装計画
 
 フェーズ別の詳細は [docs/design/implementation_plan.md](docs/design/implementation_plan.md) を参照。
@@ -250,5 +263,40 @@ Java は型安全性・エコシステム・実行速度・信頼性の面で非
 | Phase 7 | 一括削除・一括編集 | ✅ 完了 |
 | Phase 8 | 商品マスタ機能 | 🔲 未着手 |
 | Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 |
+| Phase 10 | 在庫管理・価格管理・商品一覧改修 | 🔲 未着手 |
+| Phase 11 | Amazia Console ログイン画面 | 🔲 未着手 |
+| Phase 12 | ワークフロー機能（承認フロー）| 🔲 未着手 |
+| Phase 13 | Amazia Market ログイン・会員登録機能 | 🔲 未着手 |
+| Phase 14 | 購入機能 | 🔲 未着手 |
+| Phase 15 | 配送管理 | 🔲 未着手 |
+| Phase 16 | UIデザイン改善 | 🔲 未着手 |
+| Phase 17 | バッチ処理 | 🔲 未着手 |
+| Phase 18 | 問い合わせ機能 | 🔲 未着手 |
+| Phase 19 | お知らせ機能 | 🔲 未着手 |
+| Phase 20 | ドキュメント整理 | 🔲 未着手 |
 | Phase X-1 | デプロイパイプライン高速化 | 🔲 未着手（随時） |
 | Phase X-2 | デプロイパイプライン再設計 | ✅ 完了 |
+
+---
+
+## コーディング規約
+
+全システム共通の設計方針・コーディング規約は [docs/coding_guidelines.md](docs/coding_guidelines.md) を参照。
+
+フォルダ構成・責務分離・config 駆動設計・テスト規約について定める。
+
+---
+
+## 改善と分析
+
+不具合対応および分析結果をまとめたセクションです。  
+
+不具合に関する情報は[docs/troubles/README.md](docs/troubles/README.md) を参照。
+
+分析内容は[docs/analysis/README.md](docs/analysis/README.md) を参照。
+** 工事中 ** 
+
+---
+
+## トラブルシュート
+** 工事中 ** 
