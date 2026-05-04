@@ -73,12 +73,24 @@ docs/
 ├── architecture.svg          # システムアーキテクチャ図（全体構成）
 ├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
 ├── analysis/                 # 分析レポート
+│   ├── README.md             # 分析一覧インデックス
 │   └── 20260503_trouble_analysis.md
+├── api_design/               # API定義
+│   ├── Console_API.md        # Console API定義
+│   ├── Market_API.md         # Market API定義
+│   └── Core_API.md           # Core API定義
+├── database_design/          # DB設計
+│   ├── README.md             # テーブル一覧インデックス
+│   ├── ER_diagram.md         # ER図
+│   ├── TBL_users.md
+│   ├── TBL_password_reset_tokens.md
+│   ├── TBL_sessions.md
+│   └── TBL_personal_access_tokens.md
 ├── design/                   # 設計・実装計画
 │   ├── implementation_plan.md    # フェーズ別実装計画（全体）
-│   ├── phase6_10             # フェーズ6から10のドキュメント ※フェーズ1～5は仮実装のため割愛
+│   ├── phase6_10/            # フェーズ6から10のドキュメント ※フェーズ1～5は仮実装のため割愛
 │   ├── phase11_20/           # フェーズ11から20のドキュメント
-│   └── phaseX/               # フェーズX：
+│   └── phaseX/               # フェーズX
 └── troubles/                 # 不具合記録
     ├── README.md             # 不具合一覧・再発防止アクション
     └── 001〜009_*.md         # 個別不具合ドキュメント
@@ -100,86 +112,19 @@ docs/
 
 ## DB設計
 
-### productsテーブル（商品マスタ）
-
-| カラム名 | 型 | 説明 |
-|---|---|---|
-| id | BIGINT (PK, AUTO_INCREMENT) | 商品ID |
-| name | VARCHAR(255) | 商品名 |
-| description | TEXT | 商品説明 |
-| created_at | DATETIME | 登録日時 |
-| updated_at | DATETIME | 更新日時 |
-
-### product_pricesテーブル（価格履歴）
-
-価格はスナップショットとして管理。注文時の価格を履歴として保持するため、商品マスタと分離。
-
-| カラム名 | 型 | 説明 |
-|---|---|---|
-| id | BIGINT (PK, AUTO_INCREMENT) | 価格ID |
-| product_id | BIGINT (FK) | 商品ID |
-| price | INT | 価格（円） |
-| valid_from | DATETIME | 有効開始日時 |
-| valid_to | DATETIME | 有効終了日時（NULLは現在有効） |
-
-### product_stocksテーブル（在庫状態）
-
-在庫は「現在の状態」を示すため商品マスタと分離。バッチ処理での在庫操作の影響範囲を最小化。
-
-| カラム名 | 型 | 説明 |
-|---|---|---|
-| id | BIGINT (PK, AUTO_INCREMENT) | 在庫ID |
-| product_id | BIGINT (FK) | 商品ID |
-| stock | INT | 在庫数 |
-| updated_at | DATETIME | 更新日時 |
+テーブル定義書・ER図は [docs/database_design/README.md](docs/database_design/README.md) を参照。
 
 ---
 
-## API定義（Amazia Core）
+## API定義
 
-### 商品情報
+システム別のAPI定義は [docs/api_design/](docs/api_design/) を参照。
 
-| メソッド | エンドポイント | 説明 | レスポンス |
-|---|---|---|---|
-| GET | /api/products | 商品一覧取得 | 200 + 商品リスト |
-| GET | /api/products/{id} | 商品1件取得 | 200 / 404 |
-| POST | /api/products | 商品登録 | 201 + 登録データ |
-| PUT | /api/products/{id} | 商品更新 | 200 + 更新後データ |
-| DELETE | /api/products/{id} | 商品削除 | 204 |
-| POST | /api/products/bulk | 商品一括登録 | 201 + 件数 |
-
-### リクエスト/レスポンス例
-
-**POST /api/products（登録）**
-```json
-// リクエスト
-{
-  "name": "商品A",
-  "description": "商品Aの説明",
-  "price": 1000,
-  "stock": 100
-}
-
-// レスポンス 201
-{
-  "id": 1,
-  "name": "商品A",
-  "description": "商品Aの説明",
-  "price": 1000,
-  "stock": 100,
-  "created_at": "2026-05-03T10:00:00",
-  "updated_at": "2026-05-03T10:00:00"
-}
-```
-
-**GET /api/products（一覧）**
-```json
-// レスポンス 200
-[
-  { "id": 1, "name": "商品A", "price": 1000, "stock": 100 },
-  { "id": 2, "name": "商品B", "price": 2000, "stock": 50 }
-]
-```
+| システム | ファイル |
+|----------|---------|
+| Console | [docs/api_design/Console_API.md](docs/api_design/Console_API.md) |
+| Market | [docs/api_design/Market_API.md](docs/api_design/Market_API.md) |
+| Core | [docs/api_design/Core_API.md](docs/api_design/Core_API.md) |
 
 ---
 
@@ -294,7 +239,6 @@ flowchart TD
 不具合に関する情報は[docs/troubles/README.md](docs/troubles/README.md) を参照。
 
 分析内容は[docs/analysis/README.md](docs/analysis/README.md) を参照。
-** 工事中 ** 
 
 ---
 
