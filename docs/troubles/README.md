@@ -1,6 +1,8 @@
 # 不具合一覧
 
-詳細分析：[20260503_trouble_analysis.md](../analysis/20260503_trouble_analysis.md)
+詳細分析：
+- [20260503_trouble_analysis.md](../analysis/20260503_trouble_analysis.md)（001〜006）
+- [20260504_trouble_analysis.md](../analysis/20260504_trouble_analysis.md)（007〜013）
 
 ## 一覧
 
@@ -12,13 +14,13 @@
 | 004 | [EC2 IP変更によるCORSエラー](004_ec2_ip_changed_after_restart.md) | stop/start後のIP変動でCORS設定が無効化 | ✅ 解決済 | - | ✅ 済 |
 | 005 | [Nginx 403 Forbidden](005_nginx_console_403.md) | Console UIへのアクセスが403を返す | ✅ 解決済 | - | ✅ 済 |
 | 006 | [Composer platform ext missing](006_composer_platform_ext_missing.md) | ローカルでcomposer updateがext-gd/zipエラーで失敗 | ✅ 解決済 | - | ✅ 済 |
-| 007 | [Excel一括インポート 422エラー](007_excel_import_422.md) | Excelアップロード時に422 Unprocessable Content | ✅ 解決済 | - | - |
-| 008 | [EC2再起動後にコンテナが自動起動しない](008_containers_not_restart_after_ec2_reboot.md) | stop/start後にDockerコンテナがExitedのまま→502 | ✅ 解決済 | - | - |
-| 009 | [CORE_BASE_URL未設定による500エラー](009_core_base_url_missing.md) | Phase8デプロイ後に/api/admin/productsが500（環境変数漏れ） | ✅ 解決済 | - | - |
-| 010 | [Market商品未表示](010_market_products_not_displayed.md) | amazia-marketがdocker-compose.ymlに未定義のため商品0件表示 | ✅ 解決済 | - | - |
-| 011 | [Consoleサイドバー未表示](011_console_sidebar_not_displayed.md) | App.vueにレイアウト未実装・SKUルート未登録 | ✅ 解決済 | - | - |
-| 012 | [公開期間がMarketに反映されない](012_publish_period_not_reflected_in_market.md) | ProductFormのprice/stock必須バリデーションで送信不可 | ✅ 解決済 | - | - |
-| 013 | [Console画像登録の導線なし](013_console_image_upload_missing.md) | Phase9でAPI実装済みだがVue UIが未追加 | ✅ 解決済 | - | - |
+| 007 | [Excel一括インポート 422エラー](007_excel_import_422.md) | Excelアップロード時に422 Unprocessable Content | ✅ 解決済 | - | ✅ 済 |
+| 008 | [EC2再起動後にコンテナが自動起動しない](008_containers_not_restart_after_ec2_reboot.md) | stop/start後にDockerコンテナがExitedのまま→502 | ✅ 解決済 | - | ✅ 済 |
+| 009 | [CORE_BASE_URL未設定による500エラー](009_core_base_url_missing.md) | Phase8デプロイ後に/api/admin/productsが500（環境変数漏れ） | ✅ 解決済 | - | ✅ 済 |
+| 010 | [Market商品未表示](010_market_products_not_displayed.md) | amazia-marketがdocker-compose.ymlに未定義のため商品0件表示 | ✅ 解決済 | - | ✅ 済 |
+| 011 | [Consoleサイドバー未表示](011_console_sidebar_not_displayed.md) | App.vueにレイアウト未実装・SKUルート未登録 | ✅ 解決済 | - | ✅ 済 |
+| 012 | [公開期間がMarketに反映されない](012_publish_period_not_reflected_in_market.md) | ProductFormのprice/stock必須バリデーションで送信不可 | ✅ 解決済 | - | ✅ 済 |
+| 013 | [Console画像登録の導線なし](013_console_image_upload_missing.md) | Phase9でAPI実装済みだがVue UIが未追加 | ✅ 解決済 | - | ✅ 済 |
 
 ## 再発防止アクション（未対応）
 
