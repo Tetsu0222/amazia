@@ -220,3 +220,209 @@
 | パス | `/api/user` |
 | 認証 | 要（auth:sanctum） |
 | 説明 | Sanctumトークンで認証済みのユーザー情報を返す |
+
+---
+
+## 商品画像 API
+
+> Console → Core へのリクエストプロキシ。バリデーションは Console 側で実施。
+
+### 商品画像一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/products/{id}/images` |
+| 認証 | 不要 |
+| コントローラー | `App\ProductImage\Controller\ListProductImageController` |
+
+**パスパラメータ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| id | integer | ○ | 商品ID |
+
+**レスポンス例**
+```json
+[
+  { "id": 1, "productId": 1, "imagePath": "1/uuid.png", "sortOrder": 1 }
+]
+```
+
+---
+
+### 商品画像登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/products/{id}/images` |
+| 認証 | 不要 |
+| コントローラー | `App\ProductImage\Controller\CreateProductImageController` |
+| Content-Type | multipart/form-data |
+
+**バリデーション**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| image | file | ○ | PNG のみ・200KB以下 |
+
+---
+
+### 商品画像 sort_order 更新
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PUT |
+| パス | `/api/product-images/{id}/sort` |
+| 認証 | 不要 |
+| コントローラー | `App\ProductImage\Controller\UpdateProductImageSortController` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| sort_order | integer | ○ | 新しい表示順 |
+
+---
+
+### 商品画像削除
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | DELETE |
+| パス | `/api/product-images/{id}` |
+| 認証 | 不要 |
+| コントローラー | `App\ProductImage\Controller\DeleteProductImageController` |
+
+---
+
+## SKU API
+
+> Console → Core へのリクエストプロキシ。バリデーションは Console 側で実施。
+
+### SKU一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/products/{id}/skus` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\ListProductSkuController` |
+
+**レスポンス例**
+```json
+[
+  { "id": 1, "productId": 1, "skuCode": "P1-001", "color": "Red", "size": "M", "status": "active" }
+]
+```
+
+---
+
+### SKU登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/products/{id}/skus` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\CreateProductSkuController` |
+
+**バリデーション**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| color | string | ○ | 色（例：Red） |
+| size | string | ○ | サイズ（例：M） |
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 422 | color・sizeが未指定 |
+| 409 | 同一商品内で color + size が重複 |
+
+---
+
+### SKU現行価格取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/skus/{id}/prices` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\GetProductSkuPriceController` |
+
+**レスポンス例**
+```json
+{ "id": 1, "skuId": 1, "price": 1000, "startDate": "2026-01-01", "endDate": null }
+```
+
+---
+
+### SKU価格登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/skus/{id}/prices` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\CreateProductSkuPriceController` |
+
+**バリデーション**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| price | integer | ○ | 価格（円） |
+| start_date | date | × | 適用開始日 |
+
+---
+
+### SKU現在在庫取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/skus/{id}/stocks` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\GetProductSkuStockController` |
+
+**レスポンス例**
+```json
+{ "skuId": 1, "quantity": 50 }
+```
+
+---
+
+### SKU入荷登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/skus/{id}/stocks/receive` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\ReceiveProductSkuStockController` |
+
+**バリデーション**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| quantity | integer | ○ | 入荷数（1以上） |
+
+---
+
+### SKU在庫履歴取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/skus/{id}/stocks/history` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\GetProductSkuStockHistoryController` |
+
+**レスポンス例**
+```json
+[
+  { "id": 1, "skuId": 1, "type": "receive", "quantity": 50, "createdAt": "2026-01-01T00:00:00" }
+]
+```

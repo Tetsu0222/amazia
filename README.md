@@ -81,11 +81,19 @@ docs/
 │   └── Core_API.md           # Core API定義
 ├── database_design/          # DB設計
 │   ├── README.md             # テーブル一覧インデックス
-│   ├── ER_diagram.md         # ER図
+│   ├── ER_diagram.md         # ER図（Console / Core）
 │   ├── TBL_users.md
 │   ├── TBL_password_reset_tokens.md
 │   ├── TBL_sessions.md
-│   └── TBL_personal_access_tokens.md
+│   ├── TBL_personal_access_tokens.md
+│   ├── TBL_products.md
+│   ├── TBL_product_images.md
+│   ├── TBL_product_skus.md
+│   ├── TBL_product_sku_prices.md
+│   ├── TBL_product_sku_price_history.md
+│   ├── TBL_product_sku_stocks.md
+│   ├── TBL_product_sku_stock_transactions.md
+│   └── TBL_product_sku_images.md
 ├── design/                   # 設計・実装計画
 │   ├── implementation_plan.md    # フェーズ別実装計画（全体）
 │   ├── phase6_10/            # フェーズ6から10のドキュメント ※フェーズ1～5は仮実装のため割愛
@@ -206,9 +214,9 @@ flowchart TD
 | Phase 5 | フロントエンドのEC2公開（Nginx） | ✅ 完了 |
 | Phase 6 | エクセルアップロードによる一括登録 | ✅ 完了 |
 | Phase 7 | 一括削除・一括編集 | ✅ 完了 |
-| Phase 8 | 商品マスタ機能 | 🔲 未着手 |
-| Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 |
-| Phase 10 | 在庫管理・価格管理・商品一覧改修 | 🔲 未着手 |
+| Phase 8 | 商品マスタ機能 | ✅ 完了 |
+| Phase 9 | 商品マスタへの画像登録 | ✅ 完了 |
+| Phase 10 | 在庫管理・価格管理・商品一覧改修 | ✅ 完了 |
 | Phase 11 | Amazia Console ログイン画面 | 🔲 未着手 |
 | Phase 12 | ワークフロー機能（承認フロー）| 🔲 未着手 |
 | Phase 13 | Amazia Market ログイン・会員登録機能 | 🔲 未着手 |
