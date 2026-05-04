@@ -1,5 +1,5 @@
 
-# フェーズ12：ワークフロー機能（承認フロー）
+# フェーズ12：ワークフロー機能（承認フロー）【改訂版 v2】
 
 ## ステータス
 🔲 未着手  
@@ -9,145 +9,153 @@
 - Amazia Core  
 - DB設計
 
-## 機能概要
-- Amazia Console にワークフロー（承認フロー）機能を追加する
-- 一般ユーザーが行う以下の操作は「申請 → 承認 → 反映」のプロセスを必須とする
+---
+
+# 1. 機能概要
+
+- Amazia Console にワークフロー（承認フロー）機能を追加する。
+- 一般ユーザーが行う以下の操作は「申請 → 承認 → 反映」のプロセスを必須とする。
   - 商品の公開
   - 在庫数の変更
   - 価格の変更
-- 管理者は承認権限を持ち、権限者による直接変更はワークフロー不要
+- 管理者以上の権限者は承認権限を持ち、直接変更可能（ワークフロー不要）。
 
-## 機能詳細
+---
 
-### ワークフロー一覧画面（Amazia Console）
-- 申請一覧を表示
-- ステータス別フィルタ（申請中 / 承認済 / 却下 / 取り下げ）
-- 申請内容の詳細確認
-- 承認・却下操作（管理者のみ）
+# 2. ロール定義（改訂）
 
-### ワークフロー対象操作
-- **商品公開**
-  - 一般ユーザー：申請が必要
-  - 管理者：即時反映可能  
-- **在庫数変更**  
-  - 一般ユーザー：申請が必要  
-  - 管理者：即時反映可能  
-- **価格変更**  
-  - 一般ユーザー：申請が必要  
-  - 管理者：即時反映可能  
+| ロール | 承認権限 | 備考 |
+| --- | --- | --- |
+| 一般ユーザー | × | 申請のみ |
+| スーパーバイザー | △ | ステップ1の承認対象 |
+| 管理者 | ○ | ステップ1/2の承認対象 |
+| 上位管理者 | ○ | ステップ2/3の承認対象 |
+| エターナルフォースバイザー | ○ | 全ステップ承認可能 |
 
-### ワークフロー処理フロー
-1. 一般ユーザーが変更を申請
-2. 申請情報テーブルにレコード登録
-3. 管理者が承認または却下
-4. 承認時のみ対象データへ反映
+---
 
-### ロール別権限者
-1. 一般ユーザー：権限無
-2. スーパーバイザー：権限無
-3. 管　理　者：権限有
-4. 上位管理者：権限有
-5. エターナルフォースバイザー：権限有
+# 3. target_role と destination_user_id の関係（新規追記）
 
-#### 制約事項
-- 申請中のレコードは更新不可  
-- 取り下げは「申請者本人」または「権限者」が可能  
-- 権限者（管理者）による変更はワークフローを経由しない
+ワークフローの承認対象は **ロールベース** と **個別ユーザー指定** の両方に対応する。
 
-## ワークフロー状態遷移図（横着）
-### 商品の公開
-1.商品登録(価格やSKU設定など)
-  - 下書き or 申請中
-    - 作成する際に、保存と申請ボタンを用意する。
-    - 保存ボタン⇒下書きとしてただただ保存
-    - 申請ボタン⇒申請先をモーダル画面で表示⇒選択⇒登録
-      - スーパーバイザーを選択
-      - 申請中は更新できない。
-        - 取り下げは申請者と管理者であれば可能
-    - 申請時のレコード登録
-      - workflow_requests_detailに2レコード登録する。
-        - step_number = 1 , step_number = 2 で　2レコード
-        - workflow_requests_idでworkflow_requestsとリレーションする。
-          - 当然、workflow_requestsと1対N
-        - step_number = 1 の申請先idと申請先(和名)は登録する。
-          - step_number = 2 の申請先idと申請先(和名)は空欄で登録
-        - step_number = 1,2　の　承認者idと承認者(和名)を空欄で登録
-        - ワークフロー表示ラベルを和名で持つ(スナップショット)
-          - step_number = 1  "スーパーバイザー："
-          - step_number = 2  "管理者:"
-            - ワークフロー一覧画面の表示に使用する。
-2.承認フェーズOne
-  - ワークフロー一覧画面
-    - ワークフロー単位で表示
-      - 申請先の2レコードを1行の1セルで表示
-      - 承認者の2レコードを1行の1セルで表示
-        - 例(空欄でも表示した方が見通しが良い。)
-          申請先　                    承認者
-           スーパーバイザー：[和名]     スーパーバイザー：
-           管理者:                     管理者:
-  - ワークフロー詳細画面
-    - ワークフローの内容を表示
-      - 承認ボタンと否認ボタンを用意する。
-        - 承認ボタン⇒申請先をモーダル画面で表示⇒選択⇒登録
-          - 管理者を選択
-            - workflow_requests_detailのレコードを更新
-            - step_number = 1 の承認者idと承認者(和名)を更新
-            - step_number = 2 の申請先idと申請先(和名)を更新(Null⇒実値)
-            - step_number = 2 の承認者idと承認者(和名)を空欄のまま
-  - ステータスは申請中のまま
-3.承認フェーズTwo
-  - ワークフロー一覧画面
-    - ワークフロー単位で表示
-  - ワークフロー詳細画面
-    - ワークフローの内容を表示
-      - 承認ボタンと否認ボタンを用意する。
-        - 承認ボタン
-          - ステータスは承認済
-            - workflow_requests_detailのレコードを更新
-            - step_number = 2 の承認者idと承認者(和名)を更新(Null⇒実値)
+| target_role | destination_user_id | 意味 |
+| --- | --- | --- |
+| supervisor | NULL | 「スーパーバイザー全員」が承認対象 |
+| supervisor | 123 | 「ユーザーID=123 のスーパーバイザー」が承認対象 |
+| admin | NULL | 「管理者全員」が承認対象 |
+| admin | 456 | 「ユーザーID=456 の管理者」が承認対象 |
 
-#### まとめ
-▼ 初期登録
-  下書き保存 → workflow_requests は作らない
-  申請 → workflow_requests + detail（2レコード）作成
-  detail.step1.status = pending
-  detail.step2.status = waiting（まだ開始していない）
+### 仕様まとめ
+- **destination_user_id が NULL の場合**  
+  → *target_role に属する全ユーザーが承認対象*
 
-▼ 承認フェーズ1（スーパーバイザー）
-  承認 → detail.step1.status = approved
-  次のステップを pending にする
-  detail.step2.status = pending
-  workflow_requests.status は pending のまま
+- **destination_user_id に値がある場合**  
+  → *そのユーザーのみが承認対象*
 
-▼ 承認フェーズ2（管理者）
-  承認 → detail.step2.status = approved
-  workflow_requests.status = approved
-  承認後の反映処理へ
+これにより、  
+- ロール承認（部署承認）  
+- 個別承認（特定の担当者承認）  
+の両方を実現する。
 
-▼ 否認
-  どの step でも reject されたら
-  workflow_requests.status = rejected
-  detail の該当 step.status = rejected
-  以降の step は waiting のまま
+---
 
-▼ 取り下げ
-  workflow_requests.status = canceled
-  detail の全step.status = canceled
+# 4. ワークフロー対象操作
 
-### 在庫数の変更(ヒューマンエラーや盗人の対応になる)
-step_number = 1：スーパーバイザー
-step_number = 1：管理者
-step_number = 2：上位管理者
-※step_number が同じ場合は「並列」とみなす
+### 商品公開
+- 一般ユーザー：申請必須  
+- 管理者以上：即時反映  
 
-### 価格の変更
-step_number = 1：スーパーバイザー
-step_number = 2：管理者
+### 在庫数変更（改訂）
+- step1（並列）：スーパーバイザー、管理者  
+- step2：上位管理者  
+- 並列ステップの承認条件：  
+  **全員承認で次ステップへ進む**
 
+### 価格変更
+- step1：スーパーバイザー  
+- step2：管理者  
 
-## DB設計（追加）
+---
 
-### workflow_requests テーブル（新規）
+# 5. ワークフロー処理フロー（改訂）
+
+## 5.1 親ステータス定義
+
+| status | 説明 |
+| --- | --- |
+| pending | 承認中 |
+| approved | 全ステップ承認済 |
+| rejected | いずれかのステップで否認 |
+| canceled | 取り下げ |
+
+`completed_at` は **approved / rejected / canceled に遷移した後、反映処理が成功したタイミングでセットする**。
+
+---
+
+## 5.2 ステップステータス定義
+
+| status | 説明 |
+| --- | --- |
+| waiting | まだ開始されていない |
+| pending | 承認待ち |
+| approved | 承認済 |
+| rejected | 否認 |
+| canceled | 親が取り下げられた |
+
+---
+
+## 5.3 並列ステップの否認時の挙動（新規追記）
+
+例：在庫変更の step1（並列）  
+- supervisor（A）  
+- admin（B）
+
+### supervisor が reject した場合
+- A.status = rejected  
+- B.status = **waiting のまま**（承認不要扱い）  
+- workflow_requests.status = rejected  
+- UI 表示例：  
+  - A：否認  
+  - B：承認不要（他ステップで否認済）
+
+### 理由
+- 並列ステップは「全員承認で次へ進む」ため、  
+  **1人でも否認した時点でワークフローは終了**  
+- 他の pending ステップは承認不要となるため waiting のまま固定する。
+
+---
+
+## 5.4 取り下げ
+- 申請者本人 or 権限者が可能  
+- 承認済みステップがあっても取り下げ可能（反映前であれば）  
+- 全 step.status = canceled  
+- workflow_requests.status = canceled  
+- completed_at は反映処理成功後にセット  
+
+---
+
+# 6. 対象データのロック仕様
+
+### ロック対象
+- 対象エンティティ全体をロックする
+
+### ロック方式
+- 楽観ロック（version カラム）  
+- workflow_requests.status = pending の場合は更新不可（409 Conflict）
+
+---
+
+# 7. ワークフロー一覧画面（Amazia Console）
+
+- ステータス別フィルタ（pending / approved / rejected / canceled）
+- 並列ステップは同一 step_number としてまとめて表示
+- 否認済ワークフローでは、未処理ステップを「承認不要」と表示
+
+---
+
+# 8. DB設計（改訂）
+
+## 8.1 workflow_requests
 
 | カラム | 説明 |
 | --- | --- |
@@ -155,28 +163,34 @@ step_number = 2：管理者
 | target_type | product / price / stock |
 | target_id | 対象ID |
 | requested_by | 申請者 |
-| completed_at | 完了日時（NULL＝未完了） |
-| result_type | approved / rejected / canceled |
+| status | pending / approved / rejected / canceled |
+| payload | JSON（差分情報） |
+| completed_at | 完了日時（反映処理成功後） |
 | created_at | 申請日時 |
 | updated_at | 更新日時 |
 
-### workflow_requests_detail テーブル（新規）
+---
+
+## 8.2 workflow_requests_detail
 
 | カラム | 説明 |
 | --- | --- |
+| id | PK |
 | workflow_requests_id | 親ID |
-| step_number | 1, 2 , 3 |
-| target_role | supervisor / admin | 申請先以外でも承認できるようにする拡張を想定 |
-| destination_user_id | 申請先id |
-| destination_name | 申請先名（スナップショット） |
-| approver_user_id | 承認者id |
-| approver_name | 承認者名（スナップショット） |
-| status | pending / approved / rejected / waiting |
+| step_number | 1, 2, 3 |
+| target_role | supervisor / admin / senior_admin / eternal_advisor |
+| destination_user_id | NULL＝ロール全員、値あり＝個別指定 |
+| destination_name | スナップショット |
+| approver_user_id | 承認者ID |
+| approver_name | 承認者名 |
+| status | waiting / pending / approved / rejected / canceled |
 | updated_at | 更新日時 |
 
-※必要に応じて詳細は調整
+---
 
-## JSONスキーマ
+# 9. JSONスキーマ（変更なし）
+
+```json
 {
   "target_type": "product",
   "target_id": 12345,
@@ -198,25 +212,31 @@ step_number = 2：管理者
     "reason": "キャンペーン対応のため"
   }
 }
+```
 
-## 反映方式
-同期でええ
+---
 
-##
+# 10. 反映方式
+- 同期処理  
+- completed_at は **反映処理成功後** にセットする
 
-## 技術検討事項
-- ワークフローの対象操作をどこまで拡張するか  
-- 差分情報の保持形式（JSON / 専用テーブル）  
-- 承認後の反映処理を同期・非同期どちらで行うか  
-- ロール・権限設計（一般 / 管理者 / スーパーバイザーなど）
+---
 
-## TDDテストケース（Amazia Core / JUnit）
-- 申請が workflow_requests に登録されること  
-- 承認時に対象データへ正しく反映されること  
-- 申請中の対象データが更新不可であること  
-- 取り下げが正しく処理されること  
+# 11. 技術検討事項
+- ロール承認と個別承認の両立（今回仕様で対応済）  
+- 並列ステップの否認時の UI 表示  
+- 排他制御（version カラム）  
+- ロールマスタ化  
 
-## TDDテストケース（Amazia Console / PHPUnit）
-- 一般ユーザーが申請すると一覧に表示されること  
-- 管理者が承認・却下できること  
-- 権限者による直接変更がワークフローを経由しないこと  
+---
+
+# 12. TDDテストケース（Amazia Core / JUnit）
+- 並列ステップでの否認時、他ステップが waiting のままになること  
+- completed_at が反映処理成功後にセットされること  
+- target_role + destination_user_id の組み合わせテスト  
+
+---
+
+# 13. TDDテストケース（Amazia Console / PHPUnit）
+- 並列ステップの否認時 UI 表示（承認不要）  
+- ロール承認と個別承認の表示切替  
