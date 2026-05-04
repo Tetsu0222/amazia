@@ -41,7 +41,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'price'">
-          {{ record.price.toLocaleString() }} 円
+          {{ record.price != null ? record.price.toLocaleString() : '-' }} 円
         </template>
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.statusCode)">
