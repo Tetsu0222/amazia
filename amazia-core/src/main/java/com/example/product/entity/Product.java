@@ -2,7 +2,6 @@ package com.example.product.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 
@@ -19,10 +18,8 @@ public class Product {
 
     private String description;
 
-    @NotNull
     private Integer price;
 
-    @NotNull
     private Integer stock;
 
     private String statusCode;

@@ -68,18 +68,17 @@ public class ProductControllerTest {
 
         mockMvc.perform(put("/api/products/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"商品A改\",\"description\":\"説明A改\",\"price\":2000,\"stock\":50}"))
+                .content("{\"name\":\"商品A改\",\"description\":\"説明A改\",\"statusCode\":null,\"publishStart\":null,\"publishEnd\":null}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("商品A改"))
-                .andExpect(jsonPath("$.price").value(2000))
-                .andExpect(jsonPath("$.stock").value(50));
+                .andExpect(jsonPath("$.description").value("説明A改"));
     }
 
     @Test
     void 存在しない商品を更新しようとしたとき404が返ること() throws Exception {
         mockMvc.perform(put("/api/products/999")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"商品X\",\"description\":\"説明X\",\"price\":1000,\"stock\":10}"))
+                .content("{\"name\":\"商品X\",\"description\":\"説明X\"}"))
                 .andExpect(status().isNotFound());
     }
 

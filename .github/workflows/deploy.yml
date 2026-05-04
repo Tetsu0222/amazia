@@ -241,8 +241,9 @@ jobs:
             MARKET=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95 2>/dev/null || echo "000")
             CONSOLE=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95:8001 2>/dev/null || echo "000")
             CORE=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95:8080/api/products 2>/dev/null || echo "000")
-            echo "[$i] market:$MARKET console:$CONSOLE core:$CORE"
-            if [ "$MARKET" = "200" ] && [ "$CONSOLE" = "200" ] && [ "$CORE" = "200" ]; then
+            MARKET_CONTAINER=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95:5173 2>/dev/null || echo "000")
+            echo "[$i] market(nginx):$MARKET console:$CONSOLE core:$CORE market(container):$MARKET_CONTAINER"
+            if [ "$MARKET" = "200" ] && [ "$CONSOLE" = "200" ] && [ "$CORE" = "200" ] && [ "$MARKET_CONTAINER" = "200" ]; then
               echo "全サービス正常応答を確認"
               exit 0
             fi

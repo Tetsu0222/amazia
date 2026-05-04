@@ -24,8 +24,6 @@ public class UpdateProductService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         existing.setName(request.getName());
         existing.setDescription(request.getDescription());
-        existing.setPrice(request.getPrice());
-        existing.setStock(request.getStock());
         existing.setStatusCode(request.getStatusCode());
         existing.setPublishStart(request.getPublishStart());
         existing.setPublishEnd(request.getPublishEnd());
