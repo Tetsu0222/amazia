@@ -1,5 +1,8 @@
 package com.example.product;
 
+import com.example.sku.repository.ProductSkuRepository;
+import com.example.sku.repository.ProductSkuPriceRepository;
+import com.example.sku.repository.ProductSkuStockRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -9,6 +12,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -20,6 +24,15 @@ public class ProductControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ProductSkuRepository skuRepository;
+
+    @Autowired
+    private ProductSkuPriceRepository priceRepository;
+
+    @Autowired
+    private ProductSkuStockRepository stockRepository;
 
     @Test
     void 商品一覧が取得できること() throws Exception {
@@ -102,6 +115,44 @@ public class ProductControllerTest {
     void 存在しない商品を削除しようとしたとき404が返ること() throws Exception {
         mockMvc.perform(delete("/api/products/999"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 商品登録時にデフォルトSKUと価格と在庫が自動生成されること() throws Exception {
+        String created = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"SKU自動生成商品\",\"description\":\"説明\",\"price\":1500,\"stock\":20}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        var skus = skuRepository.findByProductId(id);
+        assertEquals(1, skus.size());
+
+        long skuId = skus.get(0).getId();
+        var price = priceRepository.findBySkuId(skuId);
+        assertTrue(price.isPresent());
+        assertEquals(1500, price.get().getPrice());
+
+        var stock = stockRepository.findBySkuId(skuId);
+        assertTrue(stock.isPresent());
+        assertEquals(20, stock.get().getQuantity());
+    }
+
+    @Test
+    void 商品登録後にMarket一覧APIで商品が取得できること() throws Exception {
+        mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Market表示商品\",\"description\":\"説明\",\"price\":2000,\"stock\":5}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/products/market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].productName").value("Market表示商品"))
+                .andExpect(jsonPath("$[0].minPrice").value(2000))
+                .andExpect(jsonPath("$[0].totalStock").value(5));
     }
 
     @Test
