@@ -75,6 +75,7 @@ public class ProductMasterTest {
 
     @Test
     void 管理者向け商品一覧にSKUサマリーが含まれること() throws Exception {
+        // 商品登録時にデフォルトSKU（price=0, stock=0）が自動生成される
         String productJson = mockMvc.perform(post("/api/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"テスト商品\",\"description\":\"\",\"price\":0,\"stock\":0,\"statusCode\":\"ON_SALE\"}"))
@@ -95,25 +96,26 @@ public class ProductMasterTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"quantity\":50}"));
 
+        // デフォルトSKU(1個) + 手動登録SKU(1個) = 2個
         mockMvc.perform(get("/api/admin/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].skuCount").value(1))
-                .andExpect(jsonPath("$[0].minPrice").value(1980))
+                .andExpect(jsonPath("$[0].skuCount").value(2))
+                .andExpect(jsonPath("$[0].minPrice").value(0))
                 .andExpect(jsonPath("$[0].maxPrice").value(1980))
                 .andExpect(jsonPath("$[0].totalStock").value(50));
     }
 
     @Test
-    void SKU未登録の商品はskuCount0で価格帯nullが返ること() throws Exception {
+    void 商品登録時はデフォルトSKUが1件自動生成されること() throws Exception {
+        // デフォルトSKU自動生成により、SKUなしの商品は登録直後から skuCount=1 になる
         mockMvc.perform(post("/api/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"新商品\",\"description\":\"\",\"price\":0,\"stock\":0,\"statusCode\":\"WAITING\"}"));
 
         mockMvc.perform(get("/api/admin/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].skuCount").value(0))
-                .andExpect(jsonPath("$[0].minPrice").isEmpty())
-                .andExpect(jsonPath("$[0].maxPrice").isEmpty())
+                .andExpect(jsonPath("$[0].skuCount").value(1))
+                .andExpect(jsonPath("$[0].minPrice").value(0))
                 .andExpect(jsonPath("$[0].totalStock").value(0));
     }
 
