@@ -16,6 +16,6 @@ class GetProductSkuPriceService
 
     public function get(int $skuId): Response
     {
-        return Http::get("{$this->coreBaseUrl}/skus/{$skuId}/prices");
+        return Http::timeout(10)->get("{$this->coreBaseUrl}/skus/{$skuId}/prices");
     }
 }

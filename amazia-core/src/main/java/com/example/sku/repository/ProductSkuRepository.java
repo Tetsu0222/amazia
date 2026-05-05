@@ -15,4 +15,6 @@ public interface ProductSkuRepository extends JpaRepository<ProductSku, Long> {
     boolean existsByProductIdAndColorAndSize(Long productId, String color, String size);
 
     Optional<ProductSku> findBySkuCode(String skuCode);
+
+    List<ProductSku> findByProductIdIn(List<Long> productIds);
 }

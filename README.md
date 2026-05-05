@@ -69,6 +69,7 @@ Java は型安全性・エコシステム・実行速度・信頼性の面で非
 
 ```
 docs/
+├── setup.md                  # 環境構築手順（ローカル開発環境）
 ├── coding_guidelines.md      # コーディング規約（全システム共通）
 ├── architecture.svg          # システムアーキテクチャ図（全体構成）
 ├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
@@ -110,19 +111,17 @@ docs/
 
 ## セットアップ手順
 
-### 前提条件
+環境構築の詳細手順は [docs/setup.md](docs/setup.md) を参照。
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) がインストール済みであること
-
-### 起動
+### クイックスタート
 
 ```bash
+# 起動
 docker compose -f docker-compose.local.yml up --build
+
+# 停止
+docker compose -f docker-compose.local.yml down
 ```
-
-初回は `amazia-core` のビルド（Maven の依存解決）に数分かかります。2回目以降はキャッシュが効くため高速です。
-
-### アクセス先
 
 | サービス | URL |
 |---|---|
@@ -130,12 +129,6 @@ docker compose -f docker-compose.local.yml up --build
 | Amazia Console UI（Vue） | http://localhost:5174 |
 | Amazia Console API（Laravel） | http://localhost:8000 |
 | Amazia Core API（Spring Boot） | http://localhost:8080 |
-
-### 停止
-
-```bash
-docker compose -f docker-compose.local.yml down
-```
 
 ---
 

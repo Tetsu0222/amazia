@@ -14,6 +14,9 @@ class GetProductSkuStockController extends Controller
     public function __invoke(Request $request, int $id): JsonResponse
     {
         $response = $this->getProductSkuStockService->getCurrent($id);
+        if ($response->status() === 404) {
+            return response()->json(null, 200);
+        }
         return response()->json($response->json(), $response->status());
     }
 }

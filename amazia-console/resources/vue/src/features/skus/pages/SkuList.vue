@@ -57,7 +57,7 @@
       <template v-if="selectedSkuId">
         <a-divider>選択中のSKU：{{ selectedSkuLabel }}</a-divider>
 
-        <a-tabs>
+        <a-tabs v-model:activeKey="activeTab" @change="onTabChange">
           <!-- 価格管理タブ -->
           <a-tab-pane key="price" tab="価格管理">
             <a-table
@@ -126,7 +126,7 @@
             <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px">
               <div v-for="img in images" :key="img.id" style="position: relative; width: 120px">
                 <img
-                  :src="`/storage/Product/images/${img.imagePath}`"
+                  :src="`/api/skus/${selectedSkuId}/image-file/${img.imagePath.split('/').pop()}`"
                   style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #d9d9d9; border-radius: 4px"
                 />
                 <div style="text-align: center; font-size: 12px; color: #888; margin-top: 4px">
@@ -158,6 +158,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { getProducts } from '../../products/api/products';
 import {
@@ -167,6 +168,7 @@ import {
   getSkuImages, uploadSkuImage,
 } from '../api/skus';
 
+const route = useRoute();
 const products = ref([]);
 const productsLoading = ref(false);
 const skus = ref([]);
@@ -230,14 +232,27 @@ const stockHistoryColumns = [
 const images = ref([]);
 const imageUploading = ref(false);
 
+// タブ
+const activeTab = ref('price');
+const loadedTabs = ref(new Set());
+
 onMounted(async () => {
   productsLoading.value = true;
   try {
     products.value = await getProducts();
   } catch {
     message.warning('商品一覧の取得に失敗しました');
+    return;
   } finally {
     productsLoading.value = false;
+  }
+
+  const initialProductId = route.query.productId
+    ? Number(route.query.productId)
+    : null;
+  if (initialProductId) {
+    selectedProductId.value = initialProductId;
+    await fetchSkus(initialProductId);
   }
 });
 
@@ -265,12 +280,7 @@ const onSkuRowClick = async (record) => {
   selectedSkuId.value = record.id;
   selectedSkuLabel.value = `${record.skuCode}（${record.color} / ${record.size}）`;
   clearSkuDetail();
-  await Promise.all([
-    fetchPrices(record.id),
-    fetchStock(record.id),
-    fetchStockHistory(record.id),
-    fetchImages(record.id),
-  ]);
+  await fetchTabData('price', record.id);
 };
 
 const clearSkuDetail = () => {
@@ -278,6 +288,24 @@ const clearSkuDetail = () => {
   currentStock.value = null;
   stockHistory.value = [];
   images.value = [];
+  activeTab.value = 'price';
+  loadedTabs.value = new Set();
+};
+
+const onTabChange = async (tab) => {
+  await fetchTabData(tab, selectedSkuId.value);
+};
+
+const fetchTabData = async (tab, skuId) => {
+  if (loadedTabs.value.has(tab)) return;
+  if (tab === 'price') {
+    await fetchPrices(skuId);
+  } else if (tab === 'stock') {
+    await Promise.all([fetchStock(skuId), fetchStockHistory(skuId)]);
+  } else if (tab === 'image') {
+    await fetchImages(skuId);
+  }
+  loadedTabs.value.add(tab);
 };
 
 // SKU追加
@@ -300,9 +328,10 @@ const handleSkuSubmit = async () => {
 const fetchPrices = async (skuId) => {
   pricesLoading.value = true;
   try {
-    prices.value = await getSkuPrices(skuId);
+    const data = await getSkuPrices(skuId);
+    prices.value = data ? [data] : [];
   } catch {
-    message.warning('価格一覧の取得に失敗しました');
+    prices.value = [];
   } finally {
     pricesLoading.value = false;
   }
@@ -336,8 +365,9 @@ const fetchStock = async (skuId) => {
 const fetchStockHistory = async (skuId) => {
   stockHistoryLoading.value = true;
   try {
-    stockHistory.value = await getSkuStockHistory(skuId);
+    stockHistory.value = await getSkuStockHistory(skuId) ?? [];
   } catch {
+    stockHistory.value = [];
     message.warning('在庫履歴の取得に失敗しました');
   } finally {
     stockHistoryLoading.value = false;
@@ -362,9 +392,9 @@ const handleStockReceive = async () => {
 // 画像
 const fetchImages = async (skuId) => {
   try {
-    images.value = await getSkuImages(skuId);
+    images.value = await getSkuImages(skuId) ?? [];
   } catch {
-    message.warning('画像一覧の取得に失敗しました');
+    images.value = [];
   }
 };
 

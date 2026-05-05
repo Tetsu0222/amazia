@@ -29,8 +29,7 @@ public class GetProductSkuStockService {
     public ProductSkuStock getCurrent(Long skuId) {
         skuRepository.findById(skuId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "SKUが見つかりません"));
-        return stockRepository.findBySkuId(skuId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "在庫が登録されていません"));
+        return stockRepository.findBySkuId(skuId).orElse(null);
     }
 
     public List<ProductSkuStockTransaction> getHistory(Long skuId) {

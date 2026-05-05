@@ -74,42 +74,6 @@
       </a-form-item>
     </a-form>
 
-    <!-- 画像管理（編集モードのみ） -->
-    <template v-if="isEdit">
-      <a-divider>商品画像</a-divider>
-      <a-form-item label="画像をアップロード（PNG・200KB以下）">
-        <a-upload
-          accept=".png,image/png"
-          :show-upload-list="false"
-          :custom-request="handleImageUpload"
-          :disabled="imageUploading"
-        >
-          <a-button :loading="imageUploading">画像を選択</a-button>
-        </a-upload>
-      </a-form-item>
-      <a-space wrap style="margin-top: 8px">
-        <div
-          v-for="img in images"
-          :key="img.id"
-          style="display: flex; flex-direction: column; align-items: center; gap: 4px"
-        >
-          <div style="position: relative; width: 80px; height: 80px">
-            <img
-              :src="`/storage/Product/images/${img.imagePath}`"
-              style="width: 80px; height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px"
-            />
-            <a-tag
-              v-if="img.sortOrder === 1"
-              color="blue"
-              style="position: absolute; top: 2px; left: 2px; font-size: 10px; padding: 0 4px"
-            >
-              メイン
-            </a-tag>
-          </div>
-          <a-button size="small" danger @click="handleImageDelete(img.id)">削除</a-button>
-        </div>
-      </a-space>
-    </template>
   </div>
 </template>
 
@@ -119,7 +83,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import {
   getProduct, createProduct, updateProduct, getProductStatuses,
-  getProductImages, uploadProductImage, deleteProductImage,
 } from '../api/products';
 
 const route = useRoute();
@@ -128,8 +91,6 @@ const formRef = ref();
 const submitting = ref(false);
 const statuses = ref([]);
 const statusesLoading = ref(false);
-const images = ref([]);
-const imageUploading = ref(false);
 
 const isEdit = computed(() => route.path !== '/products/new');
 
@@ -169,38 +130,8 @@ onMounted(async () => {
       message.error('商品データの取得に失敗しました');
       router.push('/');
     }
-    await fetchImages();
   }
 });
-
-const fetchImages = async () => {
-  try {
-    images.value = await getProductImages(route.params.id);
-  } catch {
-    message.warning('画像一覧の取得に失敗しました');
-  }
-};
-
-const handleImageUpload = async ({ file }) => {
-  imageUploading.value = true;
-  try {
-    await uploadProductImage(route.params.id, file);
-    await fetchImages();
-  } catch {
-    message.error('画像のアップロードに失敗しました');
-  } finally {
-    imageUploading.value = false;
-  }
-};
-
-const handleImageDelete = async (imageId) => {
-  try {
-    await deleteProductImage(imageId);
-    await fetchImages();
-  } catch {
-    message.error('画像の削除に失敗しました');
-  }
-};
 
 const handleSubmit = async () => {
   submitting.value = true;

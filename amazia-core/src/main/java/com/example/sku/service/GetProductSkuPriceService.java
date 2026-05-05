@@ -22,7 +22,6 @@ public class GetProductSkuPriceService {
     public ProductSkuPrice get(Long skuId) {
         skuRepository.findById(skuId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "SKUが見つかりません"));
-        return priceRepository.findBySkuId(skuId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "価格が登録されていません"));
+        return priceRepository.findBySkuId(skuId).orElse(null);
     }
 }

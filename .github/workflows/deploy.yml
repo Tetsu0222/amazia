@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
+    paths:
+      - 'amazia-core/**'
+      - 'amazia-console/**'
+      - 'amazia-market/**'
+      - 'docker-compose.yml'
+      - 'nginx/**'
 
 jobs:
   test-core:

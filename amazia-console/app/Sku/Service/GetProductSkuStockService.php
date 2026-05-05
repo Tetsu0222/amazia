@@ -16,11 +16,11 @@ class GetProductSkuStockService
 
     public function getCurrent(int $skuId): Response
     {
-        return Http::get("{$this->coreBaseUrl}/skus/{$skuId}/stocks");
+        return Http::timeout(10)->get("{$this->coreBaseUrl}/skus/{$skuId}/stocks");
     }
 
     public function getHistory(int $skuId): Response
     {
-        return Http::get("{$this->coreBaseUrl}/skus/{$skuId}/stocks/history");
+        return Http::timeout(10)->get("{$this->coreBaseUrl}/skus/{$skuId}/stocks/history");
     }
 }

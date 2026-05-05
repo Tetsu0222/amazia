@@ -15,12 +15,6 @@
             一括削除（{{ selectedRowKeys.length }}件）
           </a-button>
         </a-popconfirm>
-        <a-button
-          :disabled="selectedRowKeys.length === 0"
-          @click="openBulkEditModal"
-        >
-          一括編集（在庫数）
-        </a-button>
       </a-space>
       <a-space>
         <a-button @click="$router.push('/products/import')">
@@ -38,10 +32,66 @@
       :loading="loading"
       row-key="id"
       :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
+      :expand-row-by-click="true"
+      :expanded-row-keys="expandedRowKeys"
+      @expand="onExpand"
     >
+      <template #expandedRowRender="{ record }">
+        <div style="padding: 8px 0">
+          <a-spin v-if="skuLoadingMap[record.id]" />
+          <template v-else>
+            <a-empty
+              v-if="!skuMap[record.id] || skuMap[record.id].length === 0"
+              description="SKUが登録されていません"
+              :image-style="{ height: '40px' }"
+              style="margin: 8px 0"
+            />
+            <a-table
+              v-else
+              :columns="skuColumns"
+              :data-source="skuMap[record.id]"
+              row-key="id"
+              size="small"
+              :pagination="false"
+              style="margin: 0"
+            >
+              <template #bodyCell="{ column, record: sku }">
+                <template v-if="column.key === 'price'">
+                  {{ sku.price != null ? sku.price.toLocaleString() + ' 円' : '未設定' }}
+                </template>
+                <template v-if="column.key === 'stock'">
+                  {{ sku.stock != null ? sku.stock + ' 個' : '0 個' }}
+                </template>
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="sku.status === 'ACTIVE' ? 'green' : 'default'">
+                    {{ sku.status }}
+                  </a-tag>
+                </template>
+              </template>
+            </a-table>
+          </template>
+        </div>
+      </template>
+
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'skuCount'">
+          <a-badge
+            :count="record.skuCount"
+            :number-style="{ backgroundColor: record.skuCount > 0 ? '#1677ff' : '#d9d9d9' }"
+            show-zero
+          />
+        </template>
         <template v-if="column.key === 'price'">
-          {{ record.price != null ? record.price.toLocaleString() : '-' }} 円
+          <span v-if="record.minPrice == null" style="color: #aaa">未設定</span>
+          <span v-else-if="record.minPrice === record.maxPrice">
+            {{ record.minPrice.toLocaleString() }} 円
+          </span>
+          <span v-else>
+            {{ record.minPrice.toLocaleString() }} 〜 {{ record.maxPrice.toLocaleString() }} 円
+          </span>
+        </template>
+        <template v-if="column.key === 'totalStock'">
+          {{ record.totalStock }} 個
         </template>
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.statusCode)">
@@ -56,14 +106,18 @@
         </template>
         <template v-if="column.key === 'action'">
           <a-space>
-            <a-button size="small" @click="$router.push(`/products/${record.id}/edit`)">
+            <a-button size="small" @click.stop="$router.push(`/products/${record.id}/edit`)">
               編集
+            </a-button>
+            <a-button size="small" @click.stop="$router.push('/skus?productId=' + record.id)">
+              SKU管理
             </a-button>
             <a-popconfirm
               title="削除しますか？"
               ok-text="削除"
               cancel-text="キャンセル"
               @confirm="handleDelete(record.id)"
+              @click.stop
             >
               <a-button size="small" danger>削除</a-button>
             </a-popconfirm>
@@ -71,54 +125,26 @@
         </template>
       </template>
     </a-table>
-
-    <!-- 一括編集モーダル -->
-    <a-modal
-      v-model:open="bulkEditVisible"
-      title="在庫数 一括編集"
-      ok-text="保存"
-      cancel-text="キャンセル"
-      :confirm-loading="bulkEditLoading"
-      @ok="handleBulkEditSave"
-    >
-      <a-table
-        :columns="bulkEditColumns"
-        :data-source="bulkEditItems"
-        row-key="id"
-        :pagination="false"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'stock'">
-            <a-input-number
-              v-model:value="record.newStock"
-              :min="0"
-              style="width: 100px"
-            />
-          </template>
-        </template>
-      </a-table>
-    </a-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { getAdminProducts, deleteProduct, bulkDeleteProducts, bulkUpdateStock } from '../api/products';
+import { getAdminProducts, deleteProduct, bulkDeleteProducts } from '../api/products';
+import { getProductSkus, getSkuPrices, getSkuStock } from '../../skus/api/skus';
 
 const products = ref([]);
 const loading = ref(false);
 const selectedRowKeys = ref([]);
-
-const bulkEditVisible = ref(false);
-const bulkEditLoading = ref(false);
-const bulkEditItems = ref([]);
+const expandedRowKeys = ref([]);
+const skuMap = ref({});
+const skuLoadingMap = ref({});
 
 const STATUS_MAP = {
-  WAITING:     { label: '入荷待',    color: 'default' },
+  WAITING:     { label: '入荷待',     color: 'default' },
   RESERVATION: { label: '予約受付中', color: 'blue' },
-  ON_SALE:     { label: '販売中',    color: 'green' },
+  ON_SALE:     { label: '販売中',     color: 'green' },
 };
 
 const statusLabel = (code) => STATUS_MAP[code]?.label ?? '未設定';
@@ -132,19 +158,23 @@ const isPublished = (product) => {
 };
 
 const columns = [
-  { title: 'ID',     dataIndex: 'id',    key: 'id',        width: 70 },
-  { title: '商品名',  dataIndex: 'name',  key: 'name' },
-  { title: '価格',   dataIndex: 'price', key: 'price',     width: 130 },
-  { title: '在庫数',  dataIndex: 'stock', key: 'stock',     width: 90 },
-  { title: 'ステータス', key: 'status',                      width: 120 },
-  { title: '公開状態', key: 'published',                     width: 100 },
-  { title: '操作',   key: 'action',                         width: 140 },
+  { title: 'ID',       dataIndex: 'id',         key: 'id',         width: 70 },
+  { title: '商品名',   dataIndex: 'name',        key: 'name' },
+  { title: 'SKU数',    key: 'skuCount',                             width: 80 },
+  { title: '価格帯',   key: 'price',                                width: 200 },
+  { title: '合計在庫', key: 'totalStock',                           width: 100 },
+  { title: 'ステータス', key: 'status',                             width: 120 },
+  { title: '公開状態', key: 'published',                            width: 100 },
+  { title: '操作',     key: 'action',                               width: 200 },
 ];
 
-const bulkEditColumns = [
-  { title: '商品名',    dataIndex: 'name',  key: 'name' },
-  { title: '現在の在庫', dataIndex: 'stock', key: 'currentStock', width: 120 },
-  { title: '変更後の在庫', key: 'stock',                          width: 140 },
+const skuColumns = [
+  { title: 'SKUコード', dataIndex: 'skuCode', key: 'skuCode', width: 140 },
+  { title: '色',        dataIndex: 'color',   key: 'color',   width: 80 },
+  { title: 'サイズ',   dataIndex: 'size',    key: 'size',    width: 80 },
+  { title: '価格',      key: 'price',                         width: 120 },
+  { title: '在庫',      key: 'stock',                         width: 100 },
+  { title: 'ステータス', key: 'status',                        width: 100 },
 ];
 
 const fetchProducts = async () => {
@@ -158,6 +188,39 @@ const fetchProducts = async () => {
   }
 };
 
+const onExpand = async (expanded, record) => {
+  if (!expanded) {
+    expandedRowKeys.value = expandedRowKeys.value.filter(k => k !== record.id);
+    return;
+  }
+  expandedRowKeys.value = [...expandedRowKeys.value, record.id];
+  if (skuMap.value[record.id]) return;
+
+  skuLoadingMap.value[record.id] = true;
+  try {
+    const skus = await getProductSkus(record.id);
+    const enriched = await Promise.all(
+      skus.map(async (sku) => {
+        const [priceData, stockData] = await Promise.allSettled([
+          getSkuPrices(sku.id),
+          getSkuStock(sku.id),
+        ]);
+        return {
+          ...sku,
+          price: priceData.status === 'fulfilled' ? priceData.value?.price ?? null : null,
+          stock: stockData.status === 'fulfilled' ? stockData.value?.quantity ?? 0 : 0,
+        };
+      })
+    );
+    skuMap.value = { ...skuMap.value, [record.id]: enriched };
+  } catch {
+    message.warning('SKU情報の取得に失敗しました');
+    skuMap.value = { ...skuMap.value, [record.id]: [] };
+  } finally {
+    skuLoadingMap.value[record.id] = false;
+  }
+};
+
 const onSelectChange = (keys) => {
   selectedRowKeys.value = keys;
 };
@@ -167,6 +230,7 @@ const handleDelete = async (id) => {
     await deleteProduct(id);
     message.success('削除しました');
     selectedRowKeys.value = selectedRowKeys.value.filter(k => k !== id);
+    delete skuMap.value[id];
     await fetchProducts();
   } catch {
     message.error('削除に失敗しました');
@@ -177,33 +241,11 @@ const handleBulkDelete = async () => {
   try {
     await bulkDeleteProducts(selectedRowKeys.value);
     message.success(`${selectedRowKeys.value.length}件 削除しました`);
+    selectedRowKeys.value.forEach(id => delete skuMap.value[id]);
     selectedRowKeys.value = [];
     await fetchProducts();
   } catch {
     message.error('一括削除に失敗しました');
-  }
-};
-
-const openBulkEditModal = () => {
-  bulkEditItems.value = products.value
-    .filter(p => selectedRowKeys.value.includes(p.id))
-    .map(p => ({ ...p, newStock: p.stock }));
-  bulkEditVisible.value = true;
-};
-
-const handleBulkEditSave = async () => {
-  bulkEditLoading.value = true;
-  try {
-    const updates = bulkEditItems.value.map(item => ({ id: item.id, stock: item.newStock }));
-    await bulkUpdateStock(updates);
-    message.success('在庫数を更新しました');
-    bulkEditVisible.value = false;
-    selectedRowKeys.value = [];
-    await fetchProducts();
-  } catch {
-    message.error('一括編集に失敗しました');
-  } finally {
-    bulkEditLoading.value = false;
   }
 };
 

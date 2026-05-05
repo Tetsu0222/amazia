@@ -128,10 +128,11 @@ public class SkuControllerTest {
     }
 
     @Test
-    void 価格未登録のSKUの価格取得は404を返すこと() throws Exception {
+    void 価格未登録のSKUの価格取得は200とnullを返すこと() throws Exception {
         Long skuId = createSku();
         mockMvc.perform(get("/api/skus/{id}/prices", skuId))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
     }
 
     // ─── 在庫 ───────────────────────────────────────────
@@ -169,6 +170,14 @@ public class SkuControllerTest {
         mockMvc.perform(get("/api/skus/{id}/stocks", skuId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quantity").value(100));
+    }
+
+    @Test
+    void 在庫未登録のSKUの在庫取得は200とnullを返すこと() throws Exception {
+        Long skuId = createSku();
+        mockMvc.perform(get("/api/skus/{id}/stocks", skuId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
     }
 
     @Test

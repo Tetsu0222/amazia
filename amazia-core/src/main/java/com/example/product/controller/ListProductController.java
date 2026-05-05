@@ -1,8 +1,9 @@
 package com.example.product.controller;
 
+import com.example.product.dto.ProductAdminSummary;
 import com.example.product.entity.Product;
+import com.example.product.service.AdminListProductService;
 import com.example.product.service.ListProductService;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,9 +13,12 @@ import java.util.List;
 public class ListProductController {
 
     private final ListProductService listProductService;
+    private final AdminListProductService adminListProductService;
 
-    public ListProductController(ListProductService listProductService) {
+    public ListProductController(ListProductService listProductService,
+                                 AdminListProductService adminListProductService) {
         this.listProductService = listProductService;
+        this.adminListProductService = adminListProductService;
     }
 
     @GetMapping("/products")
@@ -23,7 +27,7 @@ public class ListProductController {
     }
 
     @GetMapping("/admin/products")
-    public List<Product> getAll() {
-        return listProductService.getAll();
+    public List<ProductAdminSummary> getAll() {
+        return adminListProductService.getAll();
     }
 }

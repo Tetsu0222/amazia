@@ -74,6 +74,50 @@ public class ProductMasterTest {
     }
 
     @Test
+    void 管理者向け商品一覧にSKUサマリーが含まれること() throws Exception {
+        String productJson = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"テスト商品\",\"description\":\"\",\"price\":0,\"stock\":0,\"statusCode\":\"ON_SALE\"}"))
+                .andReturn().getResponse().getContentAsString();
+        Long productId = Long.parseLong(productJson.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        String skuJson = mockMvc.perform(post("/api/products/{id}/skus", productId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"color\":\"Red\",\"size\":\"M\"}"))
+                .andReturn().getResponse().getContentAsString();
+        Long skuId = Long.parseLong(skuJson.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(post("/api/skus/{id}/prices", skuId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"price\":1980,\"startDate\":\"2026-01-01\"}"));
+
+        mockMvc.perform(post("/api/skus/{id}/stocks/receive", skuId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"quantity\":50}"));
+
+        mockMvc.perform(get("/api/admin/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].skuCount").value(1))
+                .andExpect(jsonPath("$[0].minPrice").value(1980))
+                .andExpect(jsonPath("$[0].maxPrice").value(1980))
+                .andExpect(jsonPath("$[0].totalStock").value(50));
+    }
+
+    @Test
+    void SKU未登録の商品はskuCount0で価格帯nullが返ること() throws Exception {
+        mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"新商品\",\"description\":\"\",\"price\":0,\"stock\":0,\"statusCode\":\"WAITING\"}"));
+
+        mockMvc.perform(get("/api/admin/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].skuCount").value(0))
+                .andExpect(jsonPath("$[0].minPrice").isEmpty())
+                .andExpect(jsonPath("$[0].maxPrice").isEmpty())
+                .andExpect(jsonPath("$[0].totalStock").value(0));
+    }
+
+    @Test
     void ステータスコードが不正な値のとき400が返ること() throws Exception {
         mockMvc.perform(post("/api/products")
                 .contentType(MediaType.APPLICATION_JSON)
