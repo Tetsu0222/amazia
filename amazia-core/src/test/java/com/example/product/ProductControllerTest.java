@@ -3,6 +3,8 @@ package com.example.product;
 import com.example.sku.repository.ProductSkuRepository;
 import com.example.sku.repository.ProductSkuPriceRepository;
 import com.example.sku.repository.ProductSkuStockRepository;
+import com.example.shared.config.TestAwsConfig;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -17,6 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
+@Import(TestAwsConfig.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)

@@ -17,7 +17,7 @@ class AuthenticateJwtTest extends TestCase
         $this->jwtSecret   = config('app.auth.jwt_secret');
     }
 
-    private function makeToken(array $payload, ?string $secret = null): string
+    private function buildToken(array $payload, ?string $secret = null): string
     {
         $secret ??= $this->jwtSecret;
         $header  = base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
@@ -30,7 +30,7 @@ class AuthenticateJwtTest extends TestCase
 
     private function validToken(string $role = 'admin'): string
     {
-        return $this->makeToken([
+        return $this->buildToken([
             'sub'  => '1',
             'role' => $role,
             'iat'  => time(),
@@ -77,7 +77,7 @@ class AuthenticateJwtTest extends TestCase
 
     public function test_期限切れアクセストークンは401(): void
     {
-        $expiredToken = $this->makeToken([
+        $expiredToken = $this->buildToken([
             'sub'  => '1',
             'role' => 'admin',
             'iat'  => time() - 1000,
