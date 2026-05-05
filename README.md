@@ -73,36 +73,11 @@ docs/
 ├── coding_guidelines.md      # コーディング規約（全システム共通）
 ├── architecture.svg          # システムアーキテクチャ図（全体構成）
 ├── cicd_pipeline.svg         # CI/CDパイプライン アーキテクチャ図
-├── analysis/                 # 分析レポート
-│   ├── README.md             # 分析一覧インデックス
-│   └── 20260503_trouble_analysis.md
-├── api_design/               # API定義
-│   ├── Console_API.md        # Console API定義
-│   ├── Market_API.md         # Market API定義
-│   └── Core_API.md           # Core API定義
-├── database_design/          # DB設計
-│   ├── README.md             # テーブル一覧インデックス
-│   ├── ER_diagram.md         # ER図（Console / Core）
-│   ├── TBL_users.md
-│   ├── TBL_password_reset_tokens.md
-│   ├── TBL_sessions.md
-│   ├── TBL_personal_access_tokens.md
-│   ├── TBL_products.md
-│   ├── TBL_product_images.md
-│   ├── TBL_product_skus.md
-│   ├── TBL_product_sku_prices.md
-│   ├── TBL_product_sku_price_history.md
-│   ├── TBL_product_sku_stocks.md
-│   ├── TBL_product_sku_stock_transactions.md
-│   └── TBL_product_sku_images.md
-├── design/                   # 設計・実装計画
-│   ├── implementation_plan.md    # フェーズ別実装計画（全体）
-│   ├── phase6_10/            # フェーズ6から10のドキュメント ※フェーズ1～5は仮実装のため割愛
-│   ├── phase11_20/           # フェーズ11から20のドキュメント
-│   └── phaseX/               # フェーズX
-└── troubles/                 # 不具合記録
-    ├── README.md             # 不具合一覧・再発防止アクション
-    └── 001〜009_*.md         # 個別不具合ドキュメント
+├── analysis/                 # 分析レポート・障害分析まとめ
+├── api_design/               # システム別API定義（Console / Market / Core）
+├── database_design/          # DB設計（ER図・テーブル定義）
+├── design/                   # 設計・フェーズ別実装計画
+└── troubles/                 # 不具合記録・再発防止アクション
 ```
 
 > 画面遷移図、リポジトリ構成を作成予定

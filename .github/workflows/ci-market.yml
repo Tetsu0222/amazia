@@ -24,6 +24,10 @@ jobs:
         working-directory: amazia-market
         run: npm install
 
+      - name: Run tests
+        working-directory: amazia-market
+        run: npm test
+
       - name: Build
         working-directory: amazia-market
         run: npm run build
