@@ -10,6 +10,7 @@ on:
       - 'amazia-market/**'
       - 'docker-compose.yml'
       - 'nginx/**'
+  workflow_dispatch:
 
 jobs:
   test-core:
