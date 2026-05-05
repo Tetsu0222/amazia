@@ -1,0 +1,87 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: amazia-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: amazia
+      MYSQL_USER: amazia
+      MYSQL_PASSWORD: amazia_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  amazia-core:
+    build:
+      context: ./amazia-core
+      dockerfile: Dockerfile
+    container_name: amazia-core
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  amazia-console:
+    build:
+      context: ./amazia-console
+      dockerfile: Dockerfile
+    container_name: amazia-console
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_KEY: ${APP_KEY:-base64:EKpjSK2pqqo9qyW10J/MCkO5b06NnVSXE618mLVN4cY=}
+      APP_DEBUG: "true"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: amazia
+      DB_USERNAME: amazia
+      DB_PASSWORD: amazia_pass
+      CORE_API_URL: http://amazia-core:8080/api/products
+      CORE_BASE_URL: http://amazia-core:8080/api
+    depends_on:
+      mysql:
+        condition: service_healthy
+      amazia-core:
+        condition: service_started
+
+  amazia-market:
+    image: node:20-alpine
+    container_name: amazia-market
+    working_dir: /app
+    volumes:
+      - ./amazia-market:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080/api
+
+  amazia-console-vue:
+    image: node:20-alpine
+    container_name: amazia-console-vue
+    working_dir: /app
+    volumes:
+      - ./amazia-console/resources/vue:/app
+    ports:
+      - "5174:5174"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    environment:
+      VITE_API_BASE: http://localhost:8000
+
+volumes:
+  mysql_data:

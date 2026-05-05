@@ -109,7 +109,33 @@ docs/
 ---
 
 ## セットアップ手順
-** 工事中 ** 
+
+### 前提条件
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) がインストール済みであること
+
+### 起動
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+初回は `amazia-core` のビルド（Maven の依存解決）に数分かかります。2回目以降はキャッシュが効くため高速です。
+
+### アクセス先
+
+| サービス | URL |
+|---|---|
+| Amazia Market（React） | http://localhost:5173 |
+| Amazia Console UI（Vue） | http://localhost:5174 |
+| Amazia Console API（Laravel） | http://localhost:8000 |
+| Amazia Core API（Spring Boot） | http://localhost:8080 |
+
+### 停止
+
+```bash
+docker compose -f docker-compose.local.yml down
+```
 
 ---
 
