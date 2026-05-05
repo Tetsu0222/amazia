@@ -206,10 +206,10 @@ flowchart TD
 | Phase 5 | フロントエンドのEC2公開（Nginx） | ✅ 完了 | [docs/design/phase1_5.md](docs/design/phase1_5.md#フェーズ5フロントエンドのec2公開nginx) |
 | Phase 6 | エクセルアップロードによる一括登録 | ✅ 完了 | [docs/design/phase6_10/phase6_excel_import.md](docs/design/phase6_10/phase6_excel_import.md) |
 | Phase 7 | 一括削除・一括編集 | ✅ 完了 | [docs/design/phase6_10/phase7_bulk_edit_delete.md](docs/design/phase6_10/phase7_bulk_edit_delete.md) |
-| Phase 8 | 商品マスタ機能 | 🔲 未着手 | [docs/design/phase6_10/phase8_product_master.md](docs/design/phase6_10/phase8_product_master.md) |
-| Phase 9 | 商品マスタへの画像登録 | 🔲 未着手 | [docs/design/phase6_10/phase9_product_image.md](docs/design/phase6_10/phase9_product_image.md) |
-| Phase 10 | 在庫管理・価格管理・商品一覧改修 | 🔲 未着手 | [docs/design/phase6_10/phase10_inventory_price_management.md](docs/design/phase6_10/phase10_inventory_price_management.md) |
-| Phase 11 | Amazia Console ログイン画面 | 🔲 未着手 | [docs/design/phase11_20/phase11_console_auth.md](docs/design/phase11_20/phase11_console_auth.md) |
+| Phase 8 | 商品マスタ機能 | ✅ 完了 | [docs/design/phase6_10/phase8_product_master.md](docs/design/phase6_10/phase8_product_master.md) |
+| Phase 9 | 商品マスタへの画像登録 | ✅ 完了 | [docs/design/phase6_10/phase9_product_image.md](docs/design/phase6_10/phase9_product_image.md) |
+| Phase 10 | 在庫管理・価格管理・商品一覧改修 | ✅ 完了 | [docs/design/phase6_10/phase10_inventory_price_management.md](docs/design/phase6_10/phase10_inventory_price_management.md) |
+| Phase 11 | Amazia Console ログイン画面 | 🔄 着手中 | [docs/design/phase11_20/phase11_console_auth.md](docs/design/phase11_20/phase11_console_auth.md) |
 | Phase 12 | ワークフロー機能（承認フロー）| 🔲 未着手 | [docs/design/phase11_20/phase12_workflow_approval.md](docs/design/phase11_20/phase12_workflow_approval.md) |
 | Phase 13 | Amazia Market ログイン・会員登録機能 | 🔲 未着手 | [docs/design/phase11_20/phase13_market_auth.md](docs/design/phase11_20/phase13_market_auth.md) |
 | Phase 14 | 購入機能 | 🔲 未着手 | [docs/design/phase11_20/phase14_shipping.md](docs/design/phase11_20/phase14_shipping.md) |
