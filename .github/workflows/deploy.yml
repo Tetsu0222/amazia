@@ -236,7 +236,11 @@ jobs:
         run: npm install && npm run build
 
       - name: amazia-console Vue ビルド
+        # フェーズX-3: HTTPS（CloudFront）化時は VITE_BASE_PATH=/console/ をセットして
+        # Vue/Vite を /console/ 配下で動かす。Variables/Secrets の HTTPS_ENABLED=true で切替。
         working-directory: amazia-console/resources/vue
+        env:
+          VITE_BASE_PATH: ${{ vars.HTTPS_ENABLED == 'true' && '/console/' || '/' }}
         run: npm install && npm run build
 
       - name: S3にzipをアップロード
@@ -252,19 +256,49 @@ jobs:
           aws s3 cp amazia.zip s3://fullstack-renaissance-demo/amazia.zip
 
       - name: EC2 - Docker停止・ECR pull・Docker起動
+        # フェーズX-3: HTTPS（CloudFront）化時は HTTPS_ENABLED=true を GitHub Variables にセット。
+        # 環境変数で CORS / Cookie Secure / Cookie Domain / Cookie Path / Password Reset URL を切替。
+        env:
+          HTTPS_ENABLED: ${{ vars.HTTPS_ENABLED }}
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN || 'www.amazia-portfolio.dedyn.io' }}
         run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands='[
+          if [ "$HTTPS_ENABLED" = "true" ]; then
+            CORS_ORIGINS="https://${DEPLOY_DOMAIN}"
+            PASSWORD_RESET_URL="https://${DEPLOY_DOMAIN}/console/password/reset/confirm"
+            REFRESH_COOKIE_SECURE="true"
+            REFRESH_COOKIE_DOMAIN="${DEPLOY_DOMAIN}"
+            REFRESH_COOKIE_PATH="/console/api/auth/refresh"
+            SESSION_SECURE_COOKIE="true"
+            SESSION_DOMAIN="${DEPLOY_DOMAIN}"
+          else
+            CORS_ORIGINS="http://13.54.203.95,http://13.54.203.95:5173"
+            PASSWORD_RESET_URL="http://13.54.203.95:8001/password/reset/confirm"
+            REFRESH_COOKIE_SECURE="false"
+            REFRESH_COOKIE_DOMAIN=""
+            REFRESH_COOKIE_PATH="/api/auth/refresh"
+            SESSION_SECURE_COOKIE="false"
+            SESSION_DOMAIN=""
+          fi
+          # SSM の commands 配列は JSON 文字列（ダブルクォート区切り）。
+          # シェル変数を埋め込むため jq で安全にエスケープした上で JSON を組み立てる。
+          # APP_KEY 等の値内のシングルクォートを避けるため、シェル側ではダブルクォートで囲み、
+          # 内部で値内のダブルクォートを使わない構成にする（CORS_ORIGINS にカンマは含まれるが " は含まれない）。
+          UP_CMD="cd /home/ssm-user/amazia && APP_KEY='${{ secrets.LARAVEL_APP_KEY }}' CORS_ALLOWED_ORIGINS='${CORS_ORIGINS}' PASSWORD_RESET_URL='${PASSWORD_RESET_URL}' REFRESH_COOKIE_SECURE='${REFRESH_COOKIE_SECURE}' REFRESH_COOKIE_DOMAIN='${REFRESH_COOKIE_DOMAIN}' REFRESH_COOKIE_PATH='${REFRESH_COOKIE_PATH}' SESSION_SECURE_COOKIE='${SESSION_SECURE_COOKIE}' SESSION_DOMAIN='${SESSION_DOMAIN}' docker-compose up -d --remove-orphans"
+          PARAMS_JSON=$(jq -n --arg up "$UP_CMD" '{
+            commands: [
               "cd /home/ssm-user/amazia && docker-compose down --remove-orphans || true",
               "aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com",
               "docker pull 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-core:latest",
               "docker pull 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-console:latest",
               "aws s3 cp s3://fullstack-renaissance-demo/amazia.zip /home/ssm-user/amazia.zip",
               "cd /home/ssm-user && unzip -o amazia.zip -d amazia",
-              "cd /home/ssm-user/amazia && APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" CORS_ALLOWED_ORIGINS=\"http://13.54.203.95,http://13.54.203.95:5173\" docker-compose up -d --remove-orphans"
-            ]' \
+              $up
+            ]
+          }')
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS_JSON" \
             --region ap-southeast-2 \
             --query "Command.CommandId" --output text)
           echo "CommandId: $COMMAND_ID"
@@ -301,17 +335,30 @@ jobs:
           done
 
       - name: EC2 - Nginx設定とフロントエンド配置
+        # フェーズX-3: HTTPS_ENABLED=true なら CloudFront 経由用設定（amazia.cloudfront.conf）を配置。
+        # それ以外は従来の amazia.conf を配置（直 IP HTTP 動作維持）。
+        env:
+          HTTPS_ENABLED: ${{ vars.HTTPS_ENABLED }}
         run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands='[
-              "sudo cp /home/ssm-user/amazia/nginx/amazia.conf /etc/nginx/conf.d/amazia.conf && sudo rm -f /etc/nginx/conf.d/default.conf",
+          if [ "$HTTPS_ENABLED" = "true" ]; then
+            NGINX_SRC="amazia.cloudfront.conf"
+          else
+            NGINX_SRC="amazia.conf"
+          fi
+          NGINX_CMD="sudo cp /home/ssm-user/amazia/nginx/${NGINX_SRC} /etc/nginx/conf.d/amazia.conf && sudo rm -f /etc/nginx/conf.d/default.conf"
+          PARAMS_JSON=$(jq -n --arg ng "$NGINX_CMD" '{
+            commands: [
+              $ng,
               "sudo cp -r /home/ssm-user/amazia/amazia-market/dist/. /var/www/amazia-market/",
               "sudo cp -r /home/ssm-user/amazia/amazia-console/public/vue/. /var/www/amazia-console/",
               "sudo chown -R nginx:nginx /var/www/amazia-market /var/www/amazia-console",
               "sudo nginx -t && sudo systemctl reload nginx"
-            ]' \
+            ]
+          }')
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS_JSON" \
             --region ap-southeast-2 \
             --query "Command.CommandId" --output text)
           echo "CommandId: $COMMAND_ID"
@@ -348,14 +395,28 @@ jobs:
           done
 
       - name: デプロイ後ヘルスチェック
+        # フェーズX-3: HTTPS_ENABLED=true の場合は CloudFront 経由 URL で確認。
+        # 直 IP HTTP の場合は従来どおり nginx (:80) / console (:8000) / core (:8080) を直叩き。
+        env:
+          HTTPS_ENABLED: ${{ vars.HTTPS_ENABLED }}
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN || 'www.amazia-portfolio.dedyn.io' }}
         run: |
-          echo "サービス応答確認中..."
+          if [ "$HTTPS_ENABLED" = "true" ]; then
+            MARKET_URL="https://${DEPLOY_DOMAIN}/"
+            CONSOLE_URL="https://${DEPLOY_DOMAIN}/console/"
+            CORE_URL="https://${DEPLOY_DOMAIN}/api/products"
+          else
+            MARKET_URL="http://13.54.203.95"
+            CONSOLE_URL="http://13.54.203.95:8000"
+            CORE_URL="http://13.54.203.95:8080/api/products"
+          fi
+          echo "サービス応答確認中... (MARKET=$MARKET_URL CONSOLE=$CONSOLE_URL CORE=$CORE_URL)"
           for i in $(seq 1 36); do
             sleep 10
-            MARKET=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95 2>/dev/null || echo "000")
-            CONSOLE=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95:8000 2>/dev/null || echo "000")
-            CORE=$(curl -s -o /dev/null -w "%{http_code}" http://13.54.203.95:8080/api/products 2>/dev/null || echo "000")
-            echo "[$i] market(nginx):$MARKET console:$CONSOLE core:$CORE"
+            MARKET=$(curl -s -o /dev/null -w "%{http_code}" "$MARKET_URL" 2>/dev/null || echo "000")
+            CONSOLE=$(curl -s -o /dev/null -w "%{http_code}" "$CONSOLE_URL" 2>/dev/null || echo "000")
+            CORE=$(curl -s -o /dev/null -w "%{http_code}" "$CORE_URL" 2>/dev/null || echo "000")
+            echo "[$i] market:$MARKET console:$CONSOLE core:$CORE"
             if [ "$MARKET" = "200" ] && [ "$CONSOLE" = "200" ] && [ "$CORE" = "200" ]; then
               echo "全サービス正常応答を確認"
               exit 0

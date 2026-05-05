@@ -29,6 +29,15 @@ public class RefreshTokenService {
     @Value("${jwt.refresh-ttl}")
     private long refreshTtlSeconds;
 
+    @Value("${refresh-cookie.secure:false}")
+    private boolean refreshCookieSecure;
+
+    @Value("${refresh-cookie.domain:}")
+    private String refreshCookieDomain;
+
+    @Value("${refresh-cookie.path:/api/auth/refresh}")
+    private String refreshCookiePath;
+
     public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, JwtService jwtService) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
@@ -85,7 +94,11 @@ public class RefreshTokenService {
 
         Cookie cookie = new Cookie("refresh_token", raw);
         cookie.setHttpOnly(true);
-        cookie.setPath("/api/auth/refresh");
+        cookie.setPath(refreshCookiePath);
+        cookie.setSecure(refreshCookieSecure);
+        if (!refreshCookieDomain.isBlank()) {
+            cookie.setDomain(refreshCookieDomain);
+        }
         cookie.setMaxAge((int) refreshTtlSeconds);
         httpResponse.addCookie(cookie);
 

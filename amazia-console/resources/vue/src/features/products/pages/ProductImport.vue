@@ -105,7 +105,7 @@ const handleUpload = async () => {
   result.value = null;
 
   try {
-    const response = await axios.post('/api/products/import', formData, {
+    const response = await axios.post(`${import.meta.env.BASE_URL}api/products/import`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     result.value = response.data;

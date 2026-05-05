@@ -7,6 +7,7 @@ import com.example.auth.repository.RoleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -33,6 +34,10 @@ class LoginControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired UserRepository userRepository;
     @Autowired RoleRepository roleRepository;
+
+    @Value("${refresh-cookie.path}") String refreshCookiePath;
+    @Value("${refresh-cookie.secure}") boolean refreshCookieSecure;
+    @Value("${refresh-cookie.domain:}") String refreshCookieDomain;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
@@ -87,6 +92,22 @@ class LoginControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(cookie().exists("refresh_token"))
                 .andExpect(cookie().httpOnly("refresh_token", true));
+    }
+
+    @Test
+    void リフレッシュトークンCookieのPathSecureDomainがconfig値どおりに反映されること() throws Exception {
+        createUser("cookieattr@example.com", "Pass@1234", true, 0, null);
+
+        var resultActions = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"cookieattr@example.com\",\"password\":\"Pass@1234\"}"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().path("refresh_token", refreshCookiePath))
+                .andExpect(cookie().secure("refresh_token", refreshCookieSecure));
+
+        if (!refreshCookieDomain.isBlank()) {
+            resultActions.andExpect(cookie().domain("refresh_token", refreshCookieDomain));
+        }
     }
 
     // --- 異常系: 認証失敗 ---

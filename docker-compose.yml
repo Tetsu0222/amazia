@@ -32,6 +32,11 @@ services:
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-1209600}
       AWS_SES_FROM_ADDRESS: ${AWS_SES_FROM_ADDRESS:-no-reply@amazia.example.com}
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:5173/password/reset/confirm}
+      # フェーズX-3: HTTPS（CloudFront）化に伴う Refresh Token Cookie 設定
+      # 平文 HTTP のままなら全て既定値（false / 空 / /api/auth/refresh）でよい
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
+      REFRESH_COOKIE_DOMAIN: ${REFRESH_COOKIE_DOMAIN:-}
+      REFRESH_COOKIE_PATH: ${REFRESH_COOKIE_PATH:-/api/auth/refresh}
     depends_on:
       mysql:
         condition: service_healthy
@@ -55,6 +60,10 @@ services:
       CORE_API_URL: http://amazia-core:8080/api/products
       CORE_BASE_URL: http://amazia-core:8080/api
       JWT_SECRET: ${JWT_SECRET}
+      # フェーズX-3: HTTPS（CloudFront）化に伴う Laravel セッション Cookie 設定
+      # 平文 HTTP 運用なら未設定（false / 空）でよい
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
+      SESSION_DOMAIN: ${SESSION_DOMAIN:-}
     depends_on:
       mysql:
         condition: service_healthy

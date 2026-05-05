@@ -4,7 +4,9 @@ import { authStore } from '../../../stores/authStore.js';
 // axios.create() を使わず axios 本体を使うことで defaults.headers.common が確実に反映される
 // baseURL はリクエスト時に手動で付加する
 
-const BASE = '/api';
+// Vite の base（'/' or '/console/'）に追従。BASE_URL は末尾 '/' で来るので
+// 'api' を連結すると '/api' or '/console/api' になる。
+const BASE = `${import.meta.env.BASE_URL}api`;
 
 function req(method, path, data, config) {
   const token = localStorage.getItem('accessToken');
@@ -23,7 +25,7 @@ function req(method, path, data, config) {
           return axios({ ...err.config, headers: { ...err.config.headers, Authorization: `Bearer ${newToken}` } });
         } catch {
           authStore.clear();
-          window.location.href = '/login';
+          window.location.href = `${import.meta.env.BASE_URL}login`;
         }
       }
       return Promise.reject(err);

@@ -27,6 +27,19 @@
 
 ---
 
+## 着手前提条件
+
+時系列フェーズ非依存だが、**インフラ変更の同時並行は切り分けを困難にする** ため、以下の順序で進める。
+
+- [phaseX-3（HTTPS 化）](phaseX-3_https_via_cloudfront.md) と並行着手しない
+- phaseX-3 の動作確認が完了し、HTTPS 経由で Market/Console/Spring が安定している状態を確認してから着手する
+- 万一 phaseX-3 を保留とする判断になった場合は、phaseX-4 を先行してよい（その場合は本フェーズ完了後に phaseX-3 へ進む）
+
+理由：t3.micro 戻し → OOM 発生時、原因が JVM ヒープ不足なのか CloudFront 経由のリクエスト増なのか、
+同時に変更すると判別できなくなる。
+
+---
+
 ## 設計判断のサマリ
 
 | 項目 | 現状（t3.small 一時運用） | 本フェーズの判断 | 判断理由 |
@@ -49,8 +62,8 @@
 | 2 | Spring Heap 制限の追加 | docker-compose.yml | `amazia-core` に `JAVA_TOOL_OPTIONS=-Xmx384m -Xss256k` を環境変数で渡す |
 | 3 | Swap 2GB のセットアップスクリプト整備 | EC2 | `/swapfile` を作成し `/etc/fstab` に永続化 |
 | 4 | t3.small で動作確認 | 全体 | Heap 制限と Swap が効いていることを確認、4 ポート 200 |
-| 5 | t3.micro に戻して再検証 | AWS / EC2 | インスタンスタイプ変更 → 起動 → 動作確認 |
-| 6 | 負荷試験（軽負荷で OOM が出ないか） | EC2 | `ab` か `curl` ループで 1 分間アクセスして安定性を見る |
+| 5 | t3.micro に戻して再検証 | AWS / EC2 | スキーマ健全性チェック → インスタンスタイプ変更 → 起動 → 再チェック → CD 経路確認 |
+| 6 | 負荷試験（軽負荷で OOM が出ないか） | EC2 | 3 経路（Spring/Console/Market）に `curl` ループで 1 分間アクセスして安定性を見る |
 | 7 | 設計書・トラブルドキュメント更新 | docs | 029 §再発防止に「phaseX-4 完了」と記録、本書のステータスを ✅ に |
 
 ---
@@ -72,20 +85,40 @@ docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"
 
 ### ステップ 2：Spring Heap 制限の追加
 
-`docker-compose.yml` の `amazia-core` セクションに以下を追加：
+[`docker-compose.yml`](../../../docker-compose.yml) の `amazia-core` サービスに環境変数を 1 行追加する。
+追加位置は `SPRING_PROFILES_ACTIVE` の直下（`environment:` ブロック先頭）。
+
+**変更前（[docker-compose.yml:27-34](../../../docker-compose.yml#L27-L34)）：**
 
 ```yaml
-amazia-core:
-  image: ...
-  environment:
-    SPRING_PROFILES_ACTIVE: dev
-    JAVA_TOOL_OPTIONS: "-Xmx384m -Xss256k -XX:MaxMetaspaceSize=128m"
-    # ...既存の環境変数
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-1209600}
+      AWS_SES_FROM_ADDRESS: ${AWS_SES_FROM_ADDRESS:-no-reply@amazia.example.com}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:5173/password/reset/confirm}
 ```
 
-**留意：** `JAVA_TOOL_OPTIONS` は JVM が自動で読み込む環境変数。Dockerfile の ENTRYPOINT を
-変更せずに済む。`-Xss256k` はスレッドスタックサイズの抑制（デフォルト 1MB）、
-`-XX:MaxMetaspaceSize=128m` はクラスメタデータ領域の上限。
+**変更後：**
+
+```yaml
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      JAVA_TOOL_OPTIONS: "-Xmx384m -Xss256k -XX:MaxMetaspaceSize=128m"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-1209600}
+      AWS_SES_FROM_ADDRESS: ${AWS_SES_FROM_ADDRESS:-no-reply@amazia.example.com}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:5173/password/reset/confirm}
+```
+
+**留意：**
+- `JAVA_TOOL_OPTIONS` は JVM が自動で読み込む環境変数。[Dockerfile:14](../../../amazia-core/Dockerfile#L14) の `ENTRYPOINT` を変更せずに済む
+- `-Xss256k` はスレッドスタックサイズの抑制（デフォルト 1MB）、`-XX:MaxMetaspaceSize=128m` はクラスメタデータ領域の上限
+- `JWT_SECRET` 等の既存変数は **絶対に削除しない**（[トラブル029 原因2](../../troubles/029_compose_plugin_lost_and_users_schema_drift.md) で `.env` 不在によるバグが発生済み）
 
 ---
 
@@ -128,6 +161,31 @@ docker stats --no-stream amazia-core
 
 ### ステップ 5：t3.micro に戻して再検証
 
+#### 5-1. 停止前のスキーマ健全性チェック（必須）
+
+[トラブル029 原因3](../../troubles/029_compose_plugin_lost_and_users_schema_drift.md) で
+ALTER 直打ちによる応急処置（業務カラムの手動追加）を行ったため、現状の mysql volume には
+migration ファイルにない状態が残存している。インスタンス停止 → 起動の前後で同じ状態が維持されて
+いることを保証するため、停止前に以下を記録する。
+
+```bash
+# Session Manager 経由で実行
+docker exec amazia-mysql mysql -uroot -proot_pass amazia -e "
+  SHOW TABLES;
+  SHOW COLUMNS FROM users;
+  SELECT COUNT(*) AS roles_cnt FROM roles;
+  SELECT COUNT(*) AS perms_cnt FROM permissions;
+  SELECT COUNT(*) AS rp_cnt FROM role_permissions;
+"
+# 期待値：
+#   - users に employee_id / password_hash / role_id / active_flag / failed_attempts / locked_until が存在
+#   - roles / permissions / role_permissions テーブルが存在しレコードあり
+```
+
+出力をテキストとして保存しておき、5-4 の起動後チェックと突き合わせる。
+
+#### 5-2. インスタンスタイプ変更
+
 ```bash
 # 1. EC2 停止
 aws ec2 stop-instances --instance-ids i-024a0748df78fc93e --region ap-southeast-2
@@ -138,28 +196,79 @@ aws ec2 modify-instance-attribute --instance-id i-024a0748df78fc93e \
 
 # 3. 起動
 aws ec2 start-instances --instance-ids i-024a0748df78fc93e --region ap-southeast-2
+```
 
-# 4. SSM Online 待機後、Session Manager で接続して全コンテナ Up を確認
+#### 5-3. 起動後の基本確認
+
+```bash
+# SSM Online 待機後、Session Manager で接続
+docker compose ps                 # 3 コンテナとも Up、mysql は (healthy)
+docker compose logs amazia-core | tail -50  # JAVA_TOOL_OPTIONS が認識されているか
+free -m && swapon --show          # Swap 2GB が有効
+```
+
+#### 5-4. スキーマ健全性の再チェック（5-1 と突き合わせ）
+
+```bash
+docker exec amazia-mysql mysql -uroot -proot_pass amazia -e "
+  SHOW TABLES;
+  SHOW COLUMNS FROM users;
+  SELECT COUNT(*) AS roles_cnt FROM roles;
+"
+# 5-1 の出力と完全一致することを確認。
+# 不一致なら mysql volume の状態崩れが起きている → 復旧を最優先
+# （[トラブル029 §修正内容 3-4](../../troubles/029_compose_plugin_lost_and_users_schema_drift.md) を再適用）
+```
+
+#### 5-5. CD 経路でも JAVA_TOOL_OPTIONS が維持されることの確認
+
+[deploy.yml:266](../../../.github/workflows/deploy.yml#L266) の SSM 経由 `docker-compose up -d`
+が走った後も `JAVA_TOOL_OPTIONS` が効いていることを確認する。
+
+```bash
+# 任意のコミットを main に push して CD を走らせ、デプロイ完了後に
+docker exec amazia-core ps -ef | grep java
+# → java -jar app.jar の引数または環境にオプションが反映されていること
+docker exec amazia-core sh -c 'echo $JAVA_TOOL_OPTIONS'
+# → "-Xmx384m -Xss256k -XX:MaxMetaspaceSize=128m"
 ```
 
 ---
 
 ### ステップ 6：軽負荷試験
 
-```bash
-# /api/products に 60 秒間アクセス
-for i in $(seq 1 60); do
-  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/api/products
-  sleep 1
-done
+Spring 単体だけでなく、Console（Laravel）/ Market 経由のメモリ圧も含めて測定する。
+[トラブル029 §検証](../../troubles/029_compose_plugin_lost_and_users_schema_drift.md) で
+動作確認した 4 ポート構成に合わせる。
 
-# 並行してメモリと swap を監視
-watch -n 2 "free -m && echo --- && docker stats --no-stream"
+```bash
+# 端末 A：3 経路を同時に 60 秒間叩く（外部 IP は EIP 13.54.203.95）
+HOST=13.54.203.95
+for i in $(seq 1 60); do
+  curl -s -o /dev/null -w "core=%{http_code} "    http://$HOST:8080/api/products
+  curl -s -o /dev/null -w "console=%{http_code} " http://$HOST:8000/
+  curl -s -o /dev/null -w "market=%{http_code}\n" http://$HOST/
+  sleep 1
+done | tee /tmp/load_test.log
+```
+
+```bash
+# 端末 B：並行してメモリ・swap・コンテナ状態を監視
+watch -n 2 "free -m && echo --- && docker stats --no-stream && echo --- && docker compose ps"
 ```
 
 **判定：**
-- 全リクエスト 200 が返り続け、Swap が 500MB 以下で安定 → ✅ t3.micro 運用可能
-- OOM Killer 発動・コンテナが Restarting に入る → ❌ t3.small 維持を選択（A 案恒久化）
+
+| 条件 | 結果 |
+|------|------|
+| 全 180 リクエスト（3 経路 × 60 回）が 200 を返し続ける | ✅ 必須 |
+| Swap 使用量が 500MB 以下で安定 | ✅ 必須 |
+| amazia-core のメモリが 500MB 前後で頭打ち | ✅ 期待値 |
+| `docker compose ps` で Restarting が発生しない | ✅ 必須 |
+| OOM Killer 発動（`dmesg | grep -i oom`）・コンテナが Restarting に入る | ❌ → t3.small 恒久化（A 案） |
+
+なお Spring 直叩きしか行えない場合は `/api/products` のみで代替可だが、Console/Market 経由の
+負荷を含まないため判定の信頼性は下がる点に留意する。
 
 ---
 

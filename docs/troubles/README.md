@@ -37,6 +37,7 @@
 | 027 | [フェーズ12 ワークフロー導入で CI 全滅](027_workflow_test_h2_schema_and_json_payload.md) | schema.sql の MySQL 専用構文 + payload の JSON 列が H2 テストで爆発・連鎖失敗 | ✅ 解決済 | - | - |
 | 028 | [CD 中の SSM 配信不能 → コンテナクラッシュループ](028_cd_ssm_undeliverable_then_container_crashloop.md) | CD 中断 + EC2 stop/start 後に compose の残骸でコンテナが restart loop、SSM カナリアも InProgress 滞留 | ✅ 解決済 | - | - |
 | 029 | [docker compose plugin 消失 + users スキーマ齟齬](029_compose_plugin_lost_and_users_schema_drift.md) | systemd の compose 起動が exit 125、users 業務カラム欠落で Spring が data.sql 失敗、SSM 応答阻害も連鎖 | ✅ 解決済 | - | - |
+| 030 | [HTTPS化を CloudFront + DuckDNS 1ドメイン構成に変更](030_https_via_cloudfront_duckdns_single_domain.md) | フェーズ11 §3 ALB 案を ALB 時間課金（無料枠不可）と整合させるため CloudFront + DuckDNS に切替・コード変更完了 | 🟡 AWS 側作業待ち | - | - |
 
 ## 再発防止アクション（未対応）
 

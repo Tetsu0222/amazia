@@ -10,6 +10,7 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -36,6 +37,10 @@ class RefreshTokenControllerTest {
     @Autowired UserRepository userRepository;
     @Autowired RoleRepository roleRepository;
     @Autowired RefreshTokenRepository refreshTokenRepository;
+
+    @Value("${refresh-cookie.path}") String refreshCookiePath;
+    @Value("${refresh-cookie.secure}") boolean refreshCookieSecure;
+    @Value("${refresh-cookie.domain:}") String refreshCookieDomain;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
@@ -75,6 +80,23 @@ class RefreshTokenControllerTest {
                 .cookie(new Cookie("refresh_token", raw)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty());
+    }
+
+    @Test
+    void リフレッシュ後の新Cookieのpath_secure_domainがconfig値どおりであること() throws Exception {
+        String raw = saveRefreshToken("attr-raw-token", LocalDateTime.now().plusDays(14), false);
+
+        var resultActions = mockMvc.perform(post("/api/auth/refresh")
+                .cookie(new Cookie("refresh_token", raw)))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("refresh_token"))
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                .andExpect(cookie().path("refresh_token", refreshCookiePath))
+                .andExpect(cookie().secure("refresh_token", refreshCookieSecure));
+
+        if (!refreshCookieDomain.isBlank()) {
+            resultActions.andExpect(cookie().domain("refresh_token", refreshCookieDomain));
+        }
     }
 
     @Test

@@ -47,14 +47,23 @@ Amazia Console に以下の認証・認可機能を実装する。
 
 # 3. HTTPS 化
 
-## 3.1 対応内容
-- ALB に ACM 証明書を設定し HTTPS 化
-- HTTP → HTTPS へリダイレクトを強制
-- 内部通信（ALB → ECS）は HTTP のままで OK
+> **2026-05-06 更新：** 本セクションの ALB ベース原案は、AWS 無料枠完走方針との不整合（ALB が時間課金）を理由に廃止。
+> 実装は **CloudFront + DuckDNS / 1 ドメイン構成** に切替済み。詳細は [phaseX-3 設計書](../phaseX/phaseX-3_https_via_cloudfront.md)、経緯は [トラブル030](../../troubles/030_https_via_cloudfront_duckdns_single_domain.md) を参照。
+> 後続セクション（§4 以降）で `console.amazia.example.com` 等のサンプル URL は実際には `www.amazia-portfolio.dedyn.io/console/` 等に置き換わる。
 
-## 3.2 ドメイン
-- Console：`https://console.amazia.example.com`
-- API：`https://api.amazia.example.com`
+## 3.1 対応内容（旧案・参考）
+- ~~ALB に ACM 証明書を設定し HTTPS 化~~
+- HTTP → HTTPS へリダイレクトを強制（CloudFront の Viewer Protocol Policy で実現）
+- 内部通信（CloudFront → EC2）は HTTP のまま
+
+## 3.2 ドメイン（旧案・参考）
+- ~~Console：`https://console.amazia.example.com`~~
+- ~~API：`https://api.amazia.example.com`~~
+- 実際の構成：
+  - Console：`https://www.amazia-portfolio.dedyn.io/console/`
+  - Console API：`https://www.amazia-portfolio.dedyn.io/console/api/*`
+  - Market：`https://www.amazia-portfolio.dedyn.io/`
+  - Core API：`https://www.amazia-portfolio.dedyn.io/api/*`
 
 ---
 
@@ -754,19 +763,27 @@ app/Shared/Middleware/
 
 ---
 
-### ステップ 9：HTTPS 化（AWS ALB + ACM）
+### ステップ 9：HTTPS 化（AWS ALB + ACM）→ **CloudFront + desec.io / www 構成に変更**
 
-**作業内容：**
-1. ACM で証明書リクエスト（`*.amazia.example.com`）
-2. ALB リスナーに HTTPS（443）を追加、証明書を紐付け
-3. HTTP（80）リスナーに HTTP→HTTPS リダイレクトルールを設定
-4. CORS 設定で Console オリジンのみ許可（Core の `WebConfig.java` 更新）
-5. Cookie の `Secure` フラグを有効化
+> **2026-05-06：** ALB 案は無料枠完走方針との不整合により廃止。実装は phaseX-3 を参照。
+> DuckDNS は ACM 検証用 CNAME を作れず断念し、desec.io に移行。さらにルート CNAME 不可（DNS RFC 制約）のため `www` サブドメイン構成へ。
+
+**実構成（phaseX-3 にて詳述）：**
+1. desec.io で `amazia-portfolio.dedyn.io` を取得し A レコード（origin）を EC2 EIP に向ける
+2. ACM（us-east-1）で `www.amazia-portfolio.dedyn.io` 証明書発行・desec.io で DNS 検証
+3. CloudFront ディストリビューション作成（オリジン：`origin.amazia-portfolio.dedyn.io` / プロトコル: HTTP only）
+4. Behaviors をパス優先度順に設定（`/console/api/*` → `/console/*` → `/api/*` → `*`）
+5. Alternate Domain Name に `www.amazia-portfolio.dedyn.io` を紐付け、desec.io で `www` を CloudFront ドメインへ CNAME
+6. GitHub Variables に `HTTPS_ENABLED=true` / `DEPLOY_DOMAIN=www.amazia-portfolio.dedyn.io` をセットしてデプロイ
+   - Vue ビルド時 `VITE_BASE_PATH=/console/` 適用
+   - `nginx/amazia.cloudfront.conf` 配置（直 IP 444 / Host 検証）
+   - 環境変数で Cookie Secure / Domain / Path を本番値へ切替
 
 **確認ポイント：**
-- `https://console.amazia.example.com` でアクセス可能
-- `http://` アクセスが `https://` にリダイレクトされる
-- API 疎通確認
+- `https://www.amazia-portfolio.dedyn.io/` でアクセス可能・証明書エラーなし
+- `http://` アクセスが `https://` にリダイレクトされる（CloudFront Viewer Protocol Policy）
+- 直 IP `https://13.54.203.95/` は nginx が 444 で接続切断
+- Cookie の Path / Secure / Domain が config 値どおり反映（テストで担保済み）
 
 ---
 

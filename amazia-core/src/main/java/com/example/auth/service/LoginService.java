@@ -35,6 +35,15 @@ public class LoginService {
     @Value("${jwt.refresh-ttl}")
     private long refreshTtlSeconds;
 
+    @Value("${refresh-cookie.secure:false}")
+    private boolean refreshCookieSecure;
+
+    @Value("${refresh-cookie.domain:}")
+    private String refreshCookieDomain;
+
+    @Value("${refresh-cookie.path:/api/auth/refresh}")
+    private String refreshCookiePath;
+
     public LoginService(UserRepository userRepository,
                         RefreshTokenRepository refreshTokenRepository,
                         JwtService jwtService) {
@@ -74,7 +83,11 @@ public class LoginService {
 
         Cookie cookie = new Cookie("refresh_token", rawRefreshToken);
         cookie.setHttpOnly(true);
-        cookie.setPath("/api/auth/refresh");
+        cookie.setPath(refreshCookiePath);
+        cookie.setSecure(refreshCookieSecure);
+        if (!refreshCookieDomain.isBlank()) {
+            cookie.setDomain(refreshCookieDomain);
+        }
         cookie.setMaxAge((int) refreshTtlSeconds);
         httpResponse.addCookie(cookie);
 
