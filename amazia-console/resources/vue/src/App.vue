@@ -12,14 +12,14 @@
           mode="inline"
           :selected-keys="[currentPath]"
           style="border-right: none"
-          @click="({ key }) => $router.push(key)"
+          @click="onMenuClick"
         >
           <a-menu-item key="/">商品マスタ</a-menu-item>
           <a-menu-item key="/skus">SKU管理</a-menu-item>
           <a-menu-item key="/products/market-view">商品一覧（SKU集約版）</a-menu-item>
           <a-menu-item v-if="isAdmin" key="/users">社員管理</a-menu-item>
           <a-menu-divider />
-          <a-menu-item key="__logout" @click="logout">ログアウト</a-menu-item>
+          <a-menu-item key="__logout">ログアウト</a-menu-item>
         </a-menu>
       </a-layout-sider>
       <a-layout>
@@ -43,6 +43,14 @@ const PUBLIC_PATHS = ['/login', '/password/reset', '/password/reset/confirm'];
 const isPublicRoute = computed(() => PUBLIC_PATHS.some(p => route.path.startsWith(p)));
 const currentPath   = computed(() => route.path);
 const isAdmin       = computed(() => authStore.role === 'admin');
+
+function onMenuClick({ key }) {
+  if (key === '__logout') {
+    logout();
+    return;
+  }
+  router.push(key);
+}
 
 function logout() {
   authStore.clear();

@@ -1,6 +1,12 @@
 <template>
   <div style="padding: 24px; max-width: 960px">
-    <a-page-header title="SKU管理" sub-title="Amazia Console" />
+    <a-page-header title="SKU管理" sub-title="Amazia Console">
+      <template #extra>
+        <a-button @click="$router.push('/skus/stocks/import')">
+          Excel一括入荷
+        </a-button>
+      </template>
+    </a-page-header>
 
     <!-- 商品選択 -->
     <a-form layout="inline" style="margin-bottom: 24px">
@@ -92,11 +98,6 @@
 
           <!-- 在庫管理タブ -->
           <a-tab-pane key="stock" tab="在庫管理">
-            <div style="margin-bottom: 12px; text-align: right">
-              <a-button @click="$router.push('/skus/stocks/import')">
-                Excel一括入荷
-              </a-button>
-            </div>
             <a-descriptions bordered size="small" :column="1" style="margin-bottom: 16px; max-width: 300px">
               <a-descriptions-item label="現在在庫">
                 {{ currentStock != null ? currentStock + ' 個' : '—' }}
