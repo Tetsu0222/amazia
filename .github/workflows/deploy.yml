@@ -120,25 +120,37 @@ jobs:
             aws ec2 start-instances \
               --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
 
-            ONLINE=false
-            for i in $(seq 1 18); do
+            # PingStatus=Online は SSM Agent のハートビート成立のみを示し
+            # コマンド受信パイプラインの起動完了とは別。Online を一度検知しただけで
+            # send-command すると Pending 滞留→Undeliverable になる事例があるため
+            # 連続3回 Online を確認 + 追加60秒の安定化待機を入れる。
+            ONLINE_STREAK=0
+            ONLINE_OK=false
+            for i in $(seq 1 30); do
               sleep 10
               STATUS=$(aws ssm describe-instance-information \
                 --region ap-southeast-2 \
                 --query "InstanceInformationList[?InstanceId=='${{ secrets.EC2_INSTANCE_ID }}'].PingStatus" \
                 --output text)
-              echo "[$i] SSM: $STATUS"
+              echo "[$i] SSM: ${STATUS:-(empty)} (streak=$ONLINE_STREAK)"
               if [ "$STATUS" = "Online" ]; then
-                ONLINE=true
-                break
+                ONLINE_STREAK=$((ONLINE_STREAK + 1))
+                if [ "$ONLINE_STREAK" -ge 3 ]; then
+                  ONLINE_OK=true
+                  break
+                fi
+              else
+                ONLINE_STREAK=0
               fi
             done
 
-            if [ "$ONLINE" = "false" ]; then
-              echo "ERROR: SSM Online確認タイムアウト（180秒）"
+            if [ "$ONLINE_OK" = "false" ]; then
+              echo "ERROR: SSM Online連続検知タイムアウト（300秒）"
               exit 1
             fi
-            echo "SSM Online確認。デプロイを継続します。"
+            echo "SSM Online連続確認。コマンドパイプライン安定化のため60秒待機..."
+            sleep 60
+            echo "SSM 安定化待機完了。デプロイを継続します。"
           else
             echo "SSMキュー正常。デプロイを開始します。"
           fi
