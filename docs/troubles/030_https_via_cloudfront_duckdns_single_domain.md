@@ -151,6 +151,7 @@
 | DDNS 選定基準 | 「プレフィックス付き CNAME を作れるか」が ACM DNS 検証の必須要件 |
 | ルート CNAME | DNS RFC で禁止。**`www` ホストに正規 URL を寄せる**のが定石 |
 | CloudFront プロトコル | デフォルトの「推奨設定」は HTTPS 前提。**HTTP オリジンは明示的に HTTP only に変更** |
+| Vue SFC template と `import.meta` | template 内で `import.meta.env.BASE_URL` を直接使うと Vite ビルドが失敗（`'sourceType: module'` エラー）。**script setup 内で定数化 or 関数化して template から参照する** |
 
 ---
 

@@ -132,7 +132,7 @@
             <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px">
               <div v-for="img in images" :key="img.id" style="position: relative; width: 120px">
                 <img
-                  :src="`${import.meta.env.BASE_URL}api/skus/${selectedSkuId}/image-file/${img.imagePath.split('/').pop()}`"
+                  :src="buildImageSrc(img)"
                   style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #d9d9d9; border-radius: 4px"
                 />
                 <div style="text-align: center; font-size: 12px; color: #888; margin-top: 4px">
@@ -177,6 +177,10 @@ import {
 const route = useRoute();
 const products = ref([]);
 const productsLoading = ref(false);
+
+const apiBase = `${import.meta.env.BASE_URL}api`;
+const buildImageSrc = (img) =>
+  `${apiBase}/skus/${selectedSkuId.value}/image-file/${img.imagePath.split('/').pop()}`;
 const skus = ref([]);
 const skusLoading = ref(false);
 const selectedProductId = ref(null);
