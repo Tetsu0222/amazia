@@ -43,7 +43,6 @@ public class LoginService {
         this.jwtService = jwtService;
     }
 
-    @Transactional
     public LoginResponse login(LoginRequest request, HttpServletResponse httpResponse) {
         Optional<User> optUser = userRepository.findByEmail(request.getEmail());
 

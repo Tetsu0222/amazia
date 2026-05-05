@@ -49,7 +49,7 @@ class ProductImageTest extends TestCase
             ], 201),
         ]);
 
-        $response = $this->call('POST', '/api/products/1/images', [], [], ['image' => $this->validPng()]);
+        $response = $this->call('POST', '/api/products/1/images', [], [], ['image' => $this->validPng()], ['HTTP_AUTHORIZATION' => 'Bearer ' . $this->makeToken()]);
 
         $this->assertEquals(201, $response->status());
         $this->assertArrayHasKey('productId', json_decode($response->getContent(), true));
