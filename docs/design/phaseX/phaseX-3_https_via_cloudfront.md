@@ -290,3 +290,46 @@ Host ヘッダ付きで叩くか、ヘルスチェック専用パスを `default
 | Let's Encrypt + EC2 直 | 証明書自動更新の運用負荷、EC2 IP 直公開によるセキュリティ低下 |
 | 独自 TLD（`.com` `.dev` 等）+ DuckDNS 不使用 | ドメイン取得費が発生、無料枠完走方針と矛盾 |
 | サブドメイン分離（`console.amazia.duckdns.org` 等） | CloudFront ディストリビューションが複数になり手数が増える |
+| Cloudflare Tunnel + EC2 直 | 静的配信のキャッシュ効率・EC2 負荷削減・障害独立性で CloudFront に劣る（詳細は次節） |
+
+---
+
+## Cloudflare Tunnel との比較詳細
+
+「ALB を使わず HTTPS 化する」というゴールに対し、Cloudflare Tunnel は最有力の対抗案である。
+本フェーズで CloudFront を採用した判断根拠を、学習目的を除外した純粋な技術観点で以下に整理する。
+
+### 観点 1：パフォーマンスとキャッシュ効率
+
+- CloudFront は東京・大阪エッジから配信され、価格クラス次第で日本ユーザーに最寄り配信が安定する。
+- Market（静的 SPA）はエッジキャッシュが効くため、オリジン EC2 へのリクエストを大幅に削減できる。
+- Cloudflare Tunnel もエッジキャッシュは効くが、Tunnel 経由の常時接続を維持する性質上、オリジン側の負荷削減効果は CloudFront より弱い。
+- t2.micro / t3.micro 級の EC2 を想定する本構成では、エッジキャッシュによる EC2 負荷削減のメリットが大きい。
+
+### 観点 2：EC2 リソースと無料枠の保護
+
+- CloudFront 経由ならオリジン EC2 のアウト転送は実質キャッシュミス分のみとなり、AWS 無料枠（EC2 アウト 100GB/月）を超過しにくい。
+- Cloudflare Tunnel は基本的に都度オリジンへ取りに行くため、EC2 アウト転送量がそのまま消費される。
+- Cloudflare Tunnel は `cloudflared` デーモンを EC2 上で常駐させる必要があり、プロセス監視・自動再起動の運用負荷が増える（障害点が 1 つ増える）。
+- CloudFront は AWS マネージドのため、EC2 で動かす常駐プロセスは増えない。
+
+### 観点 3：可用性と障害独立性
+
+- Amazia 全体は AWS 上に構築されているため、HTTPS 終端も AWS 内で完結させた方が外部 SaaS への可用性依存が増えない。
+- Cloudflare Tunnel を採用すると、自サービスの可用性が「AWS の障害」に加えて「Cloudflare の障害」にも依存する。
+- CloudFront はオリジン EC2 を再起動しても、キャッシュ済みコンテンツはエッジから返り続けるため、デプロイ中も静的配信は維持される。
+- Cloudflare Tunnel は cloudflared が EC2 上にあるため、EC2 再起動でサイト全体がダウンする。
+
+### 観点 4：将来の拡張性とデータ所在
+
+- 将来 WAF を導入する場合、CloudFront に AWS WAF を貼るだけで済む。AWS Shield Standard（DDoS 防御）は CloudFront に自動適用・無料。
+- Cloudflare の WAF も無料で強力だが、ログ・分析が AWS CloudWatch から分離されるため、運用基盤が二系統になる。
+- CloudFront のアクセスログは S3 に出力でき、自 AWS アカウント内に閉じる。
+- Cloudflare Tunnel 経由では全リクエストが Cloudflare のインフラを通過する（個人開発レベルでは些末だが、データ主権の観点で差がある）。
+
+### Cloudflare Tunnel 側が優位な点（公平性のため記載）
+
+- EC2 のインバウンドポートを完全に閉じられる（セキュリティグループで 80/443 を 0.0.0.0/0 に開ける必要がない）。
+- 設定が極めて簡単（cloudflared をインストールしてトークンを設定するだけ）。
+- これらの利点は「動的処理中心でキャッシュが効かないアプリ」「セキュリティ要件が厳しい社内ツール」では決定的だが、
+  Amazia のような静的配信込みの一般公開サービスでは観点 1〜4 の優位性が上回ると判断した。
