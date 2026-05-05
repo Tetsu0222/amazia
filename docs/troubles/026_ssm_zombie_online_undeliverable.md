@@ -136,3 +136,69 @@ aws ssm cancel-command --command-id <COMMAND_ID> --region ap-southeast-2
 - ゾンビ Online を踏んだケースでも自動リカバリが機能するか
 
 を観測。安定動作が確認できたら本ドキュメント・025・024 をまとめて ✅ 解決済 に更新する。
+
+---
+
+## 補足: AWS SSM サービス障害時の挙動（2026-05-05 観測）
+
+本対応のテストデプロイ実行中、ap-southeast-2 リージョンで AWS SSM サービス側に障害が発生していた。
+本機構は以下のように振る舞い、**無限リカバリループに陥らず明示的に失敗** した。
+
+### 観測されたシーケンス
+
+```
+1. 事前 PingStatus 確認 → ConnectionLost 検知
+2. recover_ssm 実行（stop/start）
+3. Online 連続検知 (streak=3) 成功 ← Agent 自体は復活する
+4. 60秒安定化待機
+5. カナリア送信 → 12回連続 Pending → Undeliverable 判定
+6. ゾンビOnlineと判定し recover_ssm 実行（2回目）
+7. 同様にカナリア失敗 → exit 1
+```
+
+### 切り分けの経緯（反省点込み）
+
+ジョブ失敗時、最初は EC2 / Agent / VPC / SG など**自分側の構成要因を疑った**。
+最終的にユーザーが **Google Translate のポップアップから AWS Health Dashboard を開き、障害ステータスを発見** した。
+この時点で AWS 側の障害が原因と確定。
+
+#### 反省点
+**「自分側を疑い尽くしてから外を疑う」のは姿勢として正しいが、並行で疑える項目は並行で確認すべきだった。**
+具体的には、最初の Undeliverable を観測した時点で:
+- Agent ログ確認（自分側）
+- セキュリティグループ確認（自分側）
+- **AWS Service Health Dashboard 確認（AWS 側）**
+
+を **並行して** 行えば、切り分けが10〜20分早かった。
+
+### 学びの記録方針
+
+「過去の失敗から学んで、次回は効率的に切り分ける」ためのチェックリストとして、
+将来のトラブル対応では **以下を最初の5分で並行確認** する：
+
+| 項目 | 確認方法 | 所要時間 |
+|------|---------|---------|
+| AWS Service Health Dashboard | https://health.aws.amazon.com/health/status の該当リージョン・サービス | 1分 |
+| EC2 状態 | コンソールで running + 3/3 OK | 1分 |
+| SSM PingStatus | `aws ssm describe-instance-information` | 1分 |
+| セキュリティグループ Outbound | コンソールで 443/0.0.0.0/0 の有無 | 1分 |
+| 最近のデプロイ・設定変更 | git log / CloudTrail | 2分 |
+
+これは本プロジェクトのトラブルシュート全般に適用する原則として
+`docs/troubles/lessons.md`（フェーズ20で新設予定）に転記する。
+
+### 設計の妥当性
+
+本機構は AWS 側障害下でも以下の性質を満たしていることが実環境で確認できた：
+
+| 性質 | 結果 |
+|------|------|
+| 異常を確実に検知する | ✅ ConnectionLost も Undeliverable も検知 |
+| 自動リカバリを試みる | ✅ stop/start を最大2回実行 |
+| 無限ループに陥らない | ✅ 最大2回でジョブを失敗させる |
+| 失敗時に運用者に明示的通知 | ✅ exit 1 で GitHub Actions が失敗通知 |
+| ログから原因切り分け可能 | ✅ 024 の StatusDetails 出力で Undeliverable 確定 |
+
+「リカバリが失敗した」という事実そのものが
+**自分側の問題ではなく外部要因を疑うべきシグナル** として機能した点も含め、
+022〜026 の連鎖対応で構築した機構は実用的な水準に達したと判断する。
