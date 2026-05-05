@@ -57,11 +57,11 @@ public class ProductControllerTest {
     }
 
     @Test
-    void 必須項目が欠けているとき400が返ること() throws Exception {
+    void 必須項目が欠けているとき422が返ること() throws Exception {
         mockMvc.perform(post("/api/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\":\"説明のみ\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test
