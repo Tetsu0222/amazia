@@ -93,8 +93,25 @@ jobs:
 
           echo "15分超InProgressコマンド数: $STUCK"
 
+          # SSM Agentの疎通確認（ConnectionLostならコマンドUndeliverableで失敗するため事前検知）
+          PING=$(aws ssm describe-instance-information \
+            --region ap-southeast-2 \
+            --query "InstanceInformationList[?InstanceId=='${{ secrets.EC2_INSTANCE_ID }}'].PingStatus" \
+            --output text)
+          echo "SSM PingStatus: ${PING:-NotRegistered}"
+
+          NEEDS_RECOVERY=false
           if [ "$STUCK" -gt 0 ]; then
-            echo "SSMキューが詰まっています。EC2を再起動してクリアします..."
+            echo "判定: SSMキュー詰まり"
+            NEEDS_RECOVERY=true
+          fi
+          if [ "$PING" != "Online" ]; then
+            echo "判定: SSM未接続 (PingStatus=${PING:-NotRegistered})"
+            NEEDS_RECOVERY=true
+          fi
+
+          if [ "$NEEDS_RECOVERY" = "true" ]; then
+            echo "EC2を再起動してSSMをリカバリします..."
             aws ec2 stop-instances \
               --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
             aws ec2 wait instance-stopped \

@@ -29,6 +29,7 @@
 | 019 | [Consoleログイン500 / Market商品取得401](019_console_login_500_market_401.md) | ConsoleログインでLaravel 500・Market商品一覧で401 | ✅ 解決済 | - | - |
 | 020 | [リロードでログアウト／refresh_token Cookie未保存](020_refresh_cookie_domain_container_name.md) | ログイン後リロードでログアウト・アクセストークン期限切れ後に再認証失敗 | ✅ 解決済 | - | - |
 | 021 | [社員登録422エラーの詳細不明](021_user_creation_422_no_error_detail.md) | POST /api/users が422を返すがエラー詳細が表示されない | ✅ 解決済 | - | - |
+| 022 | [SSM Undeliverable でデプロイ失敗](022_ssm_undeliverable_during_deploy.md) | SSM Agent が ConnectionLost のままデプロイが走りコマンド配信不能で失敗 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

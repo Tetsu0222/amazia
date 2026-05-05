@@ -11,6 +11,7 @@ Route::post('/skus/{id}/prices',          \App\Sku\Controller\CreateProductSkuPr
 Route::get('/skus/{id}/stocks',           \App\Sku\Controller\GetProductSkuStockController::class);
 Route::post('/skus/{id}/stocks/receive',  \App\Sku\Controller\ReceiveProductSkuStockController::class);
 Route::get('/skus/{id}/stocks/history',   \App\Sku\Controller\GetProductSkuStockHistoryController::class);
+Route::post('/skus/stocks/import',        \App\Sku\Controller\ImportProductSkuStockController::class);
 
 Route::get('/skus/{id}/images',                      \App\Sku\Controller\ListProductSkuImageController::class);
 Route::post('/skus/{id}/images',                     \App\Sku\Controller\CreateProductSkuImageController::class);

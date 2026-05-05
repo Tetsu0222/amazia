@@ -2,6 +2,12 @@
   <div style="padding: 24px; max-width: 900px">
     <a-page-header title="SKU在庫管理" sub-title="Amazia Console" />
 
+    <div style="margin-bottom: 16px; text-align: right">
+      <a-button @click="$router.push('/skus/stocks/import')">
+        Excel一括入荷
+      </a-button>
+    </div>
+
     <a-form layout="inline" style="margin-bottom: 16px">
       <a-form-item label="商品">
         <a-select

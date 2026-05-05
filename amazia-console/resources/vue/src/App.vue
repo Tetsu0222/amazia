@@ -16,6 +16,7 @@
         >
           <a-menu-item key="/">商品マスタ</a-menu-item>
           <a-menu-item key="/skus">SKU管理</a-menu-item>
+          <a-menu-item key="/products/market-view">商品一覧（SKU集約版）</a-menu-item>
           <a-menu-item v-if="isAdmin" key="/users">社員管理</a-menu-item>
           <a-menu-divider />
           <a-menu-item key="__logout" @click="logout">ログアウト</a-menu-item>

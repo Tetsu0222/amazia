@@ -9,6 +9,13 @@ export const createSkuPrice     = (skuId, data) => api.post(`/skus/${skuId}/pric
 export const getSkuStock        = (skuId) => api.get(`/skus/${skuId}/stocks`).then(r => r.data);
 export const receiveSkuStock    = (skuId, data) => api.post(`/skus/${skuId}/stocks/receive`, data).then(r => r.data);
 export const getSkuStockHistory = (skuId) => api.get(`/skus/${skuId}/stocks/history`).then(r => r.data);
+export const importSkuStock     = (file) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post('/skus/stocks/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data);
+};
 
 export const getSkuImages       = (skuId) => api.get(`/skus/${skuId}/images`).then(r => r.data);
 export const uploadSkuImage     = (skuId, file) => {

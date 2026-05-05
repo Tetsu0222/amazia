@@ -92,6 +92,11 @@
 
           <!-- 在庫管理タブ -->
           <a-tab-pane key="stock" tab="在庫管理">
+            <div style="margin-bottom: 12px; text-align: right">
+              <a-button @click="$router.push('/skus/stocks/import')">
+                Excel一括入荷
+              </a-button>
+            </div>
             <a-descriptions bordered size="small" :column="1" style="margin-bottom: 16px; max-width: 300px">
               <a-descriptions-item label="現在在庫">
                 {{ currentStock != null ? currentStock + ' 個' : '—' }}

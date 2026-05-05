@@ -196,6 +196,28 @@ public class SkuControllerTest {
                 .andExpect(jsonPath("$[0].quantity").value(10));
     }
 
+    // ─── SKUコード検索 ───────────────────────────────────
+
+    @Test
+    void SKUコードでSKUを取得できること() throws Exception {
+        String json = mockMvc.perform(post("/api/products/{id}/skus", productId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"color\":\"Red\",\"size\":\"M\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String skuCode = json.replaceAll(".*\"skuCode\":\"([^\"]+)\".*", "$1");
+
+        mockMvc.perform(get("/api/skus/by-code/{code}", skuCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.skuCode").value(skuCode))
+                .andExpect(jsonPath("$.color").value("Red"));
+    }
+
+    @Test
+    void 存在しないSKUコードで取得すると404が返ること() throws Exception {
+        mockMvc.perform(get("/api/skus/by-code/{code}", "NOT_EXIST_CODE"))
+                .andExpect(status().isNotFound());
+    }
+
     // ─── ヘルパー ────────────────────────────────────────
 
     private Long createSku() throws Exception {

@@ -7,7 +7,10 @@ import PasswordResetConfirmPage   from '../features/auth/pages/PasswordResetConf
 import ProductList                from '../features/products/pages/ProductList.vue';
 import ProductForm                from '../features/products/pages/ProductForm.vue';
 import ProductImport              from '../features/products/pages/ProductImport.vue';
+import ProductMarketList          from '../features/products/pages/ProductMarketList.vue';
 import SkuList                    from '../features/skus/pages/SkuList.vue';
+import SkuStockList               from '../features/skus/pages/SkuStockList.vue';
+import SkuStockImport             from '../features/skus/pages/SkuStockImport.vue';
 import ListUserPage               from '../features/users/pages/ListUserPage.vue';
 import CreateUserPage             from '../features/users/pages/CreateUserPage.vue';
 import EditUserPage               from '../features/users/pages/EditUserPage.vue';
@@ -21,7 +24,10 @@ const routes = [
   { path: '/products/new',             component: ProductForm,   meta: { requiresAuth: true } },
   { path: '/products/:id/edit',        component: ProductForm,   meta: { requiresAuth: true } },
   { path: '/products/import',          component: ProductImport, meta: { requiresAuth: true } },
+  { path: '/products/market-view',     component: ProductMarketList, meta: { requiresAuth: true } },
   { path: '/skus',                     component: SkuList,       meta: { requiresAuth: true } },
+  { path: '/skus/stocks',              component: SkuStockList,  meta: { requiresAuth: true } },
+  { path: '/skus/stocks/import',       component: SkuStockImport, meta: { requiresAuth: true } },
 
   { path: '/users',                    component: ListUserPage,  meta: { requiresAuth: true, role: 'admin' } },
   { path: '/users/new',                component: CreateUserPage, meta: { requiresAuth: true, role: 'admin' } },

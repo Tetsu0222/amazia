@@ -145,4 +145,121 @@ class SkuTest extends TestCase
         $response = $this->getJson('/api/skus/1/stocks/history');
         $response->assertStatus(200)->assertJsonFragment(['type' => 'receive']);
     }
+
+    // ─── Excel入荷 ───────────────────────────────────────
+    // ImportProductSkuStockService の単体検証。
+    // ※ Controller の MIME バリデーションは商品Excel取込と同方式を踏襲しており、
+    //    実ファイル拡張子による経路ロジックは Service 層に閉じているためここで検証する。
+
+    public function test_Excelアップロードで複数SKUの入荷が登録できること(): void
+    {
+        Http::fake([
+            "{$this->coreBaseUrl}/skus/by-code/SKU-A" => Http::response(
+                ['id' => 11, 'skuCode' => 'SKU-A'], 200),
+            "{$this->coreBaseUrl}/skus/by-code/SKU-B" => Http::response(
+                ['id' => 22, 'skuCode' => 'SKU-B'], 200),
+            "{$this->coreBaseUrl}/skus/11/stocks/receive" => Http::response(
+                ['id' => 1, 'skuId' => 11, 'quantity' => 30], 201),
+            "{$this->coreBaseUrl}/skus/22/stocks/receive" => Http::response(
+                ['id' => 2, 'skuId' => 22, 'quantity' => 50], 201),
+        ]);
+
+        $path = $this->makeStockCsv([
+            ['sku_code', 'quantity'],
+            ['SKU-A',    30],
+            ['SKU-B',    50],
+        ]);
+
+        $service = app(\App\Sku\Service\ImportProductSkuStockService::class);
+        $result  = $service->importFromFile($path);
+
+        $this->assertSame(2, $result['succeeded']);
+        $this->assertSame([], $result['failed']);
+    }
+
+    public function test_存在しないSKUコードはエラー行として返ること(): void
+    {
+        Http::fake([
+            "{$this->coreBaseUrl}/skus/by-code/SKU-A" => Http::response(
+                ['id' => 11, 'skuCode' => 'SKU-A'], 200),
+            "{$this->coreBaseUrl}/skus/by-code/UNKNOWN" => Http::response(
+                ['message' => 'Not Found'], 404),
+            "{$this->coreBaseUrl}/skus/11/stocks/receive" => Http::response(
+                ['id' => 1, 'skuId' => 11, 'quantity' => 10], 201),
+        ]);
+
+        $path = $this->makeStockCsv([
+            ['sku_code', 'quantity'],
+            ['SKU-A',    10],
+            ['UNKNOWN',  5],
+        ]);
+
+        $service = app(\App\Sku\Service\ImportProductSkuStockService::class);
+        $result  = $service->importFromFile($path);
+
+        $this->assertSame(1, $result['succeeded']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertSame('UNKNOWN', $result['failed'][0]['row']['sku_code']);
+        $this->assertStringContainsString("'UNKNOWN'", $result['failed'][0]['reason']);
+    }
+
+    public function test_quantityが0以下の行はエラーとなり減算は不可であること(): void
+    {
+        Http::fake();
+
+        $path = $this->makeStockCsv([
+            ['sku_code', 'quantity'],
+            ['SKU-A',    -5],
+            ['SKU-B',    0],
+        ]);
+
+        $service = app(\App\Sku\Service\ImportProductSkuStockService::class);
+        $result  = $service->importFromFile($path);
+
+        $this->assertSame(0, $result['succeeded']);
+        $this->assertCount(2, $result['failed']);
+        $this->assertSame('quantityは1以上の整数である必要があります（減算は不可）', $result['failed'][0]['reason']);
+        $this->assertSame('quantityは1以上の整数である必要があります（減算は不可）', $result['failed'][1]['reason']);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_必須項目が欠けている行はエラーとなること(): void
+    {
+        Http::fake();
+
+        $path = $this->makeStockCsv([
+            ['sku_code', 'quantity'],
+            ['',         10],
+            ['SKU-B',    ''],
+        ]);
+
+        $service = app(\App\Sku\Service\ImportProductSkuStockService::class);
+        $result  = $service->importFromFile($path);
+
+        $this->assertSame(0, $result['succeeded']);
+        $this->assertSame('必須項目(sku_code)が不足',         $result['failed'][0]['reason']);
+        $this->assertSame('必須項目(quantity)が不足または不正', $result['failed'][1]['reason']);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_Excel入荷エンドポイントが認証済みでアクセス可能であること(): void
+    {
+        // Controller-routing スモークテスト：
+        // 認証ミドルウェアを通過し、ファイル必須バリデーションが効くこと。
+        $response = $this->postJson('/api/skus/stocks/import', []);
+        $response->assertStatus(422);
+    }
+
+    private function makeStockCsv(array $rows): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'sku_import_') . '.csv';
+        $fp   = fopen($path, 'w');
+        foreach ($rows as $row) {
+            fputcsv($fp, array_map(fn($v) => $v ?? '', $row));
+        }
+        fclose($fp);
+        return $path;
+    }
 }
