@@ -36,7 +36,7 @@ async function onSubmit() {
   errorMsg.value = '';
   try {
     const res = await login(form.email, form.password);
-    authStore.setAuth(res.data.accessToken, res.data.role);
+    authStore.setAuth(res.data.accessToken, res.data.role, res.data.userId ?? null);
     router.push('/');
   } catch (e) {
     const status = e.response?.status;

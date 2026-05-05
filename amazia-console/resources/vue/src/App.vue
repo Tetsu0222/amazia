@@ -17,6 +17,7 @@
           <a-menu-item key="/">商品マスタ</a-menu-item>
           <a-menu-item key="/skus">SKU管理</a-menu-item>
           <a-menu-item key="/products/market-view">商品一覧（SKU集約版）</a-menu-item>
+          <a-menu-item key="/workflows">ワークフロー</a-menu-item>
           <a-menu-item v-if="isAdmin" key="/users">社員管理</a-menu-item>
           <a-menu-divider />
           <a-menu-item key="__logout">ログアウト</a-menu-item>
@@ -42,7 +43,7 @@ const router = useRouter();
 const PUBLIC_PATHS = ['/login', '/password/reset', '/password/reset/confirm'];
 const isPublicRoute = computed(() => PUBLIC_PATHS.some(p => route.path.startsWith(p)));
 const currentPath   = computed(() => route.path);
-const isAdmin       = computed(() => authStore.role === 'admin');
+const isAdmin       = computed(() => authStore.isAdmin);
 
 function onMenuClick({ key }) {
   if (key === '__logout') {

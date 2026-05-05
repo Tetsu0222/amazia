@@ -23,10 +23,15 @@ public class ProductSkuStock {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (version == null) version = 0L;
     }
 
     @PreUpdate
@@ -41,4 +46,6 @@ public class ProductSkuStock {
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

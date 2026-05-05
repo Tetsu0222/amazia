@@ -14,6 +14,9 @@ import SkuStockImport             from '../features/skus/pages/SkuStockImport.vu
 import ListUserPage               from '../features/users/pages/ListUserPage.vue';
 import CreateUserPage             from '../features/users/pages/CreateUserPage.vue';
 import EditUserPage               from '../features/users/pages/EditUserPage.vue';
+import WorkflowList               from '../features/workflows/pages/WorkflowList.vue';
+import WorkflowDetail             from '../features/workflows/pages/WorkflowDetail.vue';
+import WorkflowRequestForm        from '../features/workflows/pages/WorkflowRequestForm.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -29,9 +32,13 @@ const routes = [
   { path: '/skus/stocks',              component: SkuStockList,  meta: { requiresAuth: true } },
   { path: '/skus/stocks/import',       component: SkuStockImport, meta: { requiresAuth: true } },
 
-  { path: '/users',                    component: ListUserPage,  meta: { requiresAuth: true, role: 'admin' } },
-  { path: '/users/new',                component: CreateUserPage, meta: { requiresAuth: true, role: 'admin' } },
-  { path: '/users/:id/edit',           component: EditUserPage,  meta: { requiresAuth: true, role: 'admin' } },
+  { path: '/users',                    component: ListUserPage,  meta: { requiresAuth: true, roles: ['admin', 'senior_admin', 'eternal_advisor'] } },
+  { path: '/users/new',                component: CreateUserPage, meta: { requiresAuth: true, roles: ['admin', 'senior_admin', 'eternal_advisor'] } },
+  { path: '/users/:id/edit',           component: EditUserPage,  meta: { requiresAuth: true, roles: ['admin', 'senior_admin', 'eternal_advisor'] } },
+
+  { path: '/workflows',                component: WorkflowList,        meta: { requiresAuth: true } },
+  { path: '/workflows/new',            component: WorkflowRequestForm, meta: { requiresAuth: true } },
+  { path: '/workflows/:id',            component: WorkflowDetail,      meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({
@@ -47,6 +54,10 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.role && authStore.role !== to.meta.role) {
+    return false;
+  }
+
+  if (to.meta.roles && !to.meta.roles.includes(authStore.role)) {
     return false;
   }
 

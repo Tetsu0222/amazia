@@ -30,10 +30,15 @@ public class ProductSkuPrice {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (version == null) version = 0L;
     }
 
     @PreUpdate
@@ -52,4 +57,6 @@ public class ProductSkuPrice {
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

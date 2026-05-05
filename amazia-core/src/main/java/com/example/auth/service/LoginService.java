@@ -78,7 +78,7 @@ public class LoginService {
         cookie.setMaxAge((int) refreshTtlSeconds);
         httpResponse.addCookie(cookie);
 
-        return new LoginResponse(accessToken, user.getRole().getCode());
+        return new LoginResponse(accessToken, user.getRole().getCode(), user.getId());
     }
 
     private void incrementFailedAttempts(User user) {

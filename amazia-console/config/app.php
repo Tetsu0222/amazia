@@ -123,6 +123,7 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'auth' => require __DIR__.'/app/Auth.php',
+    'auth'     => require __DIR__.'/app/Auth.php',
+    'workflow' => require __DIR__.'/app/Workflow.php',
 
 ];

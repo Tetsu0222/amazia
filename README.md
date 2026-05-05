@@ -77,6 +77,7 @@ docs/
 ├── api_design/               # システム別API定義（Console / Market / Core）
 ├── database_design/          # DB設計（ER図・テーブル定義）
 ├── design/                   # 設計・フェーズ別実装計画
+├── sample_excels/            # 一括取り込み用サンプルExcel（商品登録 / SKU在庫入荷）
 └── troubles/                 # 不具合記録・再発防止アクション
 ```
 
