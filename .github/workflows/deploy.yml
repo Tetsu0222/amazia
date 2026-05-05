@@ -79,25 +79,107 @@ jobs:
 
       - name: SSMキュー健全性確認・自動リカバリ
         run: |
+          INSTANCE_ID="${{ secrets.EC2_INSTANCE_ID }}"
+          REGION="ap-southeast-2"
+
+          # SSM Agent にカナリアコマンドを送って実配信できるか確認する
+          # PingStatus=Online でも MGS セッションが死んでいると Undeliverable になる
+          # 「ゾンビOnline」状態を検知するための関数。
+          # 戻り値: 0=配信成功, 1=配信失敗 (Undeliverable / TimedOut / Pending滞留)
+          canary_check() {
+            local LABEL="$1"
+            echo "===== カナリアコマンド送信 ($LABEL) ====="
+            local CID
+            CID=$(aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters commands='["echo canary-ok"]' \
+              --region "$REGION" \
+              --query "Command.CommandId" --output text)
+            echo "Canary CommandId: $CID"
+            for i in $(seq 1 12); do
+              sleep 10
+              local ST
+              ST=$(aws ssm get-command-invocation \
+                --command-id "$CID" \
+                --instance-id "$INSTANCE_ID" \
+                --region "$REGION" \
+                --query "Status" --output text 2>/dev/null || echo "Pending")
+              echo "[canary $i] $ST"
+              if [ "$ST" = "Success" ]; then
+                return 0
+              fi
+              if [ "$ST" = "Failed" ] || [ "$ST" = "TimedOut" ] || [ "$ST" = "Cancelled" ]; then
+                local DETAILS
+                DETAILS=$(aws ssm get-command-invocation \
+                  --command-id "$CID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --region "$REGION" \
+                  --query "StatusDetails" --output text 2>/dev/null || echo "unknown")
+                echo "カナリア失敗: StatusDetails=$DETAILS"
+                return 1
+              fi
+            done
+            echo "カナリアタイムアウト（120秒 Pending 滞留）→ 配信不能と判定"
+            aws ssm cancel-command --command-id "$CID" --region "$REGION" 2>/dev/null || true
+            return 1
+          }
+
+          # EC2 stop/start + Online 連続検知 + 60秒安定化待機
+          recover_ssm() {
+            echo "EC2を再起動してSSMをリカバリします..."
+            aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+            aws ec2 wait instance-stopped --instance-ids "$INSTANCE_ID" --region "$REGION"
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+
+            # PingStatus=Online は SSM Agent のハートビート成立のみを示し
+            # コマンド受信パイプラインの起動完了とは別。連続3回 Online + 60秒待機。
+            local STREAK=0 OK=false
+            for i in $(seq 1 30); do
+              sleep 10
+              local STATUS
+              STATUS=$(aws ssm describe-instance-information \
+                --region "$REGION" \
+                --query "InstanceInformationList[?InstanceId=='$INSTANCE_ID'].PingStatus" \
+                --output text)
+              echo "[$i] SSM: ${STATUS:-(empty)} (streak=$STREAK)"
+              if [ "$STATUS" = "Online" ]; then
+                STREAK=$((STREAK + 1))
+                if [ "$STREAK" -ge 3 ]; then
+                  OK=true
+                  break
+                fi
+              else
+                STREAK=0
+              fi
+            done
+            if [ "$OK" = "false" ]; then
+              echo "ERROR: SSM Online連続検知タイムアウト（300秒）"
+              return 1
+            fi
+            echo "SSM Online連続確認。コマンドパイプライン安定化のため60秒待機..."
+            sleep 60
+            echo "SSM 安定化待機完了。"
+          }
+
+          # ----- 第1段階: キュー詰まり / PingStatus 確認 -----
           # 15分以上前からInProgressのコマンドを詰まりと判定
           # JMESPathは&&未対応のため、jqで2段階フィルタ
           THRESHOLD=$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%S 2>/dev/null \
             || date -u -v-15M +%Y-%m-%dT%H:%M:%S)
 
           STUCK=$(aws ssm list-commands \
-            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-            --region ap-southeast-2 \
+            --instance-id "$INSTANCE_ID" \
+            --region "$REGION" \
             --query "Commands[?Status=='InProgress']" \
             --output json \
             | jq --arg threshold "$THRESHOLD" \
               '[.[] | select(.RequestedDateTime < $threshold)] | length')
-
           echo "15分超InProgressコマンド数: $STUCK"
 
-          # SSM Agentの疎通確認（ConnectionLostならコマンドUndeliverableで失敗するため事前検知）
           PING=$(aws ssm describe-instance-information \
-            --region ap-southeast-2 \
-            --query "InstanceInformationList[?InstanceId=='${{ secrets.EC2_INSTANCE_ID }}'].PingStatus" \
+            --region "$REGION" \
+            --query "InstanceInformationList[?InstanceId=='$INSTANCE_ID'].PingStatus" \
             --output text)
           echo "SSM PingStatus: ${PING:-NotRegistered}"
 
@@ -112,48 +194,21 @@ jobs:
           fi
 
           if [ "$NEEDS_RECOVERY" = "true" ]; then
-            echo "EC2を再起動してSSMをリカバリします..."
-            aws ec2 stop-instances \
-              --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
-            aws ec2 wait instance-stopped \
-              --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
-            aws ec2 start-instances \
-              --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ap-southeast-2
+            recover_ssm || exit 1
+          else
+            echo "SSMキュー・PingStatusは正常。"
+          fi
 
-            # PingStatus=Online は SSM Agent のハートビート成立のみを示し
-            # コマンド受信パイプラインの起動完了とは別。Online を一度検知しただけで
-            # send-command すると Pending 滞留→Undeliverable になる事例があるため
-            # 連続3回 Online を確認 + 追加60秒の安定化待機を入れる。
-            ONLINE_STREAK=0
-            ONLINE_OK=false
-            for i in $(seq 1 30); do
-              sleep 10
-              STATUS=$(aws ssm describe-instance-information \
-                --region ap-southeast-2 \
-                --query "InstanceInformationList[?InstanceId=='${{ secrets.EC2_INSTANCE_ID }}'].PingStatus" \
-                --output text)
-              echo "[$i] SSM: ${STATUS:-(empty)} (streak=$ONLINE_STREAK)"
-              if [ "$STATUS" = "Online" ]; then
-                ONLINE_STREAK=$((ONLINE_STREAK + 1))
-                if [ "$ONLINE_STREAK" -ge 3 ]; then
-                  ONLINE_OK=true
-                  break
-                fi
-              else
-                ONLINE_STREAK=0
-              fi
-            done
-
-            if [ "$ONLINE_OK" = "false" ]; then
-              echo "ERROR: SSM Online連続検知タイムアウト（300秒）"
+          # ----- 第2段階: カナリアで実配信を確認（ゾンビOnline検知） -----
+          if ! canary_check "1回目"; then
+            echo "PingStatus=Online でもカナリア配信失敗 → ゾンビOnlineと判定しリカバリ実行"
+            recover_ssm || exit 1
+            if ! canary_check "リカバリ後"; then
+              echo "ERROR: リカバリ後もカナリア配信失敗。手動調査が必要。"
               exit 1
             fi
-            echo "SSM Online連続確認。コマンドパイプライン安定化のため60秒待機..."
-            sleep 60
-            echo "SSM 安定化待機完了。デプロイを継続します。"
-          else
-            echo "SSMキュー正常。デプロイを開始します。"
           fi
+          echo "SSM 配信確認OK。デプロイを開始します。"
 
       - name: ECRログイン
         id: ecr-login

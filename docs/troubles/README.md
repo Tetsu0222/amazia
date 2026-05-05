@@ -33,6 +33,7 @@
 | 023 | [docker-compose name conflict](023_docker_compose_name_conflict_orphan.md) | 孤児コンテナ残留で `amazia-core` 作成時に name conflict・デプロイ失敗 | ✅ 解決済 | - | - |
 | 024 | [SSM Failed 時のエラー出力が空](024_ssm_failed_no_error_output.md) | デプロイ Failed 時に stderr のみ取得していて根本原因が掴めない | 🟡 対応中 | - | - |
 | 025 | [SSM 自動リカバリ直後 Pending 滞留](025_ssm_pending_after_recovery.md) | EC2 stop/start 直後の Online 検知が早すぎて send-command が Pending のまま落ちる | 🟡 対応中 | - | - |
+| 026 | [SSM ゾンビOnline (Undeliverable)](026_ssm_zombie_online_undeliverable.md) | PingStatus=Online でも MGS セッション死亡で Undeliverable になる事象。カナリア方式で検知 | 🟡 対応中 | - | - |
 
 ## 再発防止アクション（未対応）
 
