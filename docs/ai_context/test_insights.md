@@ -32,6 +32,11 @@
 - [ ] MIMEタイプ検証が Docker 環境（Alpine）でも正しく動作するか
 - [ ] ルート定義の順序が正しいか（静的 > 動的）
 
+### Spring Boot エラーレスポンス詳細（021 起因）
+- `@RestControllerAdvice` がないと `MethodArgumentNotValidException` / `ResponseStatusException` のエラー詳細がレスポンスに含まれない
+- Spring Boot プロジェクト初期に `shared/exception/GlobalExceptionHandler` を作成する
+- API テストで 422 時は `errors[].message` または `message` フィールドの内容まで検証する
+
 ---
 
 ## カテゴリ3: フロントエンドUI完全性
