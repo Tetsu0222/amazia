@@ -6,16 +6,18 @@
 
 ## ファイル一覧
 
-### Console システム
+### Core システム（認証・認可）※フェーズ11追加
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |
 |------------|------------|--------|------------|
-| [TBL_users.md](TBL_users.md) | users | ユーザー | Console |
-| [TBL_password_reset_tokens.md](TBL_password_reset_tokens.md) | password_reset_tokens | パスワードリセットトークン | Console |
-| [TBL_sessions.md](TBL_sessions.md) | sessions | セッション | Console |
-| [TBL_personal_access_tokens.md](TBL_personal_access_tokens.md) | personal_access_tokens | パーソナルアクセストークン | Console |
+| [TBL_users.md](TBL_users.md) | users | ユーザー | Core |
+| [TBL_roles.md](TBL_roles.md) | roles | ロール | Core |
+| [TBL_permissions.md](TBL_permissions.md) | permissions | パーミッション | Core |
+| [TBL_role_permissions.md](TBL_role_permissions.md) | role_permissions | ロール・パーミッション中間テーブル | Core |
+| [TBL_refresh_tokens.md](TBL_refresh_tokens.md) | refresh_tokens | リフレッシュトークン | Core |
+| [TBL_password_reset_tokens.md](TBL_password_reset_tokens.md) | password_reset_tokens | パスワードリセットトークン | Core |
 
-### Core システム
+### Core システム（商品管理）※フェーズ8〜10追加
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |
 |------------|------------|--------|------------|
@@ -30,7 +32,7 @@
 
 ## ER図
 
-- [ER_diagram.md](ER_diagram.md) — Mermaid記法によるER図（Console / Core システム）
+- [ER_diagram.md](ER_diagram.md) — Mermaid記法によるER図（Core システム全体）
 
 ## 追加ルール
 

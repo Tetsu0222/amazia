@@ -6,7 +6,7 @@
 |------|------|
 | システム | Console（amazia-console） |
 | ベースURL | `/api` |
-| 認証方式 | Laravel Sanctum（Bearer Token） |
+| 認証方式 | JWT（Bearer Token）※フェーズ11でSanctumから刷新 |
 | レスポンス形式 | JSON |
 
 ---
@@ -210,16 +210,197 @@
 
 ---
 
-## 認証 API
+## 認証 API（フェーズ11追加）
 
-### 認証済みユーザー取得
+> Console は認証リクエストを amazia-core にプロキシする。JWT の検証は Console 側の `AuthenticateJwt` ミドルウェアで実施。
+
+### ログイン
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/auth/login` |
+| 認証 | 不要 |
+| コントローラー | `App\Auth\Controller\LoginController` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| email | string | ○ | メールアドレス（ログインID） |
+| password | string | ○ | パスワード |
+
+**レスポンス例（200）**
+```json
+{ "access_token": "<JWT>" }
+```
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 401 | メールアドレスまたはパスワードが不正 |
+| 403 | アカウントが無効（active_flag = false） |
+| 423 | アカウントがロックアウト中 |
+
+---
+
+### トークン再発行
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/auth/refresh` |
+| 認証 | 不要（HttpOnly CookieのリフレッシュトークンをCore側で検証） |
+| コントローラー | `App\Auth\Controller\RefreshTokenController` |
+
+**レスポンス例（200）**
+```json
+{ "access_token": "<新しいJWT>" }
+```
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 401 | リフレッシュトークンが無効・期限切れ・失効済み |
+
+---
+
+### パスワード再発行メール送信
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/auth/password/reset/request` |
+| 認証 | 不要 |
+| コントローラー | `App\Auth\Controller\PasswordResetController` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| email | string | ○ | メールアドレス |
+
+**レスポンス**
+- 200：常に成功レスポンスを返す（列挙攻撃対策。未登録メールでもエラーにしない）
+
+---
+
+### パスワード再設定
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/auth/password/reset/confirm` |
+| 認証 | 不要 |
+| コントローラー | `App\Auth\Controller\PasswordResetController` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| token | string | ○ | 再発行URLに含まれるトークン |
+| password | string | ○ | 新パスワード |
+| password_confirmation | string | ○ | 新パスワード（確認） |
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 400 | トークンが無効・期限切れ・使用済み |
+| 422 | パスワードポリシー違反（8文字未満・大文字なし・小文字なし・数字なし） |
+| 422 | 過去3回分のパスワードと同一 |
+
+---
+
+## ユーザー管理 API（フェーズ11追加）
+
+> 全エンドポイントに JWT 認証（adminロール）が必要。
+
+### 社員一覧取得
 
 | 項目 | 内容 |
 |------|------|
 | メソッド | GET |
-| パス | `/api/user` |
-| 認証 | 要（auth:sanctum） |
-| 説明 | Sanctumトークンで認証済みのユーザー情報を返す |
+| パス | `/api/users` |
+| 認証 | 要（admin ロール） |
+| コントローラー | `App\User\Controller\ListUserController` |
+
+**レスポンス例**
+```json
+[
+  {
+    "id": 1,
+    "employeeId": "EMP001",
+    "email": "user@amazia.example.com",
+    "name": "山田 太郎",
+    "role": "admin",
+    "activeFlag": true
+  }
+]
+```
+
+---
+
+### 社員登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/users` |
+| 認証 | 要（admin ロール） |
+| コントローラー | `App\User\Controller\CreateUserController` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| employee_id | string | ○ | 社員ID（ユニーク） |
+| email | string | ○ | メールアドレス（ユニーク・ログインID） |
+| name | string | ○ | 氏名（50文字以内） |
+| password | string | ○ | パスワード（ポリシー準拠） |
+| role | string | ○ | ロール（admin / user） |
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 422 | バリデーションエラー（必須項目不足・ポリシー違反） |
+| 422 | employee_id または email の重複 |
+
+---
+
+### 社員編集
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PUT |
+| パス | `/api/users/{id}` |
+| 認証 | 要（admin ロール） |
+| コントローラー | `App\User\Controller\UpdateUserController` |
+
+**パスパラメータ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| id | integer | ○ | ユーザーID |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| email | string | × | メールアドレス |
+| name | string | × | 氏名 |
+| role | string | × | ロール（admin / user） |
+| active_flag | boolean | × | 有効フラグ（false でログイン不可） |
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 404 | 指定IDのユーザーが存在しない |
+| 422 | バリデーションエラー |
 
 ---
 

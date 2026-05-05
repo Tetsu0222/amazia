@@ -32,6 +32,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/amazia?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Tokyo
       SPRING_DATASOURCE_USERNAME: amazia
       SPRING_DATASOURCE_PASSWORD: amazia_pass
+      JWT_SECRET: local-dev-secret-key-change-before-production!!
+      JWT_ACCESS_TTL: 900
+      JWT_REFRESH_TTL: 1209600
+      AWS_SES_FROM_ADDRESS: no-reply@amazia.example.com
+      PASSWORD_RESET_URL: http://localhost:5174/password/reset/confirm
     volumes:
       - ./amazia-core/storage:/app/storage
     depends_on:
@@ -58,6 +63,7 @@ services:
       DB_PASSWORD: amazia_pass
       CORE_API_URL: http://amazia-core:8080/api/products
       CORE_BASE_URL: http://amazia-core:8080/api
+      JWT_SECRET: local-dev-secret-key-change-before-production!!
     depends_on:
       mysql:
         condition: service_healthy

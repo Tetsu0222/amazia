@@ -1,57 +1,60 @@
 # ER図
 
-## システム：Console
+## システム：Core（フェーズ11以降）
+
+認証・認可テーブルを含む Core システム全体の ER 図。
 
 ```mermaid
 erDiagram
+    roles {
+        BIGINT_UNSIGNED id PK
+        VARCHAR code UK
+        VARCHAR name
+    }
+
+    permissions {
+        BIGINT_UNSIGNED id PK
+        VARCHAR screen_id UK
+        VARCHAR name
+    }
+
+    role_permissions {
+        BIGINT_UNSIGNED role_id FK
+        BIGINT_UNSIGNED permission_id FK
+    }
+
     users {
         BIGINT_UNSIGNED id PK
-        VARCHAR name
+        VARCHAR employee_id UK
         VARCHAR email UK
-        TIMESTAMP email_verified_at
-        VARCHAR password
-        VARCHAR remember_token
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        VARCHAR name
+        VARCHAR password_hash
+        BIGINT_UNSIGNED role_id FK
+        BOOLEAN active_flag
+        INT failed_attempts
+        DATETIME locked_until
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    refresh_tokens {
+        BIGINT_UNSIGNED id PK
+        BIGINT_UNSIGNED user_id FK
+        VARCHAR token_hash UK
+        DATETIME expires_at
+        BOOLEAN revoked
+        DATETIME created_at
     }
 
     password_reset_tokens {
-        VARCHAR email PK
-        VARCHAR token
-        TIMESTAMP created_at
-    }
-
-    sessions {
-        VARCHAR id PK
-        BIGINT_UNSIGNED user_id FK
-        VARCHAR ip_address
-        TEXT user_agent
-        LONGTEXT payload
-        INT last_activity
-    }
-
-    personal_access_tokens {
         BIGINT_UNSIGNED id PK
-        VARCHAR tokenable_type
-        BIGINT_UNSIGNED tokenable_id
-        TEXT name
-        VARCHAR token UK
-        TEXT abilities
-        TIMESTAMP last_used_at
-        TIMESTAMP expires_at
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        BIGINT_UNSIGNED user_id FK
+        VARCHAR token_hash UK
+        DATETIME expires_at
+        BOOLEAN used
+        DATETIME created_at
     }
 
-    users ||--o| sessions : "1:N"
-    users ||--o| personal_access_tokens : "1:N (Polymorphic)"
-    users ||--o| password_reset_tokens : "1:0..1"
-```
-
-## システム：Core
-
-```
-erDiagram
     products {
         BIGINT id PK
         VARCHAR name
@@ -130,6 +133,11 @@ erDiagram
         DATETIME updated_at
     }
 
+    roles ||--o{ users : "1:N"
+    roles ||--o{ role_permissions : "1:N"
+    permissions ||--o{ role_permissions : "1:N"
+    users ||--o{ refresh_tokens : "1:N"
+    users ||--o{ password_reset_tokens : "1:N"
     products ||--o{ product_images : "1:N"
     products ||--o{ product_skus : "1:N"
     product_skus ||--o{ product_sku_prices : "1:N"
@@ -141,30 +149,33 @@ erDiagram
 
 ## テーブル一覧
 
-### Console システム
+### Core システム（認証・認可）
 
-| テーブル名 | 論理名 | 用途 |
-|------------|--------|------|
-| users | ユーザー | Console管理者のアカウント情報 |
-| password_reset_tokens | パスワードリセットトークン | パスワード再設定フロー |
-| sessions | セッション | Webセッション管理 |
-| personal_access_tokens | パーソナルアクセストークン | Sanctum APIトークン認証 |
+| テーブル名 | 論理名 | 用途 | 追加フェーズ |
+|------------|--------|------|------------|
+| roles | ロール | admin / user のロール定義 | フェーズ11 |
+| permissions | パーミッション | 画面単位のアクセス権限定義 | フェーズ11 |
+| role_permissions | ロール・パーミッション中間 | ロールと権限の多対多関係 | フェーズ11 |
+| users | ユーザー | Console社員アカウント（JWT認証・ロール・ロックアウト対応） | フェーズ11で刷新 |
+| refresh_tokens | リフレッシュトークン | JWT認証のリフレッシュトークン管理 | フェーズ11 |
+| password_reset_tokens | パスワードリセットトークン | パスワード再発行フロー用一時トークン | フェーズ11で刷新 |
 
-### Core システム
+### Core システム（商品管理）
 
-| テーブル名 | 論理名 | 用途 |
-|------------|--------|------|
-| products | 商品 | 商品マスタ（価格・在庫を持たない） |
-| product_images | 商品画像 | 商品単位の画像管理（sort_order=1がメイン） |
-| product_skus | SKU | 色×サイズの組み合わせ単位の管理 |
-| product_sku_prices | SKU現行価格 | SKUごとの現在有効な価格（1レコード） |
-| product_sku_price_history | SKU価格履歴 | past / future / applied の価格履歴 |
-| product_sku_stocks | SKU現在在庫 | SKUごとの現在在庫数（1レコード） |
-| product_sku_stock_transactions | SKU在庫履歴 | 入荷・調整の変動履歴 |
-| product_sku_images | SKU画像 | SKUごとの複数画像（sort_order=1がメイン） |
+| テーブル名 | 論理名 | 用途 | 追加フェーズ |
+|------------|--------|------|------------|
+| products | 商品 | 商品マスタ（価格・在庫を持たない） | フェーズ8 |
+| product_images | 商品画像 | 商品単位の画像管理（sort_order=1がメイン） | フェーズ9 |
+| product_skus | SKU | 色×サイズの組み合わせ単位の管理 | フェーズ10 |
+| product_sku_prices | SKU現行価格 | SKUごとの現在有効な価格（1レコード） | フェーズ10 |
+| product_sku_price_history | SKU価格履歴 | past / future / applied の価格履歴 | フェーズ10 |
+| product_sku_stocks | SKU現在在庫 | SKUごとの現在在庫数（1レコード） | フェーズ10 |
+| product_sku_stock_transactions | SKU在庫履歴 | 入荷・調整の変動履歴 | フェーズ10 |
+| product_sku_images | SKU画像 | SKUごとの複数画像（sort_order=1がメイン） | フェーズ10 |
 
 ## 備考
 
 - `product_skus` は (product_id, color, size) の複合UNIQUEを持つ
 - `product_sku_stocks` は sku_id に UNIQUEを持つ（SKUにつき在庫レコードは1つ）
-- `personal_access_tokens.tokenable` はPolymorphic関連のため、将来的に複数モデルに対応可能
+- `users` テーブルはフェーズ11でLaravel Sanctum管理からJWT認証管理に全面刷新
+- `refresh_tokens` と `password_reset_tokens` はトークン実体をDBに保存せず、ハッシュ値のみ格納
