@@ -8,31 +8,11 @@ use Illuminate\Support\Facades\Http;
 class UserTest extends TestCase
 {
     private string $baseUrl;
-    private string $jwtSecret;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->baseUrl   = config('services.amazia_core.base_url');
-        $this->jwtSecret = config('app.auth.jwt_secret');
-    }
-
-    private function makeToken(string $role = 'admin'): string
-    {
-        $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
-        $payload = rtrim(strtr(base64_encode(json_encode([
-            'sub'  => '1',
-            'role' => $role,
-            'iat'  => time(),
-            'exp'  => time() + 900,
-        ])), '+/', '-_'), '=');
-        $sig = rtrim(strtr(base64_encode(hash_hmac('sha256', "{$header}.{$payload}", $this->jwtSecret, true)), '+/', '-_'), '=');
-        return "{$header}.{$payload}.{$sig}";
-    }
-
-    private function authHeaders(string $role = 'admin'): array
-    {
-        return ['Authorization' => 'Bearer ' . $this->makeToken($role)];
+        $this->baseUrl = config('services.amazia_core.base_url');
     }
 
     // --- GET /api/users ---

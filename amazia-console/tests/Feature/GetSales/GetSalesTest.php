@@ -8,7 +8,7 @@ class GetSalesTest extends TestCase
 {
     public function test_売上一覧が取得できること(): void
     {
-        $response = $this->getJson('/api/sales');
+        $response = $this->withHeaders($this->authHeaders())->getJson('/api/sales');
 
         $response->assertStatus(200)
                  ->assertJsonCount(3)

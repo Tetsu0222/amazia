@@ -12,6 +12,7 @@ class BulkDeleteProductTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withHeaders($this->authHeaders());
         $this->coreApiUrl = config('services.amazia_core.url');
     }
 

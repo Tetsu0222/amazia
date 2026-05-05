@@ -12,6 +12,7 @@ class AdminListProductTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withHeaders($this->authHeaders());
         $this->coreBaseUrl = config('services.amazia_core.base_url');
     }
 
