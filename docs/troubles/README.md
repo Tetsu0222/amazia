@@ -34,6 +34,7 @@
 | 024 | [SSM Failed 時のエラー出力が空](024_ssm_failed_no_error_output.md) | デプロイ Failed 時に stderr のみ取得していて根本原因が掴めない | 🟡 対応中 | - | - |
 | 025 | [SSM 自動リカバリ直後 Pending 滞留](025_ssm_pending_after_recovery.md) | EC2 stop/start 直後の Online 検知が早すぎて send-command が Pending のまま落ちる | 🟡 対応中 | - | - |
 | 026 | [SSM ゾンビOnline (Undeliverable)](026_ssm_zombie_online_undeliverable.md) | PingStatus=Online でも MGS セッション死亡で Undeliverable になる事象。カナリア方式で検知 | 🟡 対応中 | - | - |
+| 027 | [フェーズ12 ワークフロー導入で CI 全滅](027_workflow_test_h2_schema_and_json_payload.md) | schema.sql の MySQL 専用構文 + payload の JSON 列が H2 テストで爆発・連鎖失敗 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

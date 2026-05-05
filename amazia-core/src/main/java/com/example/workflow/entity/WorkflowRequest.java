@@ -24,7 +24,12 @@ public class WorkflowRequest {
     @Column(nullable = false)
     private String status;
 
-    @Column(nullable = false, columnDefinition = "JSON")
+    // 本番(MySQL)では V4 マイグレーションで payload JSON NOT NULL として作成済み。
+    // エンティティ側で columnDefinition="JSON" を指定すると、Hibernate/H2 が
+    // String を JSON 文字列リテラルとして二重エスケープして保存し、
+    // 取り出し時のパースが失敗するため、ここでは TEXT 相当の通常カラムとして扱う。
+    @Lob
+    @Column(nullable = false)
     private String payload;
 
     @Column(name = "completed_at")

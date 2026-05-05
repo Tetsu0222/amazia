@@ -114,6 +114,27 @@
 
 ---
 
+## カテゴリ7-2: Spring Boot テスト環境（H2）と本番（MySQL）の DDL 互換（027 起因）
+
+### schema.sql の DB 方言混入
+- `spring.sql.init.mode=always` の場合、`classpath:schema.sql` はテストでも自動で拾われる
+- MySQL 専用構文（`CREATE TABLE` 内インライン `INDEX`、`ON UPDATE CURRENT_TIMESTAMP`、`ADD COLUMN IF NOT EXISTS` など）は H2 で爆発し、`ApplicationContext` ロードが失敗する
+- 一度ロードに失敗すると Spring Boot のデフォルト閾値で **以降の同一 Context のテストは全て自動 Fail** され、根本原因が読み取りづらくなる
+- 対策:
+  - テスト側 `application-test.properties` で `spring.sql.init.schema-locations=` を空指定して schema.sql を除外
+  - または schema.sql を H2/MySQL 両対応に書き直す（インライン INDEX を `CREATE INDEX IF NOT EXISTS` に分離など）
+
+### JSON 列の Hibernate マッピング
+- `String` フィールドに `@Column(columnDefinition = "JSON")` を付けると、保存時に文字列リテラルとして二重エスケープされ、`ObjectMapper.readValue` が失敗する
+- JSON として扱うなら `@JdbcTypeCode(SqlTypes.JSON)` か `AttributeConverter` を使う。単純なテキスト保存で良いなら `@Lob` で十分
+
+### テスト観点
+- [ ] フェーズ追加で `schema.sql` / `application-{profile}.properties` を変更した場合、必ずローカルで `mvn test` を流してから push する
+- [ ] JSON 列に保存した payload が読み取り側で `ObjectMapper.readValue` できるかを実テストで通す（往復検証）
+- [ ] 過去に Phase 11 でも同種の ApplicationContext 失敗（76b2dd23 / a3c565cc）があり、Phase 導入時の H2 互換性は再発パターンとして要警戒
+
+---
+
 ## カテゴリ7: Core API 依存の異常系テスト
 
 ### Console → Core のプロキシ（009 起因）

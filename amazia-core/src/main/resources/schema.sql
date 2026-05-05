@@ -1,6 +1,9 @@
--- 冪等なスキーマ定義
+-- 冪等なスキーマ定義（MySQL 本番環境向け）
 -- 既存環境向けに、足りないテーブル・カラムを起動時に保証する。
--- ALTER の重複実行エラーは spring.sql.init.continue-on-error=true で無視する。
+-- 重複実行エラー（カラム/インデックス既存など）は spring.sql.init.continue-on-error=true で無視する。
+--
+-- テスト環境(H2)では application-test.properties で schema-locations を空にして
+-- このスクリプトを読み込まない。テストは ddl-auto=create-drop で JPA が生成する。
 
 CREATE TABLE IF NOT EXISTS workflow_requests (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
