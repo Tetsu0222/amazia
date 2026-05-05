@@ -23,6 +23,8 @@
 | 013 | [Console画像登録の導線なし](013_console_image_upload_missing.md) | Phase9でAPI実装済みだがVue UIが未追加 | ✅ 解決済 | - | ✅ 済 |
 | 014 | [SKU価格管理ページのUI未実装](014_sku_price_ui_not_implemented.md) | SKU・価格管理のVue UIが未実装 | ✅ 解決済 | - | - |
 | 015 | [amazia-market ECR pull失敗](015_amazia_market_ecr_pull_failed.md) | docker-compose.ymlに存在しないECRリポジトリへの参照が残りデプロイ失敗 | ✅ 解決済 | - | - |
+| 016 | [SKU画像エンドポイント EC2で404](016_sku_image_404_on_ec2.md) | ECRイメージが古くSKU画像ルート未反映・EC2ディスク満杯が重なり発生 | ✅ 解決済 | - | - |
+| 017 | [AWS課金：不要リソースの蓄積](017_aws_cost_unused_resources.md) | 停止中EC2・ECR古イメージ・t3.smallによる想定外課金 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 
