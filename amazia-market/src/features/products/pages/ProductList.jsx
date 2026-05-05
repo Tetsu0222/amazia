@@ -5,8 +5,7 @@ import {
   CardMedia, CardContent, CircularProgress, Alert, Box,
 } from '@mui/material';
 import { getMarketProducts } from '../api/products';
-
-const NOIMAGE = '/assets/img/noimage.png';
+import { NOIMAGE } from '../constants';
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
@@ -41,7 +40,7 @@ export default function ProductList() {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={p.mainImage ? `/storage/Product/images/${p.mainImage}` : NOIMAGE}
+                  image={p.mainImage ?? NOIMAGE}
                   alt={p.productName}
                   sx={{ objectFit: 'contain', bgcolor: '#f5f5f5' }}
                   loading="lazy"

@@ -6,8 +6,7 @@ import {
   ToggleButton, ToggleButtonGroup, Chip,
 } from '@mui/material';
 import { getMarketProduct } from '../api/products';
-
-const NOIMAGE = '/assets/img/noimage.png';
+import { NOIMAGE } from '../constants';
 
 export default function ProductDetail() {
   const { id }     = useParams();
@@ -21,7 +20,11 @@ export default function ProductDetail() {
 
   useEffect(() => {
     getMarketProduct(id)
-      .then(setData)
+      .then(d => {
+        setData(d);
+        const firstColor = d.skus[0]?.color ?? null;
+        setSelectedColor(firstColor);
+      })
       .catch(() => setError('商品データの取得に失敗しました'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -61,9 +64,6 @@ export default function ProductDetail() {
   }, [data, selectedColor, selectedSize]);
 
   const images = selectedSku?.images ?? [];
-  const currentImage = images[mainImageIdx]
-    ? `/storage/Product/images/${images[mainImageIdx]}`
-    : NOIMAGE;
 
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
   if (error)   return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
@@ -80,41 +80,58 @@ export default function ProductDetail() {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
           {/* 画像エリア */}
           <Box sx={{ flexShrink: 0, width: { xs: '100%', sm: 300 } }}>
-            <Box
-              component="img"
-              src={currentImage}
-              alt={product.name}
-              sx={{
+            {selectedSku ? (
+              <>
+                <Box
+                  component="img"
+                  src={images[mainImageIdx] ?? NOIMAGE}
+                  alt={product.name}
+                  sx={{
+                    width: '100%',
+                    height: 280,
+                    objectFit: 'contain',
+                    bgcolor: '#f5f5f5',
+                    borderRadius: 1,
+                  }}
+                />
+                {images.length > 1 && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
+                    {images.map((img, i) => (
+                      <Box
+                        key={i}
+                        component="img"
+                        src={img}
+                        alt=""
+                        onClick={() => setMainImageIdx(i)}
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          objectFit: 'contain',
+                          border: mainImageIdx === i ? '2px solid' : '1px solid #ddd',
+                          borderColor: mainImageIdx === i ? 'primary.main' : '#ddd',
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          bgcolor: '#f5f5f5',
+                        }}
+                      />
+                    ))}
+                  </Stack>
+                )}
+              </>
+            ) : (
+              <Box sx={{
                 width: '100%',
                 height: 280,
-                objectFit: 'contain',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 bgcolor: '#f5f5f5',
                 borderRadius: 1,
-              }}
-            />
-            {/* サムネイル */}
-            {images.length > 1 && (
-              <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                {images.map((img, i) => (
-                  <Box
-                    key={i}
-                    component="img"
-                    src={`/storage/Product/images/${img}`}
-                    alt=""
-                    onClick={() => setMainImageIdx(i)}
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      objectFit: 'contain',
-                      border: mainImageIdx === i ? '2px solid' : '1px solid #ddd',
-                      borderColor: mainImageIdx === i ? 'primary.main' : '#ddd',
-                      borderRadius: 1,
-                      cursor: 'pointer',
-                      bgcolor: '#f5f5f5',
-                    }}
-                  />
-                ))}
-              </Stack>
+              }}>
+                <Typography color="text.secondary" variant="body2">
+                  色とサイズを選択してください
+                </Typography>
+              </Box>
             )}
           </Box>
 
@@ -155,7 +172,7 @@ export default function ProductDetail() {
             )}
 
             {/* 価格・在庫 */}
-            {selectedSku ? (
+            {selectedSku && (
               <Stack spacing={1}>
                 <Typography variant="h5" color="primary">
                   ¥{selectedSku.price != null ? selectedSku.price.toLocaleString() : '—'}
@@ -168,10 +185,6 @@ export default function ProductDetail() {
                   )}
                 </Box>
               </Stack>
-            ) : (
-              <Typography color="text.secondary" variant="body2">
-                色とサイズを選択してください
-              </Typography>
             )}
           </Stack>
         </Stack>

@@ -55,6 +55,11 @@ public class ListProductMarketService {
         return new ProductMarketDetail(product, skuDetails);
     }
 
+    private String extractFilename(String imagePath) {
+        int lastSlash = imagePath.lastIndexOf('/');
+        return lastSlash >= 0 ? imagePath.substring(lastSlash + 1) : imagePath;
+    }
+
     private ProductMarketSummary buildSummary(Product product) {
         List<ProductSku> skus = skuRepository.findByProductId(product.getId());
         if (skus.isEmpty()) return null;
@@ -71,9 +76,9 @@ public class ListProductMarketService {
                 .min().orElse(0);
 
         String mainImage = skus.stream()
-                .flatMap(sku -> imageRepository.findBySkuIdOrderBySortOrderAsc(sku.getId()).stream())
+                .flatMap(sku -> imageRepository.findBySkuIdOrderBySortOrderAsc(sku.getId()).stream()
+                        .map(img -> "/api/skus/" + sku.getId() + "/image-file/" + extractFilename(img.getImagePath())))
                 .findFirst()
-                .map(ProductSkuImage::getImagePath)
                 .orElse(null);
 
         return new ProductMarketSummary(product.getId(), product.getName(), product.getDescription(),
@@ -86,7 +91,7 @@ public class ListProductMarketService {
         Integer stock = stockRepository.findBySkuId(sku.getId())
                 .map(s -> s.getQuantity()).orElse(0);
         List<String> images = imageRepository.findBySkuIdOrderBySortOrderAsc(sku.getId()).stream()
-                .map(ProductSkuImage::getImagePath)
+                .map(img -> "/api/skus/" + sku.getId() + "/image-file/" + extractFilename(img.getImagePath()))
                 .collect(Collectors.toList());
 
         return new SkuDetail(sku.getId(), sku.getSkuCode(), sku.getColor(), sku.getSize(),
