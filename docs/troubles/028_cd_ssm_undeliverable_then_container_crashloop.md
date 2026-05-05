@@ -1,7 +1,14 @@
 # 028: CD 中の SSM 配信不能 → stop/start 後にコンテナがクラッシュループ
 
 ## ステータス
-🟡 対応中（2026-05-05）
+✅ 解決済（2026-05-05・[029](029_compose_plugin_lost_and_users_schema_drift.md) として原因切り分け）
+
+> 後日追記：本ドキュメントの §推定原因は「CD 中断による Docker 残骸 + メモリ枯渇」を主因として記述しているが、
+> 翌日復旧時に **真因は docker compose v2 プラグインの消失** であったことが判明した。
+> systemd `amazia.service` の ExecStart `/usr/bin/docker compose up -d --remove-orphans` で
+> `compose` がサブコマンドとして認識されず exit 125 で死亡 → コンテナ側の `restart: unless-stopped` が
+> 発火して veth 生成・破棄ループに見えていた、というのが正確な機序。
+> 詳細と復旧手順は [029](029_compose_plugin_lost_and_users_schema_drift.md) を参照。
 
 ## 発症箇所
 - DuckDNS ドメイン取得後の疎通確認（`amazia.duckdns.org` / `13.54.203.95`）
@@ -122,6 +129,10 @@ EC2 視点では、`down` は完了していたかもしれないが pull は中
 EC2 を停止して夜間放置（メモリ枯渇症状の悪化を回避、課金もゼロ）。
 復旧は翌日に実施する。
 
+> 後日追記：「翌日まで待つ必要性」を再検討した結果、技術的には待機不要で当日復旧可能と判明。
+> AWS 側障害ではないため時間経過で改善する要因がなく、stop 状態は単に課金停止を意味するだけ。
+> 実際の復旧は当日中（同日 22 時台）に [029](029_compose_plugin_lost_and_users_schema_drift.md) として実施・完了した。
+
 ## 翌日の復旧手順（予定）
 
 ```bash
@@ -165,8 +176,9 @@ sudo docker compose logs --tail=50
 EC2 にアタッチされていたため Public IP は変動せず、DuckDNS の再設定は不要だった。
 [004 の IP 変動問題](004_ec2_ip_changed_after_restart.md) は EIP で恒久的に解消されている。
 
-### 未アタッチ EIP の課金懸念
+### 未アタッチ EIP の課金懸念（解消済み）
 調査中に `describe-addresses` で**未アタッチ EIP が 4 本**残っていることを確認した
 （`13.237.232.101` / `15.135.8.121` / `16.176.58.160` / `3.24.48.133`）。
 未アタッチ EIP は約 \$0.005/h ≒ \$3.6/月/個 課金されるため、
-[017 課金最適化](017_aws_cost_unused_resources.md) と整合させて別途解放する必要がある。
+[017 課金最適化](017_aws_cost_unused_resources.md) と整合させて 2026-05-05 に 4 本とも解放済み。
+**現在の EIP は `13.54.203.95`（本番 EC2 アタッチ）の 1 本のみ**。

@@ -74,6 +74,7 @@ After=docker.service network-online.target
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/ssm-user/amazia
+EnvironmentFile=-/home/ssm-user/amazia/.env.production
 ExecStart=/usr/bin/docker compose up -d --remove-orphans
 ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=300
@@ -81,6 +82,12 @@ TimeoutStartSec=300
 [Install]
 WantedBy=multi-user.target
 ```
+
+> 補足：`EnvironmentFile=-` の先頭ハイフンは「ファイルが無くてもエラーにしない」指定。
+> `.env.production` を運用する前提だが、不在時もサービスは起動を試みる。
+> 実運用では `docker compose` が `WorkingDirectory` 配下の `.env` を自動で読むため、
+> `.env`（または `.env.production`）のどちらに値が入っていても compose 内の `${VAR}` に展開される。
+> 詳細経緯は [029](029_compose_plugin_lost_and_users_schema_drift.md) を参照。
 
 ## 結果
 - 全コンテナが正常起動（Up状態）
