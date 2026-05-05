@@ -189,13 +189,13 @@ jobs:
             --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
             --document-name "AWS-RunShellScript" \
             --parameters commands='[
-              "cd /home/ssm-user/amazia && docker-compose down || true",
+              "cd /home/ssm-user/amazia && docker-compose down --remove-orphans || true",
               "aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com",
               "docker pull 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-core:latest",
               "docker pull 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-console:latest",
               "aws s3 cp s3://fullstack-renaissance-demo/amazia.zip /home/ssm-user/amazia.zip",
               "cd /home/ssm-user && unzip -o amazia.zip -d amazia",
-              "cd /home/ssm-user/amazia && APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" CORS_ALLOWED_ORIGINS=\"http://13.54.203.95,http://13.54.203.95:5173\" docker-compose up -d"
+              "cd /home/ssm-user/amazia && APP_KEY=\"${{ secrets.LARAVEL_APP_KEY }}\" CORS_ALLOWED_ORIGINS=\"http://13.54.203.95,http://13.54.203.95:5173\" docker-compose up -d --remove-orphans"
             ]' \
             --region ap-southeast-2 \
             --query "Command.CommandId" --output text)
