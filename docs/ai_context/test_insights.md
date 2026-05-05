@@ -148,6 +148,109 @@
 
 ---
 
+## カテゴリ8: 認証・Cookie・プロキシ層の検証（019・020 起因）
+
+### Console（Laravel）↔ Core（Spring）の Cookie 転送
+- Core が発行する Cookie の `domain` 属性は Docker コンテナ名（例: `amazia-core`）になることがある
+- そのままブラウザに渡すと `localhost`（開発）や本番ドメインと一致せず Cookie が**保存されない**
+- Console がプロキシ転送する際は **`domain=null`** を必須とする（リバースプロキシ層で domain を上書きする原則）
+- Core 側で発行する Cookie の `domain` も空または省略にしておくのが望ましい
+
+### Guzzle Cookie API の落とし穴（019 起因）
+- Guzzle の `SetCookie` は `isSecure()` / `isHttpOnly()` を持たない（メソッド未定義で 500 になる）
+- 正しいメソッドは `getSecure()` / `getHttpOnly()`
+- Cookie 転送ヘルパー関数を切り出し、テストでメソッド名の固定化を保証する
+
+### 公開エンドポイントとミドルウェアグループ（019 起因）
+- マーケット向け公開 API（`/products/market` 等）が `routes/api.php` の `Route::middleware('auth.jwt')->group()` 内に include されると 401 になる
+- 公開ルートは auth グループの**外**に明示的に配置する
+- 「未認証で 200 が返るか」のテストを公開ルートごとに必ず1本書く
+
+### Cookie ライフサイクル E2E
+- API テストは Bearer トークン直付与で済ませがちだが、ブラウザ実装では Cookie が主役
+- 「ログイン → アクセストークン期限切れ → 自動リフレッシュ → 操作継続」のシナリオを Playwright/E2E でカバーする
+- 「ログイン → リロード → 認証維持」も最低限の E2E ケース
+
+### テスト観点
+- [ ] Core から受け取った `Set-Cookie` を Console が転送する際、`domain` が `null` で送出されているか
+- [ ] Guzzle `SetCookie` 操作箇所で `getSecure()/getHttpOnly()` を使っているか（`isSecure/isHttpOnly` の grep が 0 件）
+- [ ] 公開ルートが `auth.jwt` グループ外に定義されているか（未認証 curl で 200 を確認）
+- [ ] ログイン → リロード → 自動リフレッシュの E2E が通るか
+
+---
+
+## カテゴリ9: Docker 初回起動・JPA/Laravel 共存 DB（018 起因）
+
+### `docker compose down -v` からの初回起動シナリオ
+- H2 インメモリでは `data.sql` 用のテーブルが test スキーマで作られるため CI は通るが、Docker MySQL の**初回起動（`-v` で volume 削除後）**ではテーブル不在で爆発するパターンが頻出
+- フェーズ完了時に必ず `docker compose down -v && docker compose up --build` を実施し、DB 初期化からの起動を確認する
+
+### JPA Entity とテーブル定義の一致
+- テーブル定義 SQL（Flyway / `schema.sql` / 手動 DDL）に対応する `@Entity` クラスを必ずセットで作成する
+- Entity 不在のテーブルは `ddl-auto=update` でも自動生成されない
+- `data.sql` の INSERT 先テーブルが Entity 不在だと、Spring 起動時に `Table doesn't exist` で Restarting ループ
+
+### `data.sql` 実行順の制御
+- `spring.jpa.defer-datasource-initialization=true` は **`application.properties`（共通）**に置く
+- プロファイル別ファイル（`application-local.properties` 等）にしか書かないと、Spring Boot 3.x で確実には機能しない
+
+### Laravel ↔ Spring JPA の DB 共有
+- Laravel migration 由来の `users.id` は `bigint unsigned`、JPA 自動 FK は `bigint signed` になり型不一致 WARN が発生
+- 対策：JPA 側 FK カラムも `BIGINT UNSIGNED` を明示する。または `ddl-auto=none` にして DDL は SQL/migration で一元管理する
+
+### テスト観点
+- [ ] フェーズ完了時に `docker compose down -v && docker compose up --build` で起動完了するか
+- [ ] テーブル定義 SQL に対応する `@Entity` が存在するか
+- [ ] `spring.jpa.defer-datasource-initialization=true` が `application.properties` 側にあるか
+- [ ] Laravel と Spring JPA が共有する DB で型不一致 WARN が出ていないか
+
+---
+
+## カテゴリ10: AWS 運用（コスト・ディスク・デプロイ統合）（016・017 起因）
+
+### EC2 ディスク管理
+- 旧イメージ・ビルドキャッシュが蓄積するとルートディスクが満杯になり、`docker pull` が**途中失敗**してデプロイ全体が壊れる
+- `docker system prune -af` を週次 cron 化、または最低限デプロイ前に空き容量を確認する
+- ディスク不足は副次的に ECR コスト超過（無料枠 500MB）にも繋がる
+
+### ECR ライフサイクルポリシー
+- タグなしイメージを 1 日後に自動削除するライフサイクルポリシーを**全リポジトリで標準化**する
+- 設定なしで放置すると、タグなしイメージが各リポジトリ数十個単位で蓄積し、ストレージ課金が発生
+
+### amazia-console と amazia-core の同時デプロイ
+- 片方だけ ECR にプッシュ・EC2 で pull すると、Console 側ルート追加 → Core 側未対応で 404 という連鎖障害が起きる
+- 1 つの GitHub Actions ワークフローで両方をビルド＆プッシュ＆EC2 pull するよう統合する
+- デプロイ後は両レイヤー（8000/8080）に直接 `curl` して 404 がないことを確認する
+
+### コスト監視
+- Billing アラート（月 $1 / $5 / $10 等）を必ず設定する
+- 学習・デモ用途のインスタンスタイプは t3.micro（無料枠内）を基本とする
+  - t3.small への一時昇格は `phaseX-4`（Spring Heap 制限 + Swap）完了判定とセットで運用
+- 停止中（stopped）インスタンスでも EBS は課金される。不要なら **terminate** する（停止ではなく削除）
+
+### テスト観点（運用観点）
+- [ ] EC2 デプロイ前に `df -h` で空き容量を確認しているか（最低 1GB 以上）
+- [ ] 全 ECR リポジトリにライフサイクルポリシー（タグなし 1 日削除）が設定されているか
+- [ ] amazia-console と amazia-core が 1 ワークフローで同時デプロイされる構成になっているか
+- [ ] デプロイ後に両レイヤー（`http://127.0.0.1:8000/...` と `http://127.0.0.1:8080/...`）を curl で確認しているか
+- [ ] AWS Billing アラートが設定されており、Cost Explorer を月次確認しているか
+
+---
+
+## カテゴリ11: コンテナへのコード反映（019 起因）
+
+### イメージ COPY 方式 vs ボリュームマウント方式
+- `amazia-console` は Dockerfile の `COPY` でコードを焼き込んでおり、ホスト編集はそのままでは反映されない
+- 反映方法は 2 通り：
+  - **即時**：`docker cp` でコンテナに直接コピー（その場限り、再起動で消える）
+  - **永続**：`docker compose build` で再ビルドしてから `up -d` で再起動
+
+### テスト観点
+- [ ] ホスト編集後にコンテナへ反映する手順（cp / build）が手順書化されているか
+- [ ] 「修正したのに動かない」と感じた際、コンテナ内のファイルを `docker exec ... cat` で実際に確認するフローがあるか
+
+---
+
 ## まとめ: フェーズ完了の定義
 
 以下をすべて満たしてフェーズ完了とする:
@@ -157,3 +260,20 @@
 3. **ブラウザ確認**: 実際にアクセスして画面が動作し、スクリーンショットをPRに添付
 4. **環境変数**: `docker-compose.yml`・`phpunit.xml`・`.env.example` がセット更新済み
 5. **廃止フィールド**: 設計変更に伴うフィールド削除がエンティティ・フォーム・コントローラーで揃っている
+6. **Docker 初回起動**: `docker compose down -v && docker compose up --build` で DB 初期化からエラーなく起動する（018 起因）
+7. **認証フロー E2E**: ログイン → リロード → 自動リフレッシュのフローが通る（019・020 起因）
+8. **両レイヤー疎通**: デプロイ後に Console（8000）と Core（8080）を直接 curl して、新エンドポイントが両方とも応答する（016 起因）
+
+---
+
+## 構造的な再発パターン（001〜020 通算）
+
+[20260503_trouble_analysis.md](../analysis/20260503_trouble_analysis.md)・[20260504_trouble_analysis.md](../analysis/20260504_trouble_analysis.md)・[20260505_trouble_analysis.md](../analysis/20260505_trouble_analysis.md) の合算で、5 つの再発パターンが認められる。新規実装・修正の際は、自分の作業がどのパターンを再生産しないかを意識する。
+
+| パターン | 該当 |
+|---------|------|
+| デプロイ後ヘルスチェック不在 | 003, 005, 008, 010, 011, 013, 014, 016 |
+| docker-compose / 環境変数の管理漏れ | 002, 004, 008, 009, 010, 015, 018 |
+| フロント / UI の実装検証不在 | 007, 011, 012, 013, 014 |
+| 認証・Cookie・プロキシ層の設計検証不在 | 019, 020 |
+| AWS 運用（コスト・ディスク・デプロイ統合）の未整備 | 016, 017 |
