@@ -1,7 +1,7 @@
 # フェーズX-3：HTTPS化（CloudFront + DuckDNS / 1ドメイン構成）
 
 ## ステータス
-🟡 AWS 構築完了・GitHub Variables 設定とデプロイ実行待ち（2026-05-06）
+✅ 完了（2026-05-06）
 
 ### 実構成（DuckDNS → desec.io / www サブドメイン構成に変更）
 - 正規 URL: **`https://www.amazia-portfolio.dedyn.io/`**
@@ -10,7 +10,26 @@
 - CloudFront ディストリビューションドメイン: `d30j0e0y4f4ybd.cloudfront.net`
 - ACM 証明書（us-east-1）: `arn:aws:acm:us-east-1:741011674945:certificate/1cd548c6-cbde-4bd3-8fa0-65e8dcd76b6a`
 
-経緯詳細は [トラブル030](../../troubles/030_https_via_cloudfront_duckdns_single_domain.md)。
+### 動作確認済み（2026-05-06）
+- ✅ HTTPS でアクセス可能・証明書エラーなし
+- ✅ HTTP→HTTPS リダイレクト
+- ✅ 直 IP `https://13.54.203.95/` は nginx default_server で 444 切断
+- ✅ Console SPA `/console/` 配下で動作・ログイン成功
+- ✅ JWT 検証（HS512 alg 追従）動作
+- ✅ Cookie 中継（Set-Cookie 透過）・属性すべて設計通り（Secure / HttpOnly / Domain=www.amazia-portfolio.dedyn.io / Path=/console/api/auth/refresh）
+- ✅ リロード後ログイン状態維持
+- ✅ Console 画像表示・Market 画像表示
+- ✅ 画像永続化（bind mount + symlink、`docker restart amazia-core` 後も画像生存）
+
+経緯詳細は [トラブル030](../../troubles/030_https_via_cloudfront_duckdns_single_domain.md)
+（並びに動作確認の延長で発見した [031 Cookie 中継](../../troubles/031_console_cookie_relay_drops_set_cookie.md) /
+[032 JWT alg 不一致](../../troubles/032_jwt_alg_mismatch_console_vs_core.md) /
+[033 画像配信ルート](../../troubles/033_console_image_file_route_under_auth_jwt.md) も併読推奨）。
+
+### 残課題（X-3 範囲外として記録）
+- パスワード再発行（SES サンドボックス解除 / 送信元検証）の本番動作確認
+- スマホ Safari での動作確認
+- Spring コンテナの非 root 化と storage 所有権統一（現状 root 所有でも動作するが将来的なセキュリティベストプラクティスとして）
 
 ## 位置付け
 時系列フェーズ（1〜20）に依存しない横断的インフラ改善フェーズ。

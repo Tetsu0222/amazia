@@ -234,7 +234,7 @@ flowchart TD
 | Phase 20 | ドキュメント整理 | 🔲 未着手 | [phase20_documentation_overhaul.md](docs/design/phase11_20/phase20_documentation_overhaul.md) |
 | Phase X-1 | デプロイパイプライン高速化 | 🔲 未着手（随時） | [phaseX-1_deploy_optimization.md](docs/design/phaseX/phaseX-1_deploy_optimization.md) |
 | Phase X-2 | デプロイパイプライン再設計 | ✅ 完了 | [phaseX-2_deploy_pipeline_redesign.md](docs/design/phaseX/phaseX-2_deploy_pipeline_redesign.md) |
-| Phase X-3 | HTTPS化（CloudFront + DDNS / 1ドメイン構成） | 🟡 AWS構築完了・デプロイ待ち | [phaseX-3_https_via_cloudfront.md](docs/design/phaseX/phaseX-3_https_via_cloudfront.md) |
+| Phase X-3 | HTTPS化（CloudFront + DDNS / 1ドメイン構成） | ✅ 完了 | [phaseX-3_https_via_cloudfront.md](docs/design/phaseX/phaseX-3_https_via_cloudfront.md) |
 | Phase X-4 | t3.micro 復帰のためのメモリ最適化（Spring Heap制限 + Swap） | 🔲 未着手 | [phaseX-4_memory_optimization_for_t3_micro.md](docs/design/phaseX/phaseX-4_memory_optimization_for_t3_micro.md) |
 
 ---
