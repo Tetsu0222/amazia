@@ -65,3 +65,70 @@ CREATE TABLE IF NOT EXISTS workflow_requests_detail (
 ALTER TABLE products            ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE product_sku_prices  ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE product_sku_stocks  ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+
+-- ============================================================================
+-- フェーズ13: Amazia Market ログイン・会員登録機能用テーブル
+--   設計書: docs/design/phase11_20/phase13_market_auth.md
+--   migration: V5__phase13_market_auth_tables.sql と同内容（IF NOT EXISTS 版）
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS market_customers (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name_last       VARCHAR(100)  NOT NULL,
+    name_first      VARCHAR(100)  NOT NULL,
+    postal_code     VARCHAR(8)    NOT NULL,
+    address         VARCHAR(255)  NOT NULL,
+    birthday        DATE          NOT NULL,
+    email           VARCHAR(255)  NOT NULL UNIQUE,
+    password_hash   VARCHAR(255)  NOT NULL,
+    payment_method  VARCHAR(20)   NOT NULL,
+    card_token      VARCHAR(255)  NULL,
+    active_flag     BOOLEAN       NOT NULL DEFAULT TRUE,
+    failed_attempts INT           NOT NULL DEFAULT 0,
+    locked_until    DATETIME      NULL,
+    created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS market_customer_password_histories (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    customer_id   BIGINT UNSIGNED NOT NULL,
+    password_hash VARCHAR(255)    NOT NULL,
+    created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_mcph_customer (customer_id),
+    CONSTRAINT fk_mcph_customer FOREIGN KEY (customer_id) REFERENCES market_customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS market_customers_password_reset_tokens (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    customer_id BIGINT UNSIGNED NOT NULL,
+    token_hash  VARCHAR(255)    NOT NULL UNIQUE,
+    expires_at  DATETIME        NOT NULL,
+    used        BOOLEAN         NOT NULL DEFAULT FALSE,
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_mcprt_customer (customer_id),
+    CONSTRAINT fk_mcprt_customer FOREIGN KEY (customer_id) REFERENCES market_customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS market_sessions (
+    session_id       VARCHAR(64)     NOT NULL PRIMARY KEY,
+    customer_id      BIGINT UNSIGNED NOT NULL,
+    csrf_token       VARCHAR(64)     NOT NULL,
+    expires_at       DATETIME        NOT NULL,
+    created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_accessed_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ms_customer (customer_id),
+    INDEX idx_ms_expires (expires_at),
+    CONSTRAINT fk_ms_customer FOREIGN KEY (customer_id) REFERENCES market_customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS postal_addresses (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    postal_code VARCHAR(8)   NOT NULL,
+    prefecture  VARCHAR(20)  NOT NULL,
+    city        VARCHAR(100) NOT NULL,
+    town        VARCHAR(200) NOT NULL,
+    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_pa_postal_code (postal_code),
+    INDEX idx_pa_pref_city (prefecture, city)
+);

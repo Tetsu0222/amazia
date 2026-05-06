@@ -40,6 +40,19 @@ services:
       REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
       REFRESH_COOKIE_DOMAIN: ${REFRESH_COOKIE_DOMAIN:-}
       REFRESH_COOKIE_PATH: ${REFRESH_COOKIE_PATH:-/api/auth/refresh}
+      # フェーズ13: Market 顧客セッション Cookie 設定
+      # 平文 HTTP 運用なら全て既定値（false / 空 / 1800）でよい。CloudFront 経由では true / ドメイン指定。
+      MARKET_COOKIE_SECURE: ${MARKET_COOKIE_SECURE:-false}
+      MARKET_COOKIE_DOMAIN: ${MARKET_COOKIE_DOMAIN:-}
+      MARKET_SESSION_TTL_SECONDS: ${MARKET_SESSION_TTL_SECONDS:-1800}
+      # フェーズ13: Market 顧客アカウント運用（試行回数・ロック・最低年齢・パスワード）
+      MARKET_MAX_FAILED_ATTEMPTS: ${MARKET_MAX_FAILED_ATTEMPTS:-5}
+      MARKET_LOCK_MINUTES: ${MARKET_LOCK_MINUTES:-5}
+      MARKET_MIN_AGE_YEARS: ${MARKET_MIN_AGE_YEARS:-18}
+      MARKET_PASSWORD_HISTORY_SIZE: ${MARKET_PASSWORD_HISTORY_SIZE:-5}
+      MARKET_PASSWORD_MIN_LENGTH: ${MARKET_PASSWORD_MIN_LENGTH:-8}
+      # フェーズ13-5: 郵便局 KEN_ALL.CSV 取込 URL（フェーズ17 で月次バッチ化）
+      POSTAL_CSV_URL: ${POSTAL_CSV_URL:-https://www.post.japanpost.jp/zipcode/dl/kogaki/zip/ken_all.zip}
     volumes:
       # SKU 画像など Spring が /app/storage/ に保存するファイルを EBS 上に永続化。
       # 本番 EC2 では deploy.yml が /home/ssm-user/amazia-storage を実体として用意し、

@@ -37,6 +37,10 @@ services:
       JWT_REFRESH_TTL: 1209600
       AWS_SES_FROM_ADDRESS: no-reply@amazia.example.com
       PASSWORD_RESET_URL: http://localhost:5174/password/reset/confirm
+      # フェーズ13: Market 顧客セッション Cookie 設定（local は HTTP 平文のため secure=false / domain 空）
+      MARKET_COOKIE_SECURE: "false"
+      MARKET_COOKIE_DOMAIN: ""
+      MARKET_SESSION_TTL_SECONDS: "1800"
     volumes:
       - ./amazia-core/storage:/app/storage
     depends_on:
