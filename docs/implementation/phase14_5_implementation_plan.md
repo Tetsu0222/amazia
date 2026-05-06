@@ -99,7 +99,16 @@ ALTER TABLE products ADD COLUMN accept_backorder     BOOLEAN NOT NULL DEFAULT FA
 
 ---
 
-## 2. Step C-2：PreorderStatusService + JUnit
+## 2. Step C-2：PreorderStatusService + JUnit ✅ 完了（2026-05-07）
+
+### 完了サマリ
+- `com.example.product.entity.PreorderStatus`（enum 6 種）を新規作成
+- `com.example.shared.config.ClockConfig` を新規追加（`Clock.system(Asia/Tokyo)` Bean）
+- `ProductSkuStockRepository#sumQuantityByProductId` を追加（native SUM クエリ・`product_id` 絞り込み）
+- `com.example.product.service.PreorderStatusService` を新規作成（Clock 注入で時刻固定可能）
+- `PreorderStatusServiceTest` を新規作成、13 ケース（6 ステータス + 境界値 5 + 複数 SKU 合計 + 異常系）すべてグリーン
+- amazia-core 全体 `mvn test` 247/247 グリーン（C-1 完了時 234 → +13 件）
+
 
 ### 2-1. 配置とシグネチャ
 
