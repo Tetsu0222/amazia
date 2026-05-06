@@ -22,4 +22,5 @@ Route::middleware('auth.jwt')->group(function () {
     require __DIR__.'/api/Sales.php';
     require __DIR__.'/api/User.php';
     require __DIR__.'/api/Workflow.php';
+    require __DIR__.'/api/OperationLog.php';
 });

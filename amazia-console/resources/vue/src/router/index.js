@@ -19,6 +19,7 @@ import WorkflowDetail             from '../features/workflows/pages/WorkflowDeta
 import WorkflowRequestForm        from '../features/workflows/pages/WorkflowRequestForm.vue';
 import SalesList                  from '../features/sales/pages/SalesList.vue';
 import SalesReturnList            from '../features/salesReturn/pages/SalesReturnList.vue';
+import OperationLogList           from '../features/operationLog/pages/OperationLogList.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -44,6 +45,7 @@ const routes = [
 
   { path: '/sales',                    component: SalesList,           meta: { requiresAuth: true } },
   { path: '/sales-returns',            component: SalesReturnList,     meta: { requiresAuth: true } },
+  { path: '/operation-logs',           component: OperationLogList,    meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({
