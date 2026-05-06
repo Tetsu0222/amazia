@@ -1,7 +1,9 @@
 # フェーズ14：購入機能（改訂版 r4）
 
 ## ステータス
-🔲 未着手
+✅ 完了（2026-05-06）
+
+> **スコープ撤退の判断（2026-05-06）**：本書 r4 のうち、§予約機能（B-7：予約ステータス判定 API）と phase15 r5 への要請整理（B-8）は **phase14.5 として別フェーズに分離** した。背景は [phase14_5_preorder_status.md](phase14_5_preorder_status.md) と [operational_insights.md §スコープ撤退の判断ログ](../../ai_context/operational_insights.md) を参照。本書 r4 のステータスは「Step 0 / A / B-1〜B-6（B-5 細分化版）の実装が完了した状態」を指す。
 
 ## 改訂履歴
 | 版 | 日付 | 内容 |
@@ -11,7 +13,8 @@
 | r1 | 2026-05-06 | phase15 r3／r4 から積み上がった要請（P14-1 〜 P14-12）と phase14 単独観点（P14-13 〜 P14-17）を反映。 |
 | r2 | 2026-05-06 | 再レビューコメント Q14-1 〜 Q14-14 を反映。実装段取り Step A〜D・本番リリース前スキーマ確定前提・予約購入の出荷時減算・機能フラグ段階化など。 |
 | r3 | 2026-05-06 | 再々レビューコメント S14-1 〜 S14-12 を反映。出荷時在庫不足の挙動を「例外＋PENDING 維持」に確定、予約購入 `sale` 記録の `created_by_user_id` を出荷操作管理者に細分化、機能フラグの継承ロジック明文化と Console 表示キー追加、Step 4 で機能フラグ撤去、`payment_id` 冪等処理に user_id/product_id/amount 一致チェック追加（セキュリティ対策）など。 |
-| **r4** | **2026-05-06** | **【大幅改訂】フェーズ10で実装済みの SKU 単位在庫モデル（`product_skus` / `product_sku_stocks` / `product_sku_stock_transactions` / `ReceiveProductSkuStockService`）を在庫の正本として採用。これに伴い r3 の以下を削除：(1) `inventories` / `inbounds` / `inventory_movements` / `warehouses` 新設、(2) `InventorySyncService` による並行運用、(3) 機能フラグ `inventory.read_source` による段階移行、(4) 在庫モデル完全移行 Step C〜E、(5) `products.stock` 廃止計画。また phase13 で実装済みの `market_customers` を踏まえ、`sales.user_id` の参照先を `market_customers.id` に確定。会員住所（`market_customers.postal_code`/`address`）と注文時配送先住所（新設 `address` テーブル：1注文1スナップショット）を完全に分離。`payment_methods` マスタを新設し、`market_customers.payment_method` は会員ごとの既定値として残置（注文時は `sales.payment_method_id` で個別選択）。在庫キーを `product_id` から `sku_id` に変更。同時実行制御は既存 `@Version` 楽観ロックを維持。Step 構造を Step 0 / A / B の3段階に縮小。 |
+| r4 | 2026-05-06 | 【大幅改訂】フェーズ10で実装済みの SKU 単位在庫モデル（`product_skus` / `product_sku_stocks` / `product_sku_stock_transactions` / `ReceiveProductSkuStockService`）を在庫の正本として採用。これに伴い r3 の以下を削除：(1) `inventories` / `inbounds` / `inventory_movements` / `warehouses` 新設、(2) `InventorySyncService` による並行運用、(3) 機能フラグ `inventory.read_source` による段階移行、(4) 在庫モデル完全移行 Step C〜E、(5) `products.stock` 廃止計画。また phase13 で実装済みの `market_customers` を踏まえ、`sales.user_id` の参照先を `market_customers.id` に確定。会員住所（`market_customers.postal_code`/`address`）と注文時配送先住所（新設 `address` テーブル：1注文1スナップショット）を完全に分離。`payment_methods` マスタを新設し、`market_customers.payment_method` は会員ごとの既定値として残置（注文時は `sales.payment_method_id` で個別選択）。在庫キーを `product_id` から `sku_id` に変更。同時実行制御は既存 `@Version` 楽観ロックを維持。Step 構造を Step 0 / A / B の3段階に縮小。 |
+| **r4 実装完了** | **2026-05-06** | **Step 0 / A / B-1〜B-6（B-5 は B-5-1〜B-5-8 に細分化）まで実装完了。Core 234/234・Console 80/80・Market 53/53 全テストグリーン、本番 HTTPS で end-to-end 動作確認済み。残スコープ（B-7 予約ステータス判定 API / B-8 phase15 r5 要請整理）は工数規模を再評価し、ポートフォリオ的なスコープ妥当性の観点から phase14.5 として別フェーズに分離（[phase14_5_preorder_status.md](phase14_5_preorder_status.md)）。本書 §予約機能（リアルタイム判定 API）の章は phase14.5 着手時に Product Entity 拡張（release_date / preorder_start_date / accept_preorder / accept_backorder）と合わせて実装する。** |
 
 ## 範囲
 - Amazia Console
@@ -330,6 +333,9 @@ catch UniqueViolation on payment_id:
 ---
 
 ## 予約機能（Core のステータスを利用）
+
+> **phase14.5 へ分離（2026-05-06）**：本章の判定 API（B-7）は phase14 r4 実装時に **Product Entity の拡張カラム不足**（release_date / preorder_start_date / accept_preorder / accept_backorder の未実装）が判明し、Console 商品登録 UI の改修まで含めると規模が大きくなることから、独立した [phase14.5（phase14_5_preorder_status.md）](phase14_5_preorder_status.md) として切り出した。本表のステータス定義は phase14.5 でそのまま採用される。
+
 | ステータス | Market 表示 |
 |-----------|-------------|
 | NOT_PUBLIC | 非表示 |

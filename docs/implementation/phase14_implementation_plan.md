@@ -429,11 +429,44 @@ phase15 r4 設計書をベースに実装。ただし以下の調整が必要：
 
 ---
 
-## 6. 参考リンク
+## 7. phase14.5 への分離（2026-05-06 追記）
+
+### 7-1. 経緯
+
+Step B-6 完了時点で「個人開発・短期スパン（4〜5日）のポートフォリオ」というプロジェクト性格に対して工数規模を再評価した結果、**残スコープを別フェーズに切り出す判断**を行った。
+
+「設計書通り全部やる」より「動く範囲で線を引いて締める」ことを優先し、残った B-7 / B-8 は phase14.5 として独立化する。
+
+### 7-2. phase14.5 に分離した範囲
+
+| 元 Step | 内容 | 分離理由 |
+|---------|------|---------|
+| **B-7** | 予約ステータス判定 API（NOT_PUBLIC / PRE_ORDER_NOT_STARTED / PRE_ORDER / ON_SALE / BACK_ORDER / SOLD_OUT） | Product Entity に必要カラム（release_date / preorder_start_date / accept_preorder / accept_backorder）が不足。Entity 拡張 + Console 商品登録 UI 改修まで含めると単独フェーズ規模 |
+| **B-8** | phase15 r5 への要請整理（`shipping_methods` マスタ作成・`DeliveryCreationService.createForSales` 等） | phase15 自体の改訂と一体で扱うのが筋。phase14 単独完了に必須ではない |
+
+### 7-3. phase14 完了の定義（再定義）
+
+本書 Step 0 / A / B-1 〜 B-6（B-5 細分化版含む）の実装完了をもって phase14 完了とする。
+
+完了確認：
+- Core 234/234 / Console 80/80 / Market 53/53 全テストグリーン
+- 本番（CloudFront + EC2）で end-to-end 動作確認済み（Market 購入 → Console 配送ステータス更新 → 返品申請 → 承認 → 返金完了 → 在庫戻し）
+- B-5 で実装した sales_return ワークフローは Console / Market から実機操作で確認済み
+- B-6 操作履歴画面は B-5-8 で記録した log を Console から閲覧・絞り込みできることを確認済み
+
+### 7-4. phase14.5 の参照先
+
+- 設計書: [phase14_5_preorder_status.md](../design/phase11_20/phase14_5_preorder_status.md)
+- スコープ撤退判断の背景: [operational_insights.md §スコープ撤退の判断ログ](../ai_context/operational_insights.md)
+
+---
+
+## 8. 参考リンク
 
 - 設計書: [phase14_shipping.md](../design/phase11_20/phase14_shipping.md)
 - 旧版（r3）: [old/phase14_shipping_r3.md](../design/phase11_20/old/phase14_shipping_r3.md)
 - 関連設計書: [phase15_delivery_management.md](../design/phase11_20/phase15_delivery_management.md)（phase14 r4 完了後に r5 改訂予定）
+- 関連設計書: [phase14_5_preorder_status.md](../design/phase11_20/phase14_5_preorder_status.md)（phase14 から分離した残スコープ）
 - コーディング規約: [coding_guidelines.md](../coding_guidelines.md)
 - AIコンテキスト（テスト観点）: [test_insights.md](../ai_context/test_insights.md)
 - AIコンテキスト（実装・運用パターン）: [operational_insights.md](../ai_context/operational_insights.md)
