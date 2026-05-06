@@ -40,7 +40,7 @@ phase14 r4 完了時点の挙動と整合する。
 
 ---
 
-## 1. Step C-1：schema.sql / Product Entity / test-data 補完
+## 1. Step C-1：schema.sql / Product Entity / test-data 補完 ✅ 完了（2026-05-06）
 
 ### 1-1. 背景
 phase14 r4 設計書は予約機能のための 4 カラムを「Product Entity に存在する」前提で記述していたが、実装上は未追加。本ステップで追加する。
@@ -88,13 +88,14 @@ ALTER TABLE products ADD COLUMN accept_backorder     BOOLEAN NOT NULL DEFAULT FA
 
 `docs/database_design/TBL_products.md` のカラム定義表に 4 カラム（#12〜#15）を追加し、変更履歴に「フェーズ14.5: 予約機能用カラム 4 種を追加」を追記する。
 
-### 1-6. Step C-1 完了条件
+### 1-6. Step C-1 完了条件（2026-05-06 完了）
 
-- [ ] `amazia-core/src/main/resources/schema.sql` に 4 つの ALTER TABLE 追記
-- [ ] `Product.java` に 4 フィールド + getter/setter 追加
-- [ ] `TBL_products.md` 更新
-- [ ] `mvn -pl amazia-core test` グリーン（既存テストへの影響なし）
-- [ ] Core 起動時に schema.sql の冪等 SQL がエラーなく流れる（既存環境の products に 4 カラムが追加される）
+- [x] `amazia-core/src/main/resources/schema.sql` に 4 つの ALTER TABLE 追記
+- [x] `Product.java` に 4 フィールド + getter/setter 追加（`LocalDate releaseDate` / `LocalDate preorderStartDate` / `boolean acceptPreorder` / `boolean acceptBackorder`）
+- [x] `TBL_products.md` 更新（カラム表 #12〜#15 / 変更履歴 / マイグレーションファイル節）
+- [x] `ER_diagram.md` の `products` テーブルに 4 カラム反映
+- [x] `mvn test`（amazia-core）234/234 グリーン（既存テストへの影響なし）
+- [ ] Core 起動時に schema.sql の冪等 SQL がエラーなく流れる（**未確認**：本番 MySQL での `ALTER TABLE ... ADD COLUMN` 重複時の挙動は次回 Core 再起動時に確認）
 
 ---
 

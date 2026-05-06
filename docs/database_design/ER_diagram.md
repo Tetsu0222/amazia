@@ -93,6 +93,10 @@ erDiagram
         VARCHAR status_code
         DATETIME publish_start
         DATETIME publish_end
+        DATE release_date
+        DATE preorder_start_date
+        BOOLEAN accept_preorder
+        BOOLEAN accept_backorder
         BIGINT version
         DATETIME created_at
         DATETIME updated_at
