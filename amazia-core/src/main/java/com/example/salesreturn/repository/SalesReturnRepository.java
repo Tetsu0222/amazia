@@ -11,4 +11,5 @@ public interface SalesReturnRepository extends JpaRepository<SalesReturn, Long> 
     List<SalesReturn> findBySalesId(Long salesId);
     List<SalesReturn> findByStatus(String status);
     Optional<SalesReturn> findFirstBySalesIdAndStatusIn(Long salesId, Collection<String> statuses);
+    List<SalesReturn> findAllByOrderByCreatedAtDescIdDesc();
 }
