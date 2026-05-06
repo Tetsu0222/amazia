@@ -31,7 +31,7 @@ export default function ProductList() {
       )}
       <Grid container spacing={3}>
         {products.map(p => (
-          <Grid item xs={12} sm={6} md={4} key={p.productId}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={p.productId}>
             <Card sx={{ height: '100%' }}>
               <CardActionArea
                 sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}

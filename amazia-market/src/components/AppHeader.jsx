@@ -22,7 +22,7 @@ export default function AppHeader() {
         >
           Amazia Market
         </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           {isAuthenticated ? (
             <>
               <Box sx={{ display: { xs: 'none', sm: 'block' } }}>

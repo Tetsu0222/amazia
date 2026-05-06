@@ -44,6 +44,9 @@
 | 032 | [JWT 署名アルゴリズム不一致で API が 401](032_jwt_alg_mismatch_console_vs_core.md) | Core が HS512 で発行するトークンを Console が SHA-256 固定で検証していて必ず署名不一致・alg ヘッダ追従に修正 | ✅ 解決済 | - | - |
 | 033 | [Console 経由の SKU 画像配信が auth.jwt 配下にあり 401](033_console_image_file_route_under_auth_jwt.md) | `<img src>` は Authorization を運ばないのに画像配信ルートが auth.jwt 内にあり必ず 401・公開ルートに移動 | ✅ 解決済 | - | - |
 | 034 | [フェーズ13 トラブル0件の不在分析（メタ）](034_phase13_no_incident_analysis.md) | phase13 でトラブル記録が 0 件だったこと自体を分析。設計成熟（仮説A）／運用薄（仮説B）／観測死角（仮説C）の切り分けを将来課題として残す | 🟡 様子見 | - | - |
+| 035 | [Market 購入ボタンで sku_id=undefined](035_market_checkout_sku_id_undefined.md) | Core SkuDetail の getter は `getSkuId()` で JSON は `skuId` だが、Market 側で `selectedSku.id` を参照していて undefined。テストデータも実 JSON 形式と乖離していた | ✅ 解決済 | - | - |
+| 036 | [MUI v9 移行漏れ（Grid v1構文 + Stack props 透過）](036_mui_grid_v1_to_v2_migration_missing.md) | フェーズ9・10で書かれた `<Grid item xs={...}>` の廃止 + MUI v9 の Stack で `alignItems`/`justifyContent` を直接 props に渡せず DOM 透過する仕様変更を見逃していた。複数フェーズを跨いで放置（後日メタ評価対象） | ✅ 解決済 | - | - |
+| 037 | [Flyway 利用と誤認しフェーズ14テーブルが本番に作成されず](037_flyway_misassumed_phase14_tables_missing.md) | 本プロジェクトは Flyway 未導入で `schema.sql` 方式だが、`db/migration/` ディレクトリの存在から Flyway と外挿。Step 0/A で作った V6-V11 が死ファイル化し、注文確定 API が `payment_methods` 不在で 500 になっていた。035 と同型の「外挿による誤認」の再発（メタ評価対象） | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

@@ -16,9 +16,9 @@ vi.mock('../../customer/context/useAuth', () => ({
 const PRODUCT_DATA = {
   product: { name: 'テストシャツ', description: '説明文です' },
   skus: [
-    { id: 101, color: '赤', size: 'S', price: 3000, stock: 10, images: [] },
-    { id: 102, color: '赤', size: 'M', price: 3200, stock: 0,  images: [] },
-    { id: 103, color: '青', size: 'S', price: 2800, stock: 5,  images: [] },
+    { skuId: 101, color: '赤', size: 'S', price: 3000, stock: 10, images: [] },
+    { skuId: 102, color: '赤', size: 'M', price: 3200, stock: 0,  images: [] },
+    { skuId: 103, color: '青', size: 'S', price: 2800, stock: 5,  images: [] },
   ],
 };
 

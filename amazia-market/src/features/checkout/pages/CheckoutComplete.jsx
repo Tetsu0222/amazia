@@ -29,7 +29,7 @@ export default function CheckoutComplete() {
             <Typography variant="body2" color="text.secondary">お支払い金額</Typography>
             <Typography variant="h5" color="primary">¥{result.amount?.toLocaleString()}</Typography>
           </Box>
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
             <Button onClick={() => navigate('/')}>商品一覧へ</Button>
             <Button variant="contained" onClick={() => navigate('/mypage')}>マイページへ</Button>
           </Stack>

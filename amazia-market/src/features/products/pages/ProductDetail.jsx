@@ -191,7 +191,7 @@ export default function ProductDetail() {
                   color="primary"
                   disabled={selectedSku.stock <= 0}
                   onClick={() => {
-                    const target = `/checkout?sku_id=${selectedSku.id}&quantity=1`;
+                    const target = `/checkout?product_id=${id}&sku_id=${selectedSku.skuId}&quantity=1`;
                     if (!isAuthenticated) {
                       navigate('/login', { state: { from: target } });
                     } else {

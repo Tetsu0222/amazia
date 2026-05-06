@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container, Paper, Stack, Typography, Divider,
-  CircularProgress, Alert, Box,
+  CircularProgress, Alert, Box, Button,
 } from '@mui/material';
 import { getMyPage } from '../api/customer';
 
@@ -21,6 +22,7 @@ function Row({ label, children }) {
 }
 
 export default function MyPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,7 +41,12 @@ export default function MyPage() {
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Paper sx={{ p: 4 }}>
-        <Typography variant="h5" gutterBottom>マイページ</Typography>
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5">マイページ</Typography>
+          <Button variant="outlined" onClick={() => navigate('/orders')}>
+            購入履歴を見る
+          </Button>
+        </Stack>
         <Divider sx={{ mb: 2 }} />
         <Stack spacing={1.5}>
           <Row label="お名前">{data.nameLast} {data.nameFirst}</Row>

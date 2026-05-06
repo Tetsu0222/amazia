@@ -22,3 +22,6 @@ client.interceptors.request.use((config) => {
 
 export const confirmOrder = (payload) =>
   client.post('/orders/confirm', payload).then((r) => r.data);
+
+export const getMyPurchaseHistory = () =>
+  client.get('/orders').then((r) => r.data);

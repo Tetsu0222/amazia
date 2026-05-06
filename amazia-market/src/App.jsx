@@ -12,6 +12,7 @@ import ProtectedRoute from './features/customer/components/ProtectedRoute';
 import AppHeader from './components/AppHeader';
 import Checkout from './features/checkout/pages/Checkout';
 import CheckoutComplete from './features/checkout/pages/CheckoutComplete';
+import PurchaseHistory from './features/orders/pages/PurchaseHistory';
 
 function Layout() {
   return (
@@ -56,6 +57,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <CheckoutComplete />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <PurchaseHistory />
                 </ProtectedRoute>
               }
             />

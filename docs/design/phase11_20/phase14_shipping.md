@@ -49,11 +49,16 @@
 - `sales` / `sales_return` / `address` / `payment_methods` / `shipping_statuses` / `operation_logs` は本書の Step 0 で新規作成。既存レコード移行は不要。
 - 既存ユーザの売上・在庫履歴を引き継ぐ移行マイグレーションは本書のスコープ外。
 
-### D. DB マイグレーション管理方針（r4 で明文化）
-- **業務テーブル（`address` / `payment_methods` / `shipping_statuses` / `sales` / `sales_return` / `operation_logs` 等）は Core 側 Flyway（`amazia-core/src/main/resources/db/migration/V*.sql`）で管理する**
-- 既存方針との整合：roles / permissions / users / market_customers / postal_addresses / workflow_* など、業務テーブルはすべて V1〜V5 で Core Flyway に集約済
+### D. DB マイグレーション管理方針（r4 で明文化／**037 起因で 2026-05-06 訂正**）
+
+> **訂正注記（[037](../../troubles/037_flyway_misassumed_phase14_tables_missing.md) 起因）**：r4 改訂時に「Flyway で管理」と記述したが、**本プロジェクトは Flyway 未導入**（pom.xml に依存なし）であった。実態は `schema.sql` を `spring.sql.init.mode=always` で起動時実行する方式。`db/migration/V*.sql` は過去の名残ファイルで起動時に何も実行されない。下記方針は実態に合わせて訂正済み。
+
+- **業務テーブル（`address` / `payment_methods` / `shipping_statuses` / `sales` / `sales_return` / `operation_logs` 等）は Core 側 `schema.sql`（`amazia-core/src/main/resources/schema.sql`）で管理する**
+  - `CREATE TABLE IF NOT EXISTS` / `INSERT IGNORE` / `ALTER TABLE ... ADD COLUMN`（重複は `spring.sql.init.continue-on-error=true` で許容）の冪等構文で記述
+- 既存方針との整合：roles / permissions / users / market_customers / postal_addresses / workflow_* など、業務テーブルはすべて schema.sql に冪等版が存在する
 - Console Laravel migrations には業務テーブルを追加しない（Laravel 標準テーブル `users`（personal_access_tokens 用）/ `cache` / `jobs` のみ管理）
-- フェーズ10 の SKU 在庫モデルは JPA `@Entity` から自動生成されているため、Step A で `product_sku_stock_transactions` を拡張する際は Flyway SQL ファイルで明示的に ALTER する
+- フェーズ10 の SKU 在庫モデル（`product_skus` / `product_sku_stocks` / `product_sku_stock_transactions` 等）は JPA `@Entity` から本番でも生成されている既存実装を踏襲。Step A で `product_sku_stock_transactions` を拡張する際は **schema.sql 末尾に `ALTER TABLE ... ADD COLUMN` を追加**する（`continue-on-error=true` で再起動時の重複は無視）
+- テスト環境は `spring.sql.init.schema-locations=` を空に設定して schema.sql を読み込まず、`ddl-auto=create-drop` で JPA Entity から H2 上にテーブル自動生成。本番 MySQL とテスト H2 の DB 初期化方式は異なるため、`mvn test` 緑＝本番動作とは限らない（[037](../../troubles/037_flyway_misassumed_phase14_tables_missing.md)）
 
 ---
 

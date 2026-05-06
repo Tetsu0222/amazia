@@ -68,7 +68,7 @@ export default function Login() {
             >
               {submitting ? 'ログイン中…' : 'ログイン'}
             </Button>
-            <Stack direction="row" justifyContent="space-between">
+            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
               <Link component={RouterLink} to="/register" variant="body2">
                 会員登録はこちら
               </Link>

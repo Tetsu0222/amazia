@@ -32,12 +32,13 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { customer } = useAuth();
 
+  const productIdParam = searchParams.get('product_id');
   const skuIdParam = searchParams.get('sku_id');
   const quantityParam = searchParams.get('quantity');
+  const productId = productIdParam ? Number(productIdParam) : null;
   const skuId = skuIdParam ? Number(skuIdParam) : null;
   const initialQuantity = quantityParam ? Math.max(1, Number(quantityParam)) : 1;
 
-  const [productId, setProductId] = useState(null);
   const [productData, setProductData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,37 +49,20 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  // SKU から商品を引くため、URL に sku_id だけだと商品情報が取れない。
-  // ProductDetail から遷移してきた場合は sku_id しか持っていないため、
-  // 全商品 SKU から探す代わりに URL に product_id を持たせる方式が望ましいが、
-  // 本フェーズでは ProductList などからも遷移可能とするため、
-  // sku_id から逆引きする最小ロジックを Core 側 API で追加することを将来課題とし、
-  // 当面は ProductDetail 経由のみを対象とし state 経由 or リダイレクトで補完する。
-  // ここでは sku_id から /api/products を全件取得して該当 SKU を含む product を探す簡便実装。
+  // product_id + sku_id をクエリで受け取り、product 詳細 API を 1 回だけ呼んで対象 SKU を抽出する。
+  // 旧実装は SKU から逆引きするため全商品取得していたが、Summary に skus が含まれず破綻していた（036 関連）。
 
   useEffect(() => {
     let canceled = false;
-    if (skuId == null) {
-      setError('購入対象の SKU が指定されていません。');
+    if (productId == null || skuId == null) {
+      setError('購入対象の商品または SKU が指定されていません。');
       setLoading(false);
       return;
     }
     (async () => {
       try {
-        // 商品 ID は location.state ではなく ProductDetail からの sku_id クエリのみで来る場合に備え、
-        // 全件取得してからローカルで特定する。商品数が大きくなったら Core 側に sku_id 起点 API を追加する。
-        const list = await import('../../products/api/products').then(m => m.getMarketProducts());
-        const target = list.find(p => p.skus?.some(s => s.id === skuId));
-        if (!target) {
-          if (!canceled) {
-            setError('対象の商品が見つかりません。');
-            setLoading(false);
-          }
-          return;
-        }
-        const detail = await getMarketProduct(target.product.id);
+        const detail = await getMarketProduct(productId);
         if (!canceled) {
-          setProductId(target.product.id);
           setProductData(detail);
           setLoading(false);
         }
@@ -90,11 +74,11 @@ export default function Checkout() {
       }
     })();
     return () => { canceled = true; };
-  }, [skuId]);
+  }, [productId, skuId]);
 
   const selectedSku = useMemo(() => {
     if (!productData) return null;
-    return productData.skus.find(s => s.id === skuId) ?? null;
+    return productData.skus.find(s => s.skuId === skuId) ?? null;
   }, [productData, skuId]);
 
   const totalAmount = useMemo(() => {
@@ -107,7 +91,7 @@ export default function Checkout() {
     setSubmitting(true);
     try {
       const result = await confirmOrder({
-        skuId: selectedSku.id,
+        skuId: selectedSku.skuId,
         quantity,
         paymentMethodId,
         shippingMethodId,
@@ -160,7 +144,7 @@ export default function Checkout() {
             type="number"
             value={quantity}
             onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-            inputProps={{ min: 1, max: selectedSku.stock ?? 99 }}
+            slotProps={{ htmlInput: { min: 1, max: selectedSku.stock ?? 99 } }}
           />
           {stockShortage && (
             <Alert severity="warning">在庫数（{selectedSku.stock}）を超えています。</Alert>
@@ -205,14 +189,14 @@ export default function Checkout() {
 
           <Divider />
 
-          <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Typography variant="subtitle1">合計</Typography>
             <Typography variant="h5" color="primary">¥{totalAmount.toLocaleString()}</Typography>
           </Stack>
 
           {submitError && <Alert severity="error">{submitError}</Alert>}
 
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
             <Button onClick={() => navigate(`/products/${productId}`)} disabled={submitting}>
               戻る
             </Button>
