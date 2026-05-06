@@ -199,9 +199,11 @@ export default function ProductDetail() {
             {/* 価格・在庫 */}
             {selectedSku && (
               <Stack spacing={1}>
-                <Typography variant="h5" color="primary">
-                  ¥{selectedSku.price != null ? selectedSku.price.toLocaleString() : '—'}
-                </Typography>
+                {selectedSku.price != null && (
+                  <Typography variant="h5" color="primary">
+                    ¥{selectedSku.price.toLocaleString()}
+                  </Typography>
+                )}
                 {/* ON_SALE の在庫表示は SKU 単位の数値、その他は商品ステータスに準拠 */}
                 {preorderStatus === PREORDER_STATUS.ON_SALE && (
                   <Box>

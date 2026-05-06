@@ -38,6 +38,8 @@ export default function Checkout() {
   const productId = productIdParam ? Number(productIdParam) : null;
   const skuId = skuIdParam ? Number(skuIdParam) : null;
   const initialQuantity = quantityParam ? Math.max(1, Number(quantityParam)) : 1;
+  // フェーズ14.5 §4-2: ProductDetail から ?preorder=1 で遷移したとき予約モード
+  const isPreorder = searchParams.get('preorder') === '1';
 
   const [productData, setProductData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ export default function Checkout() {
         quantity,
         paymentMethodId,
         shippingMethodId,
-        preorder: false,
+        preorder: isPreorder,
       });
       navigate('/checkout/complete', {
         state: {
@@ -125,11 +127,14 @@ export default function Checkout() {
   if (error) return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
   if (!selectedSku) return <Alert severity="error" sx={{ m: 4 }}>SKU が見つかりません。</Alert>;
 
-  const stockShortage = selectedSku.stock != null && quantity > selectedSku.stock;
+  // 予約モードでは在庫数バリデーションを行わない（発売前 / 在庫切れの予約継続が前提）
+  const stockShortage = !isPreorder && selectedSku.stock != null && quantity > selectedSku.stock;
 
   return (
     <Container sx={{ mt: 4 }} maxWidth="sm">
-      <Typography variant="h5" gutterBottom>ご注文内容の確認</Typography>
+      <Typography variant="h5" gutterBottom>
+        {isPreorder ? 'ご予約内容の確認' : 'ご注文内容の確認'}
+      </Typography>
       <Paper sx={{ p: 3 }}>
         <Stack spacing={2}>
           <Box>
@@ -140,14 +145,18 @@ export default function Checkout() {
           <Divider />
 
           <TextField
-            label="数量"
+            label={isPreorder ? '予約数' : '数量'}
             type="number"
             value={quantity}
             onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-            slotProps={{ htmlInput: { min: 1, max: selectedSku.stock ?? 99 } }}
+            slotProps={{
+              htmlInput: isPreorder
+                ? { min: 1 }
+                : { min: 1, max: selectedSku.stock ?? 99 },
+            }}
           />
           {stockShortage && (
-            <Alert severity="warning">在庫数（{selectedSku.stock}）を超えています。</Alert>
+            <Alert severity="warning">在庫数({selectedSku.stock})を超えています。</Alert>
           )}
 
           <TextField
@@ -205,7 +214,9 @@ export default function Checkout() {
               onClick={handleSubmit}
               disabled={submitting || stockShortage || !customer}
             >
-              {submitting ? '送信中…' : '注文を確定する'}
+              {submitting
+                ? '送信中…'
+                : (isPreorder ? '予約を確定する' : '注文を確定する')}
             </Button>
           </Stack>
         </Stack>

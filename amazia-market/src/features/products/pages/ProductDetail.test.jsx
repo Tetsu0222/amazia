@@ -216,6 +216,22 @@ describe('ProductDetail', () => {
       expect(screen.getByRole('button', { name: '予約する' })).toBeEnabled();
     });
 
+    it('SKU 価格が null のときは ¥ 表記ごと非表示にする', async () => {
+      api.getMarketProduct.mockResolvedValue({
+        product: { name: '価格未設定', description: '' },
+        skus: [{ skuId: 301, color: '紫', size: 'M', price: null, stock: 3, images: [] }],
+        preorderStatus: 'ON_SALE',
+      });
+      renderProductDetail();
+
+      await waitFor(() => screen.getByText('紫'));
+      await userEvent.click(screen.getByText('紫'));
+      await userEvent.click(screen.getByText('M'));
+
+      expect(screen.queryByText(/¥/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/—/)).not.toBeInTheDocument();
+    });
+
     it('SOLD_OUT は購入/予約ボタンが表示されない', async () => {
       api.getMarketProduct.mockResolvedValue({
         product: { name: '完売商品', description: '' },

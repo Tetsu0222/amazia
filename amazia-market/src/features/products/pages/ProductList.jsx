@@ -64,9 +64,11 @@ export default function ProductList() {
                     <Typography variant="body2" color="text.secondary">
                       {p.description ?? ''}
                     </Typography>
-                    <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
-                      ¥{p.minPrice != null ? p.minPrice.toLocaleString() : '—'} 〜
-                    </Typography>
+                    {p.minPrice != null && (
+                      <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
+                        ¥{p.minPrice.toLocaleString()} 〜
+                      </Typography>
+                    )}
                     {p.preorderStatus === PREORDER_STATUS.ON_SALE && (
                       <Typography variant="body2" color="text.secondary">
                         在庫：{p.totalStock} 個

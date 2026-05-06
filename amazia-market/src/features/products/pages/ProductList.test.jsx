@@ -67,6 +67,20 @@ describe('ProductList', () => {
     });
   });
 
+  it('minPrice が null のときは価格行ごと非表示にする', async () => {
+    api.getMarketProducts.mockResolvedValue([
+      {
+        productId: 99, productName: '価格未設定商品', minPrice: null, totalStock: 0,
+        preorderStatus: 'PRE_ORDER', releaseDate: '2026-08-01',
+      },
+    ]);
+    renderProductList();
+
+    await waitFor(() => screen.getByText('価格未設定商品'));
+    expect(screen.queryByText(/¥/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/—/)).not.toBeInTheDocument();
+  });
+
   // フェーズ14.5 §4-2: ステータス別ラベルと補足表示
   it('ON_SALE は「通常販売」ラベルと在庫数を表示する', async () => {
     api.getMarketProducts.mockResolvedValue([
