@@ -39,6 +39,7 @@
 | 029 | [docker compose plugin 消失 + users スキーマ齟齬](029_compose_plugin_lost_and_users_schema_drift.md) | systemd の compose 起動が exit 125、users 業務カラム欠落で Spring が data.sql 失敗、SSM 応答阻害も連鎖 | ✅ 解決済 | - | - |
 | 030 | [HTTPS化を CloudFront + DuckDNS 1ドメイン構成に変更](030_https_via_cloudfront_duckdns_single_domain.md) | フェーズ11 §3 ALB 案を ALB 時間課金（無料枠不可）と整合させるため CloudFront + DuckDNS に切替・コード変更完了 | 🟡 AWS 側作業待ち | - | - |
 | 031 | [Console（Laravel）の Cookie 中継で Set-Cookie が落ちる](031_console_cookie_relay_drops_set_cookie.md) | Guzzle CookieJar 未有効化のため Spring の Set-Cookie がブラウザに届かず本番ログイン後 401・生ヘッダ透過に修正 | ✅ 解決済 | - | - |
+| 032 | [JWT 署名アルゴリズム不一致で API が 401](032_jwt_alg_mismatch_console_vs_core.md) | Core が HS512 で発行するトークンを Console が SHA-256 固定で検証していて必ず署名不一致・alg ヘッダ追従に修正 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

@@ -221,4 +221,7 @@ unzip と docker-compose up の間に以下 3 コマンドを差し込む：
 ### Console（Laravel）の Set-Cookie 中継が機能していない（[031](031_console_cookie_relay_drops_set_cookie.md)）
 Spring が正しく `Set-Cookie` を返しているのに、Laravel の Guzzle ラッパーが CookieJar を有効化していないためブラウザへ転送される `Set-Cookie` が空になっていた。Spring のレスポンスヘッダを生のまま透過する方式に変更。
 
-これら 2 件は X-3 が直接の原因ではないが、本番動作確認をしたのが X-3 完了後だったため、X-3 のデプロイで踏み抜いた形。031 として独立起票しつつ、ここからもクロスリンクして経緯を追えるようにする。
+### JWT 署名アルゴリズム不一致（[032](032_jwt_alg_mismatch_console_vs_core.md)）
+Core の `Keys.hmacShaKeyFor()` が秘密鍵長で alg を自動選択するため、本番の長い `JWT_SECRET` では HS512 が選ばれていた。一方 Console の JWT 検証は SHA-256 固定で、すべての認証必須 API が 401。Console 側を JWT ヘッダの alg に追従する実装に修正。
+
+これら 3 件は X-3 が直接の原因ではないが、本番動作確認をしたのが X-3 完了後だったため、X-3 のデプロイで踏み抜いた形。031・032 として独立起票しつつ、ここからもクロスリンクして経緯を追えるようにする。
