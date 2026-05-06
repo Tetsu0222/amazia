@@ -37,6 +37,12 @@ services:
       REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
       REFRESH_COOKIE_DOMAIN: ${REFRESH_COOKIE_DOMAIN:-}
       REFRESH_COOKIE_PATH: ${REFRESH_COOKIE_PATH:-/api/auth/refresh}
+    volumes:
+      # SKU 画像など Spring が /app/storage/ に保存するファイルを EBS 上に永続化。
+      # 本番 EC2 では deploy.yml が /home/ssm-user/amazia-storage を実体として用意し、
+      # /home/ssm-user/amazia/amazia-core/storage を symlink で同所へ向ける運用。
+      # docker-compose.local.yml も同じ ./amazia-core/storage:/app/storage を使うため記述を揃えている。
+      - ./amazia-core/storage:/app/storage
     depends_on:
       mysql:
         condition: service_healthy

@@ -291,7 +291,9 @@ jobs:
               "docker pull 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-core:latest",
               "docker pull 741011674945.dkr.ecr.ap-southeast-2.amazonaws.com/amazia-console:latest",
               "aws s3 cp s3://fullstack-renaissance-demo/amazia.zip /home/ssm-user/amazia.zip",
-              "cd /home/ssm-user && unzip -o amazia.zip -d amazia",
+              "cd /home/ssm-user && unzip -o amazia.zip -d amazia -x \"amazia/amazia-core/storage/*\"",
+              "mkdir -p /home/ssm-user/amazia-storage && sudo chown -R 1000:1000 /home/ssm-user/amazia-storage",
+              "rm -rf /home/ssm-user/amazia/amazia-core/storage 2>/dev/null; ln -sfn /home/ssm-user/amazia-storage /home/ssm-user/amazia/amazia-core/storage",
               $up
             ]
           }')

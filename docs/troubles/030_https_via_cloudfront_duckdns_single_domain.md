@@ -167,3 +167,46 @@
 9. ルートに CNAME を設定しようとして **NS と競合エラー**
 10. `www` サブドメイン構成に変更・ACM 証明書を `www.amazia-portfolio.dedyn.io` で再発行
 11. CloudFront の Alternate Domain Name と SSL 証明書を `www` 用に切替 → **`https://www.amazia-portfolio.dedyn.io/` 完全動作** ✅
+12. デプロイ後、Console の Vue ビルドエラー（template 内の `import.meta` が `'sourceType: module'` エラー）→ script 内関数化で修正・再デプロイ
+13. `HTTPS_ENABLED` Variables 未設定でデプロイ走行 → 旧 nginx 設定のままになり Console が Market を返す → Variables 設定後 Re-run all jobs
+14. CloudFront キャッシュに前回の Market HTML が残り `/console/` がまだ Market を返す → CloudFront Invalidations `/*` で解消
+15. Market 商品詳細で画像が壊れる → 調査で **Spring の `/app/storage` がコンテナ内のためデプロイで消失**していたことが判明（既存設計の不備が X-3 で顕在化）
+16. **画像永続化対応**：本番 docker-compose.yml に `./amazia-core/storage:/app/storage` の bind mount を追加。EC2 上は `/home/ssm-user/amazia-storage` を実体とし、`/home/ssm-user/amazia/amazia-core/storage` は symlink で実体へ。deploy.yml の unzip にも `-x "amazia/amazia-core/storage/*"` を入れて symlink を保護
+
+---
+
+## 追記（2026-05-06 続き）：画像永続化の経緯
+
+### 症状
+HTTPS 化（X-3）デプロイ後、Market の商品詳細画面で画像が壊れて表示。`https://www.amazia-portfolio.dedyn.io/api/skus/1/image-file/<uuid>.png` が **404 Not Found** を返す。
+
+### 原因
+本番用 `docker-compose.yml` には `amazia-core` サービスにボリュームマウントが**全くなかった**。
+ローカル用 `docker-compose.local.yml` には `./amazia-core/storage:/app/storage` のバインドマウントがあるため、ローカルでは画像が永続化される。
+本番ではコンテナ内に保存されるため、`docker-compose down` → `up` のたびに `/app/storage` 配下が初期化される。
+
+X-3 のデプロイでコンテナ再作成が走ったタイミングで、それまでアップロードされていた画像がすべて消失した。
+X-3 起因ではなく、もともと潜在していた設計の不備が今回のデプロイで顕在化した形。
+
+### 採用した方式：ホストパスバインドマウント + symlink
+
+| 案 | 採否 | 判断根拠 |
+|----|------|----------|
+| Docker 名前付きボリューム | ❌ | 単一 EC2 構成でバックアップが分かりにくい・local と思想が揃わない |
+| **ホストパスバインドマウント + symlink** | ✅ | EBS 永続性・local と同じ思想・EBS スナップショットで一括バックアップ可能 |
+| S3 連携 | ❌ | アプリ側変更必須・X-3 範囲外 |
+
+### 構成
+- **実体ディレクトリ**：`/home/ssm-user/amazia-storage/`（EBS 上の永続データ）
+- **symlink**：`/home/ssm-user/amazia/amazia-core/storage` → `/home/ssm-user/amazia-storage`
+- **docker-compose.yml**：ローカルと同じ `./amazia-core/storage:/app/storage` を記述
+
+### deploy.yml の追加処理
+unzip と docker-compose up の間に以下 3 コマンドを差し込む：
+1. `unzip -o amazia.zip -d amazia -x "amazia/amazia-core/storage/*"` ← zip 内に storage が含まれていても展開せず symlink を保護
+2. `mkdir -p /home/ssm-user/amazia-storage && sudo chown -R 1000:1000 ...` ← 実体ディレクトリ確保
+3. `rm -rf .../storage 2>/dev/null; ln -sfn /home/ssm-user/amazia-storage .../storage` ← symlink 再作成
+
+### 教訓
+- **本番とローカルの docker-compose を同じ思想で書くか、差分を明示的に記録する**。永続化が片方しかないのは事故のもと
+- **アップロード機能を実装したら、本番のストレージ永続化を同タイミングで設計する**（フェーズ9 SKU 画像実装時に本対応すべきだった）

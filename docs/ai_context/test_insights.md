@@ -251,6 +251,32 @@
 
 ---
 
+## カテゴリ12: アップロードファイルの永続化（030 起因）
+
+### 本番とローカルの docker-compose 思想を揃える
+- ローカル (`docker-compose.local.yml`) でファイル永続化していても、本番 (`docker-compose.yml`) で同じマウントがなければデプロイの度にファイルが消える
+- アップロード機能（SKU 画像など）を実装した時点で、本番側のマウントも設計すること
+
+### 採用方式の比較
+| 方式 | 永続性 | 一貫性 |
+|------|--------|--------|
+| 名前付きボリューム (`core_storage:/app/storage`) | ⭕ docker volume | ❌ local とパス記述が異なる |
+| バインドマウント (`./amazia-core/storage:/app/storage`) + ホスト側 symlink | ⭕ EBS 直接 | ⭕ local と同じ記述 |
+| S3 連携 | ⭕ クラウド永続 | アプリ側の SDK 改修必要 |
+
+### symlink 方式の落とし穴
+- deploy で `unzip -o amazia.zip` した時に zip 内にダミーディレクトリがあると symlink が破壊される
+- `unzip -x "amazia/amazia-core/storage/*"` で除外する必要がある
+- ホスト側の権限（owner/group）はコンテナ内 UID と一致させる
+
+### テスト観点
+- [ ] 本番 docker-compose.yml にアップロードファイル用の volume が定義されているか
+- [ ] ローカルと本番で同じパス記述（`./amazia-core/storage:/app/storage` 等）になっているか
+- [ ] deploy スクリプトが symlink を保護する unzip 除外を含んでいるか
+- [ ] デプロイ後にアップロード → コンテナ再起動 → 画像が残るかの E2E 確認手順が用意されているか
+
+---
+
 ## まとめ: フェーズ完了の定義
 
 以下をすべて満たしてフェーズ完了とする:
