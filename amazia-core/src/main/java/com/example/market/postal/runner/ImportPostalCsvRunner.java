@@ -14,8 +14,15 @@ import org.springframework.stereotype.Component;
  * フェーズ17 で組み込むまでは手動コマンド起動とする。
  *
  * 起動例:
- *   java -jar amazia-core.jar --import-postal-csv
- *   docker compose exec amazia-core java -jar app.jar --import-postal-csv
+ *   # ローカル（pom.xml の finalName=amazia-core により target/amazia-core.jar が生成される）
+ *   java -jar target/amazia-core.jar --import-postal-csv
+ *
+ *   # 本番 EC2（既存 amazia-core コンテナを止めず、使い捨て JVM で実行）
+ *   docker compose run --rm --no-deps amazia-core java -jar app.jar --import-postal-csv
+ *
+ * 注意:
+ *   docker compose exec で既存コンテナに入って同 jar を再起動すると、Web サーバと
+ *   ポート 8080 を奪い合って即死する。run --rm --no-deps を使うこと。
  *
  * 引数が無い通常起動では何もしないため、Web サーバ起動と共存する。
  */

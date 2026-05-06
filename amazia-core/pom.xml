@@ -100,6 +100,7 @@
     </dependencies>
 
     <build>
+        <finalName>amazia-core</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

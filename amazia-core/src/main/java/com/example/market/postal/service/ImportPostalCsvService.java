@@ -33,7 +33,8 @@ import java.util.zip.ZipInputStream;
  *
  * 起動方法:
  * - フェーズ17 までは {@link com.example.market.postal.runner.ImportPostalCsvRunner} 経由のコマンド起動のみ
- *   {@code java -jar ... --import-postal-csv}
+ *   ローカル: {@code java -jar target/amazia-core.jar --import-postal-csv}
+ *   本番:     {@code docker compose run --rm --no-deps amazia-core java -jar app.jar --import-postal-csv}
  * - フェーズ17 で月次バッチ（@Scheduled）に組み込む際にも同 Service を再利用する
  */
 @Service
