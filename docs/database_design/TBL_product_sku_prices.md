@@ -18,8 +18,9 @@
 | 3 | price | 価格 | INT | - | NOT NULL | - | 円（税抜） |
 | 4 | start_date | 適用開始日 | DATE | - | NULL | NULL | |
 | 5 | end_date | 適用終了日 | DATE | - | NULL | NULL | NULL = 無期限 |
-| 6 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
-| 7 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
+| 6 | version | 楽観ロックバージョン | BIGINT | - | NOT NULL | 0 | フェーズ12追加。JPA `@Version` 用 |
+| 7 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
+| 8 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
 
 ## インデックス
 
@@ -35,6 +36,13 @@
 | product_skus | N:1 | 紐づくSKU |
 | product_sku_price_history | - | 過去・未来の価格履歴 |
 
+## 変更履歴
+
+| フェーズ | 内容 |
+|---------|------|
+| フェーズ12 | `version`（BIGINT NOT NULL DEFAULT 0）を追加。価格更新ワークフローの競合検知に利用 |
+
 ## マイグレーションファイル
 
-JPA `@Entity` により自動生成
+- JPA `@Entity` により自動生成
+- `version` カラムは `amazia-core/src/main/resources/schema.sql` の ALTER TABLE で追加（既存環境向けフォールバック）

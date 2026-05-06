@@ -21,8 +21,9 @@
 | 6 | status_code | ステータスコード | VARCHAR | 50 | NULL | NULL | ON_SALE / WAITING 等 |
 | 7 | publish_start | 公開開始日時 | DATETIME | - | NULL | NULL | |
 | 8 | publish_end | 公開終了日時 | DATETIME | - | NULL | NULL | |
-| 9 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
-| 10 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
+| 9 | version | 楽観ロックバージョン | BIGINT | - | NOT NULL | 0 | フェーズ12追加。JPA `@Version` 用 |
+| 10 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
+| 11 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
 
 ## インデックス
 
@@ -37,6 +38,13 @@
 | product_images | 1:N | 商品画像（フェーズ9） |
 | product_skus | 1:N | SKU（フェーズ10） |
 
+## 変更履歴
+
+| フェーズ | 内容 |
+|---------|------|
+| フェーズ12 | `version`（BIGINT NOT NULL DEFAULT 0）を追加。JPA `@Version` で楽観ロックを実現する |
+
 ## マイグレーションファイル
 
-JPA `@Entity` により自動生成（`spring.jpa.hibernate.ddl-auto`）
+- JPA `@Entity` により自動生成（`spring.jpa.hibernate.ddl-auto`）
+- `version` カラムは `amazia-core/src/main/resources/schema.sql` の ALTER TABLE で追加（既存環境向けフォールバック）
