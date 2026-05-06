@@ -109,3 +109,42 @@
 - [ ] r4 のような大規模改訂の場合、新設計が依存する **環境設定の前提（ビルド・起動・DB 初期化など）** も棚卸し対象に含めたか
 
 ---
+
+## カテゴリ4: 既存 DB / API 定義書を最初に読む（フェーズ15以降の設計書ドラフト前提）
+
+### なぜこのカテゴリが要るか
+
+カテゴリ3（既存実装の棚卸し）は **「@Table 全件 grep / Service 全件リスト / migration 通読」** という、コードに対する直接探索を求めている。これは正確だが時間がかかり、結果を毎回ゼロから組み立て直すことになる。
+
+DB / API の定義書（`docs/database_design/TBL_*.md` / `docs/api_design/*_API.md`）は **その探索結果の縮約版** として整備されている。設計書ドラフト着手前にこれらを通読すれば、棚卸しの初手を10倍速く回せる。
+
+ただし定義書は「最後に整備された時点のスナップショット」であり、コードの方が常に正本。**定義書の記述を信じて疑わずに前提化するのは新たな外挿**（035 / 037 と同型）になる。定義書はあくまで「最初の地図」として使い、設計の前提に組み込む際は実コード（`@Entity` / `@RestController` / migration / schema.sql）で裏付けを取る。
+
+### 棚卸しの初手（カテゴリ3 を補強する手順）
+
+1. **DB の全体像を掴む**
+   - [`docs/database_design/README.md`](../database_design/README.md) のテーブル一覧を通読（フェーズごとに分類済み）
+   - [`docs/database_design/ER_diagram.md`](../database_design/ER_diagram.md) で関連を把握（§1〜§5 のサブダイアグラムに分割済み）
+   - 関連しそうな `TBL_*.md` を 2〜3 本ピックアップして詳細を確認
+
+2. **API の既存エンドポイントを掴む**
+   - [`docs/api_design/Core_API.md`](../api_design/Core_API.md) で Spring Boot 側の実装済 API を確認
+   - [`docs/api_design/Console_API.md`](../api_design/Console_API.md) で Laravel 側のプロキシ・独自 API を確認
+   - [`docs/api_design/Market_API.md`](../api_design/Market_API.md) で React 側からの呼び出し対応を確認
+
+3. **設計書冒頭の「既存活用一覧」に反映**
+   - 新設テーブル / API と既存資産の責務境界を表で書く（カテゴリ3 §4 と統合）
+   - 既存テーブル拡張で済む箇所は新設しない
+
+4. **コードで裏付け**
+   - 定義書の記述を前提化する前に、`@Entity` / migration / `@RestController` のいずれか一次ソースで現在値を確認する
+   - 定義書と実装が乖離していたら、**コードを正、定義書を更新**（フェーズ完了の定義に「設計書反映」を含めるルールは `Amazia/CLAUDE.md` 参照）
+
+### 設計観点
+
+- [ ] 設計書ドラフトの最初に `docs/database_design/README.md` と `docs/api_design/*_API.md` を通読したか
+- [ ] 関連する既存 `TBL_*.md` を 2〜3 本以上具体的に挙げ、責務境界を整理したか
+- [ ] 「定義書にこう書いてある」を最終根拠にせず、`@Entity` / `@RestController` / migration で裏付けたか
+- [ ] 当該フェーズで触る DB / API について、フェーズ完了時に設計書を更新する計画を立てたか（実装と同一フェーズ内で更新する。後追いだと P12〜P14 で 14テーブル / 29エンドポイントが未文書化のまま放置された実例あり）
+
+---

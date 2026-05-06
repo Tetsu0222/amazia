@@ -607,3 +607,171 @@
   { "id": 1, "skuId": 1, "type": "receive", "quantity": 50, "createdAt": "2026-01-01T00:00:00" }
 ]
 ```
+
+---
+
+### SKU在庫Excelインポート（フェーズ12追加）
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/skus/stocks/import` |
+| 認証 | 要 |
+| コントローラー | `App\Sku\Controller\ImportProductSkuStockController` |
+| Content-Type | multipart/form-data |
+
+**リクエスト**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| file | file | ○ | Excelファイル（.xlsx）。SKUコードと入荷数の列を含む |
+
+**仕様**
+- ファイル全行を解析後、Core の SKU 入荷登録 API を順次呼び出して在庫を加算する
+- バリデーションエラー（SKUコード不一致・数量不正）は行単位でエラーリストを返す
+
+---
+
+## SKU画像 API（フェーズ12追加）
+
+> Console → Core へのリクエストプロキシ。
+
+### SKU画像一覧
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/skus/{id}/images` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\ListProductSkuImageController` |
+
+**レスポンス例**
+```json
+[
+  { "id": 1, "skuId": 1, "imagePath": "1/uuid.png", "sortOrder": 1 }
+]
+```
+
+---
+
+### SKU画像登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/skus/{id}/images` |
+| 認証 | 不要 |
+| コントローラー | `App\Sku\Controller\CreateProductSkuImageController` |
+| Content-Type | multipart/form-data |
+
+**バリデーション**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| image | file | ○ | PNG のみ・200KB以下 |
+
+---
+
+### SKU画像ファイル配信（プロキシ）
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/skus/{id}/image-file/{path}` |
+| 認証 | 不要（`<img src>` から直接呼ばれるため） |
+| コントローラー | `App\Sku\Controller\ProxySkuImageController` |
+
+**仕様**
+- Core の SKU画像配信 API（`/api/skus/{id}/image-file/{filename:.+}`）にプロキシ
+- 認証ミドルウェア（auth.jwt）の外側で定義する。Market 側からも参照されるため
+
+---
+
+## ワークフロー API（フェーズ12追加）
+
+> Console → Core へのリクエストプロキシ。承認・却下フローの UI 起点。
+> 詳細仕様は Core_API.md の「ワークフロー API」セクションを参照。
+
+### ワークフロー一覧
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/workflows` |
+| 認証 | 要 |
+| コントローラー | `App\Workflow\Controller\ListWorkflowController` |
+
+---
+
+### ワークフロー詳細
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/workflows/{id}` |
+| 認証 | 要 |
+| コントローラー | `App\Workflow\Controller\GetWorkflowController` |
+
+---
+
+### ワークフロー作成
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/workflows` |
+| 認証 | 要 |
+| コントローラー | `App\Workflow\Controller\CreateWorkflowController` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| targetType | string | ○ | product / price / stock 等 |
+| targetId | integer | ○ | 対象レコードの PK |
+| payload | string | ○ | 適用予定の変更内容（JSON 文字列） |
+| steps | array | ○ | 承認段階の配列 |
+
+---
+
+### ワークフロー即座適用
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/workflows/immediate-apply` |
+| 認証 | 要 |
+| コントローラー | `App\Workflow\Controller\ImmediateApplyWorkflowController` |
+
+---
+
+### ワークフロー中止
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/workflows/{id}/cancel` |
+| 認証 | 要（申請者本人のみ） |
+| コントローラー | `App\Workflow\Controller\CancelWorkflowController` |
+
+---
+
+### ワークフローステップ承認
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/workflows/{id}/steps/{stepNumber}/approve` |
+| 認証 | 要（当該ステップ承認権限） |
+| コントローラー | `App\Workflow\Controller\ApproveWorkflowController` |
+
+---
+
+### ワークフローステップ却下
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/workflows/{id}/steps/{stepNumber}/reject` |
+| 認証 | 要（当該ステップ承認権限） |
+| コントローラー | `App\Workflow\Controller\RejectWorkflowController` |
