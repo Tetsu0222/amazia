@@ -93,7 +93,7 @@ erDiagram
         VARCHAR status_code
         DATETIME publish_start
         DATETIME publish_end
-        BIGINT version "P12 楽観ロック"
+        BIGINT version
         DATETIME created_at
         DATETIME updated_at
     }
@@ -124,7 +124,7 @@ erDiagram
         INT price
         DATE start_date
         DATE end_date
-        BIGINT version "P12 楽観ロック"
+        BIGINT version
         DATETIME created_at
         DATETIME updated_at
     }
@@ -142,9 +142,9 @@ erDiagram
 
     product_sku_stocks {
         BIGINT id PK
-        BIGINT sku_id FK_UK
+        BIGINT sku_id FK
         INT quantity
-        BIGINT version "P12 楽観ロック"
+        BIGINT version
         DATETIME created_at
         DATETIME updated_at
     }
@@ -154,10 +154,10 @@ erDiagram
         BIGINT sku_id FK
         VARCHAR type
         INT quantity
-        VARCHAR reference_type "P11追加"
-        BIGINT reference_id "P11追加"
-        BIGINT created_by_user_id "P11追加 FK→users"
-        TEXT comment "P11追加"
+        VARCHAR reference_type
+        BIGINT reference_id
+        BIGINT created_by_user_id FK
+        TEXT comment
         DATETIME created_at
     }
 
@@ -187,10 +187,10 @@ erDiagram
 erDiagram
     workflow_requests {
         BIGINT id PK
-        VARCHAR target_type "product/price/stock 等"
+        VARCHAR target_type
         BIGINT target_id
-        BIGINT requested_by FK "→users.id"
-        VARCHAR status "pending/approved/rejected/canceled"
+        BIGINT requested_by FK
+        VARCHAR status
         JSON payload
         DATETIME completed_at
         DATETIME created_at
@@ -202,11 +202,11 @@ erDiagram
         BIGINT workflow_requests_id FK
         INT step_number
         VARCHAR target_role
-        BIGINT destination_user_id "→users.id"
+        BIGINT destination_user_id
         VARCHAR destination_name
-        BIGINT approver_user_id "→users.id"
+        BIGINT approver_user_id
         VARCHAR approver_name
-        VARCHAR status "waiting/pending/approved/rejected/canceled"
+        VARCHAR status
         DATETIME updated_at
     }
 
@@ -307,7 +307,7 @@ erDiagram
 
     address {
         BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED user_id FK "→market_customers.id"
+        BIGINT_UNSIGNED user_id FK
         VARCHAR postal_code
         VARCHAR prefecture
         VARCHAR city
@@ -334,13 +334,13 @@ erDiagram
 
     sales {
         BIGINT id PK
-        BIGINT_UNSIGNED user_id FK "→market_customers.id"
-        BIGINT sku_id FK "→product_skus.id"
+        BIGINT_UNSIGNED user_id FK
+        BIGINT sku_id FK
         INT quantity
         INT amount
         BIGINT payment_method_id FK
-        BIGINT shipping_method_id "FK は P15 で追加"
-        BIGINT_UNSIGNED shipping_address_id FK "→address.id"
+        BIGINT shipping_method_id
+        BIGINT_UNSIGNED shipping_address_id FK
         BIGINT shipping_status_id FK
         VARCHAR payment_id UK
         BOOLEAN is_preorder
@@ -356,7 +356,7 @@ erDiagram
         VARCHAR status
         TEXT reason
         INT quantity
-        BIGINT approver_id FK "→users.id"
+        BIGINT approver_id FK
         DATETIME approved_at
         BOOLEAN notified_user
         BOOLEAN notified_admin
@@ -366,12 +366,12 @@ erDiagram
 
     operation_logs {
         BIGINT id PK
-        BIGINT user_id FK "→users.id（Console社員）"
+        BIGINT user_id FK
         VARCHAR action
         VARCHAR target_type
         BIGINT target_id
-        VARCHAR screen_name "P14追加"
-        VARCHAR api_name "P14追加"
+        VARCHAR screen_name
+        VARCHAR api_name
         TEXT comment
         DATETIME created_at
     }
