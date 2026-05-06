@@ -224,7 +224,7 @@ flowchart TD
 | Phase 10 | 在庫管理・価格管理・商品一覧改修 | ✅ 完了 | [phase10_inventory_price_management.md](docs/design/phase6_10/phase10_inventory_price_management.md) |
 | Phase 11 | Amazia Console ログイン画面 | ✅ 完了 | [phase11_console_auth.md](docs/design/phase11_20/phase11_console_auth.md) |
 | Phase 12 | ワークフロー機能（承認フロー）| ✅ 完了 | [phase12_workflow_approval.md](docs/design/phase11_20/phase12_workflow_approval.md) |
-| Phase 13 | Amazia Market ログイン・会員登録機能 | 🔲 未着手 | [phase13_market_auth.md](docs/design/phase11_20/phase13_market_auth.md) |
+| Phase 13 | Amazia Market ログイン・会員登録機能 | ✅ 完了 | [phase13_market_auth.md](docs/design/phase11_20/phase13_market_auth.md) |
 | Phase 14 | 購入機能 | 🔲 未着手 | [phase14_shipping.md](docs/design/phase11_20/phase14_shipping.md) |
 | Phase 15 | 配送管理 | 🔲 未着手 | [phase15_delivery_management.md](docs/design/phase11_20/phase15_delivery_management.md) |
 | Phase 16 | UIデザイン改善 | 🔲 未着手 | [phase16_ui_ux_improvement.md](docs/design/phase11_20/phase16_ui_ux_improvement.md) |

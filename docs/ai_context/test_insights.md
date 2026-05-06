@@ -171,6 +171,11 @@
 - 「ログイン → アクセストークン期限切れ → 自動リフレッシュ → 操作継続」のシナリオを Playwright/E2E でカバーする
 - 「ログイン → リロード → 認証維持」も最低限の E2E ケース
 
+### フロント側シナリオ E2E（Phase 13 で採用）
+- Playwright を新規導入する前に、`Vitest + jsdom + MemoryRouter` で **App.jsx と同じ Routes 構成 + AuthProvider + ProtectedRoute + AppHeader** を結合してフローを通すだけでも、認証画面間の遷移バグや CSRF / customer 状態の連携漏れは大半検出できる
+- 例: `amazia-market/src/test/auth_flow.e2e.test.jsx` で「登録 → ログイン → マイページ → ログアウト → パスリセ」を1ファイルで通している
+- 注意：`api/customer.js` を `vi.mock` で全関数モック化したうえで、`vi.clearAllMocks()` を `beforeEach` で呼ぶ場合は **`mockResolvedValue` も毎回再設定**する（`clearAllMocks` で実装が消えるため、商品 API などの背景モックも各 `beforeEach` で初期化が必要）
+
 ### テスト観点
 - [ ] Core から受け取った `Set-Cookie` を Console が転送する際、`domain` が `null` で送出されているか
 - [ ] Guzzle `SetCookie` 操作箇所で `getSecure()/getHttpOnly()` を使っているか（`isSecure/isHttpOnly` の grep が 0 件）
