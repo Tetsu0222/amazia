@@ -1,7 +1,7 @@
 # 026: PingStatus=Online でも SSM コマンドが Undeliverable になる「ゾンビOnline」
 
 ## ステータス
-🟡 対応中（2026-05-05）
+✅ 解決済（2026-05-06）— phaseX-3 HTTPS 化の複数回デプロイでカナリア方式 + リカバリ機構が安定稼働。022/024/025 とともに ✅ 解決済としてクローズ
 
 ## 発症箇所
 GitHub Actions `Deploy to EC2` ワークフロー

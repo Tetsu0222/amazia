@@ -11,6 +11,7 @@
 | [20260503_trouble_analysis.md](20260503_trouble_analysis.md) | 2026-05-03 | 障害分析 | トラブルシュート分析レポート |
 | [20260504_trouble_analysis.md](20260504_trouble_analysis.md) | 2026-05-04 | 障害分析 | トラブル007〜013の分類分析（テスト不足／環境設定の2軸） |
 | [20260505_trouble_analysis.md](20260505_trouble_analysis.md) | 2026-05-05 | 障害分析 | トラブル014〜020の分類分析（プロキシ層／AWS運用の新パターン顕在化） |
+| [20260506_trouble_analysis.md](20260506_trouble_analysis.md) | 2026-05-06 | 障害分析 | トラブル021〜030の分類分析（SSMデプロイ機構の連鎖補強／CD-systemd経路不整合／phaseX-3で本番初動の潜在不具合露出） |
 
 ## 分類
 

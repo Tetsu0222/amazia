@@ -3,6 +3,8 @@
 詳細分析：
 - [20260503_trouble_analysis.md](../analysis/20260503_trouble_analysis.md)（001〜006）
 - [20260504_trouble_analysis.md](../analysis/20260504_trouble_analysis.md)（007〜013）
+- [20260505_trouble_analysis.md](../analysis/20260505_trouble_analysis.md)（014〜020）
+- [20260506_trouble_analysis.md](../analysis/20260506_trouble_analysis.md)（021〜030）
 
 ## 一覧
 
@@ -21,23 +23,23 @@
 | 011 | [Consoleサイドバー未表示](011_console_sidebar_not_displayed.md) | App.vueにレイアウト未実装・SKUルート未登録 | ✅ 解決済 | - | ✅ 済 |
 | 012 | [公開期間がMarketに反映されない](012_publish_period_not_reflected_in_market.md) | ProductFormのprice/stock必須バリデーションで送信不可 | ✅ 解決済 | - | ✅ 済 |
 | 013 | [Console画像登録の導線なし](013_console_image_upload_missing.md) | Phase9でAPI実装済みだがVue UIが未追加 | ✅ 解決済 | - | ✅ 済 |
-| 014 | [SKU価格管理ページのUI未実装](014_sku_price_ui_not_implemented.md) | SKU・価格管理のVue UIが未実装 | ✅ 解決済 | - | - |
-| 015 | [amazia-market ECR pull失敗](015_amazia_market_ecr_pull_failed.md) | docker-compose.ymlに存在しないECRリポジトリへの参照が残りデプロイ失敗 | ✅ 解決済 | - | - |
-| 016 | [SKU画像エンドポイント EC2で404](016_sku_image_404_on_ec2.md) | ECRイメージが古くSKU画像ルート未反映・EC2ディスク満杯が重なり発生 | ✅ 解決済 | - | - |
-| 017 | [AWS課金：不要リソースの蓄積](017_aws_cost_unused_resources.md) | 停止中EC2・ECR古イメージ・t3.smallによる想定外課金 | ✅ 解決済 | - | - |
-| 018 | [amazia-core 起動失敗 permissions テーブル不在](018_core_startup_permissions_table_not_exist.md) | amazia-coreがRestartingループ—data.sql実行時にpermissionsテーブルが存在しない | ✅ 解決済 | - | - |
-| 019 | [Consoleログイン500 / Market商品取得401](019_console_login_500_market_401.md) | ConsoleログインでLaravel 500・Market商品一覧で401 | ✅ 解決済 | - | - |
-| 020 | [リロードでログアウト／refresh_token Cookie未保存](020_refresh_cookie_domain_container_name.md) | ログイン後リロードでログアウト・アクセストークン期限切れ後に再認証失敗 | ✅ 解決済 | - | - |
-| 021 | [社員登録422エラーの詳細不明](021_user_creation_422_no_error_detail.md) | POST /api/users が422を返すがエラー詳細が表示されない | ✅ 解決済 | - | - |
-| 022 | [SSM Undeliverable でデプロイ失敗](022_ssm_undeliverable_during_deploy.md) | SSM Agent が ConnectionLost のままデプロイが走りコマンド配信不能で失敗 | ✅ 解決済 | - | - |
-| 023 | [docker-compose name conflict](023_docker_compose_name_conflict_orphan.md) | 孤児コンテナ残留で `amazia-core` 作成時に name conflict・デプロイ失敗 | ✅ 解決済 | - | - |
-| 024 | [SSM Failed 時のエラー出力が空](024_ssm_failed_no_error_output.md) | デプロイ Failed 時に stderr のみ取得していて根本原因が掴めない | 🟡 対応中 | - | - |
-| 025 | [SSM 自動リカバリ直後 Pending 滞留](025_ssm_pending_after_recovery.md) | EC2 stop/start 直後の Online 検知が早すぎて send-command が Pending のまま落ちる | 🟡 対応中 | - | - |
-| 026 | [SSM ゾンビOnline (Undeliverable)](026_ssm_zombie_online_undeliverable.md) | PingStatus=Online でも MGS セッション死亡で Undeliverable になる事象。カナリア方式で検知 | 🟡 対応中 | - | - |
-| 027 | [フェーズ12 ワークフロー導入で CI 全滅](027_workflow_test_h2_schema_and_json_payload.md) | schema.sql の MySQL 専用構文 + payload の JSON 列が H2 テストで爆発・連鎖失敗 | ✅ 解決済 | - | - |
-| 028 | [CD 中の SSM 配信不能 → コンテナクラッシュループ](028_cd_ssm_undeliverable_then_container_crashloop.md) | CD 中断 + EC2 stop/start 後に compose の残骸でコンテナが restart loop、SSM カナリアも InProgress 滞留 | ✅ 解決済 | - | - |
-| 029 | [docker compose plugin 消失 + users スキーマ齟齬](029_compose_plugin_lost_and_users_schema_drift.md) | systemd の compose 起動が exit 125、users 業務カラム欠落で Spring が data.sql 失敗、SSM 応答阻害も連鎖 | ✅ 解決済 | - | - |
-| 030 | [HTTPS化を CloudFront + desec.io 1ドメイン構成で実装](030_https_via_cloudfront_duckdns_single_domain.md) | フェーズ11 §3 ALB 案を無料枠完走方針と整合させるため CloudFront + desec.io（www サブドメイン）に切替・本番 HTTPS で主要動作確認まで完了 | ✅ 解決済 | - | - |
+| 014 | [SKU価格管理ページのUI未実装](014_sku_price_ui_not_implemented.md) | SKU・価格管理のVue UIが未実装 | ✅ 解決済 | - | ✅ 済 |
+| 015 | [amazia-market ECR pull失敗](015_amazia_market_ecr_pull_failed.md) | docker-compose.ymlに存在しないECRリポジトリへの参照が残りデプロイ失敗 | ✅ 解決済 | - | ✅ 済 |
+| 016 | [SKU画像エンドポイント EC2で404](016_sku_image_404_on_ec2.md) | ECRイメージが古くSKU画像ルート未反映・EC2ディスク満杯が重なり発生 | ✅ 解決済 | - | ✅ 済 |
+| 017 | [AWS課金：不要リソースの蓄積](017_aws_cost_unused_resources.md) | 停止中EC2・ECR古イメージ・t3.smallによる想定外課金 | ✅ 解決済 | - | ✅ 済 |
+| 018 | [amazia-core 起動失敗 permissions テーブル不在](018_core_startup_permissions_table_not_exist.md) | amazia-coreがRestartingループ—data.sql実行時にpermissionsテーブルが存在しない | ✅ 解決済 | - | ✅ 済 |
+| 019 | [Consoleログイン500 / Market商品取得401](019_console_login_500_market_401.md) | ConsoleログインでLaravel 500・Market商品一覧で401 | ✅ 解決済 | - | ✅ 済 |
+| 020 | [リロードでログアウト／refresh_token Cookie未保存](020_refresh_cookie_domain_container_name.md) | ログイン後リロードでログアウト・アクセストークン期限切れ後に再認証失敗 | ✅ 解決済 | - | ✅ 済 |
+| 021 | [社員登録422エラーの詳細不明](021_user_creation_422_no_error_detail.md) | POST /api/users が422を返すがエラー詳細が表示されない | ✅ 解決済 | - | ✅ 済 |
+| 022 | [SSM Undeliverable でデプロイ失敗](022_ssm_undeliverable_during_deploy.md) | SSM Agent が ConnectionLost のままデプロイが走りコマンド配信不能で失敗 | ✅ 解決済 | - | ✅ 済 |
+| 023 | [docker-compose name conflict](023_docker_compose_name_conflict_orphan.md) | 孤児コンテナ残留で `amazia-core` 作成時に name conflict・デプロイ失敗 | ✅ 解決済 | - | ✅ 済 |
+| 024 | [SSM Failed 時のエラー出力が空](024_ssm_failed_no_error_output.md) | デプロイ Failed 時に stderr のみ取得していて根本原因が掴めない | ✅ 解決済 | - | ✅ 済 |
+| 025 | [SSM 自動リカバリ直後 Pending 滞留](025_ssm_pending_after_recovery.md) | EC2 stop/start 直後の Online 検知が早すぎて send-command が Pending のまま落ちる | ✅ 解決済 | - | ✅ 済 |
+| 026 | [SSM ゾンビOnline (Undeliverable)](026_ssm_zombie_online_undeliverable.md) | PingStatus=Online でも MGS セッション死亡で Undeliverable になる事象。カナリア方式で検知 | ✅ 解決済 | - | ✅ 済 |
+| 027 | [フェーズ12 ワークフロー導入で CI 全滅](027_workflow_test_h2_schema_and_json_payload.md) | schema.sql の MySQL 専用構文 + payload の JSON 列が H2 テストで爆発・連鎖失敗 | ✅ 解決済 | - | ✅ 済 |
+| 028 | [CD 中の SSM 配信不能 → コンテナクラッシュループ](028_cd_ssm_undeliverable_then_container_crashloop.md) | CD 中断 + EC2 stop/start 後に compose の残骸でコンテナが restart loop、SSM カナリアも InProgress 滞留 | ✅ 解決済 | - | ✅ 済 |
+| 029 | [docker compose plugin 消失 + users スキーマ齟齬](029_compose_plugin_lost_and_users_schema_drift.md) | systemd の compose 起動が exit 125、users 業務カラム欠落で Spring が data.sql 失敗、SSM 応答阻害も連鎖 | ✅ 解決済 | - | ✅ 済 |
+| 030 | [HTTPS化を CloudFront + desec.io 1ドメイン構成で実装](030_https_via_cloudfront_duckdns_single_domain.md) | フェーズ11 §3 ALB 案を無料枠完走方針と整合させるため CloudFront + desec.io（www サブドメイン）に切替・本番 HTTPS で主要動作確認まで完了 | ✅ 解決済 | - | ✅ 済 |
 | 031 | [Console（Laravel）の Cookie 中継で Set-Cookie が落ちる](031_console_cookie_relay_drops_set_cookie.md) | Guzzle CookieJar 未有効化のため Spring の Set-Cookie がブラウザに届かず本番ログイン後 401・生ヘッダ透過に修正 | ✅ 解決済 | - | - |
 | 032 | [JWT 署名アルゴリズム不一致で API が 401](032_jwt_alg_mismatch_console_vs_core.md) | Core が HS512 で発行するトークンを Console が SHA-256 固定で検証していて必ず署名不一致・alg ヘッダ追従に修正 | ✅ 解決済 | - | - |
 | 033 | [Console 経由の SKU 画像配信が auth.jwt 配下にあり 401](033_console_image_file_route_under_auth_jwt.md) | `<img src>` は Authorization を運ばないのに画像配信ルートが auth.jwt 内にあり必ず 401・公開ルートに移動 | ✅ 解決済 | - | - |

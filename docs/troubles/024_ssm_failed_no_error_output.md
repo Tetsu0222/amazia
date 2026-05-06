@@ -1,7 +1,7 @@
 # 024: SSM デプロイ Failed 時にエラー内容が空でログから原因特定不能
 
 ## ステータス
-🟡 対応中（2026-05-05）
+✅ 解決済（2026-05-06）— phaseX-3 HTTPS 化のデプロイで本機構（StatusDetails / StandardOutputContent / StandardErrorContent の3点出力）が稼働。026 のカナリア方式と組み合わせて Undeliverable 含む失敗パターンが正しくログから判別できることを実環境で確認済み
 
 ## 発症箇所
 GitHub Actions `Deploy to EC2` ワークフロー

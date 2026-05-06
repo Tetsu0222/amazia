@@ -256,6 +256,156 @@
 
 ---
 
+## カテゴリ11-2: 認証ルートと公開ルートの分離（033 起因）
+
+### `<img src>` は Authorization を運ばない
+- ブラウザの `<img src="...">` / `<video src="...">` / `<a download>` は **fetch API ではない** ため、`axios.defaults.headers.common['Authorization']` を設定しても **Authorization ヘッダが付かない**
+- これらから呼ばれるルートを `auth.jwt` ミドルウェアの中に置くと、必ず 401 で弾かれる
+- Console 経由・Market 経由のいずれでも、画像実体配信は `auth.jwt` の**外**に明示的に置く規約とする
+- UUID ファイル名 + 公開を前提とする画像であれば、認証不要でも実害はない（情報差ゼロ）
+
+### JWT 署名アルゴリズムの揃え方（032 起因）
+- Spring (JJWT) の `Keys.hmacShaKeyFor(secret.getBytes())` は **鍵バイト長で alg を自動選択**する
+  - 32 byte → HS256 / 48 byte → HS384 / **64 byte 以上 → HS512**
+- ローカルの短い `JWT_SECRET` で動いていても、本番の長い鍵では HS512 になり、検証側が SHA-256 ハードコードだと **必ず 401**
+- 検証側（Console / 他言語）は **JWT ヘッダの `alg` クレームに追従**する実装を規約化する。固定アルゴリズムでハードコードしない
+- `JWT_SECRET` は本番標準として 64 byte 以上を `setup.md` 等で明示し、ローカルと本番の鍵長乖離による「動いていたのに本番で死ぬ」を回避する
+
+### テスト観点
+- [ ] `<img src>` から呼ばれるルートが `auth.jwt` グループ外にあるか（未認証 curl で 200）
+- [ ] 新規ルート追加時に「ブラウザの非 fetch コンテキスト（`<img>` `<video>` `<a download>`）から呼ばれる可能性があるか」をレビュー
+- [ ] JWT 検証側が alg ヘッダに追従しているか（`hash_hmac('sha256', ...)` のようなハードコード grep が 0 件）
+- [ ] ローカルと本番で `JWT_SECRET` のバイト長が同等（≥64）であるか
+
+### Cookie 中継は生ヘッダ透過で（031 起因）
+- Laravel Guzzle ラッパーはデフォルトで CookieJar が無効化されており、`$response->cookies()` が空配列になる
+- Cookie を再構築する方式は属性（Domain/Path/Secure/HttpOnly）の組み立てミスが入り込みやすい
+- 規約：**Spring の `Set-Cookie` 生ヘッダをそのまま透過**する。属性の唯一の正本は Core 側 `application.properties`（環境変数）
+- Console PHPUnit で「Spring からの `Set-Cookie` をモックして、ブラウザ転送時にそのままヘッダに含まれること」を assert する
+
+### テスト観点
+- [ ] Cookie 中継ハンドラが `$response->getHeaders()['Set-Cookie']` ベースの透過になっているか
+- [ ] Cookie 属性は環境変数で外部化されているか（コードにハードコードしない）
+
+---
+
+## カテゴリ13: SSM デプロイ機構（022・024・025・026 起因）
+
+### PingStatus = Online は「使える」を意味しない
+- `describe-instance-information` の `PingStatus=Online` は **SSM Agent → SSM サービスのハートビート成立**を示すだけ
+- コマンド受信ワーカー / MGS（Message Gateway Service）セッションの健全性は別レイヤで、AWS API には直接照会する手段がない
+- 結果として 2 種類の「Online だが配信不能」状態が発生する：
+
+| 状態 | 原因 | 対処 |
+|------|------|------|
+| 一時的 Pending 滞留（リカバリ直後） | EC2 stop/start 後 Agent が温まりきっていない | Online 連続検知 + 安定化待機 |
+| ゾンビ Online（永続的 Undeliverable） | キャンセル直後再実行などで MGS セッション死亡 | カナリアコマンドで実配信を実証 |
+
+### リカバリの確度を上げる4段ロケット
+1. **事前検知**：デプロイ前に `PingStatus=Online` を必須条件として確認（`ConnectionLost` なら stop/start）
+2. **リカバリ完了判定**：`Online` を **連続 3 回**（10秒間隔・最低20秒連続）検知してから 60 秒の安定化待機を入れる
+3. **配信実証**：本コマンド前に `echo canary-ok` を発行し、Success が返ることを確認
+4. **失敗時ログ**：Failed 時は `StatusDetails` / `StandardOutputContent` / `StandardErrorContent` の **3 点セット**を必ず出力し、`Failed` `TimedOut` に加えて `Cancelled` も拾う
+
+リカバリは最大 2 回までに制限し、それ以上は exit 1 で明示的に失敗させる（無限ループ回避）。
+
+### キャンセル直後の再実行を抑止する運用
+- GitHub Actions のジョブを Cancel すると、未完の SSM コマンドが MGS セッションを破壊することがある
+- キャンセル後は **最低 5 分待つ**運用ルールを明記。それでも詰まったら `cancel-command` でキューから外してから再実行
+
+### 切り分けの最初の 5 分で並行確認すべき項目（026 補足の教訓）
+
+「自分側を疑い尽くしてから外を疑う」は姿勢としては正しいが、**並行で疑える項目は並行で確認**することで切り分け時間を 10〜20 分短縮できる。
+
+| 項目 | 確認方法 |
+|------|---------|
+| AWS Service Health Dashboard | `https://health.aws.amazon.com/health/status` で該当リージョン・サービス |
+| EC2 状態 | コンソールで running + 3/3 OK |
+| SSM PingStatus | `aws ssm describe-instance-information` |
+| セキュリティグループ Outbound | コンソールで 443/0.0.0.0/0 の有無 |
+| 最近のデプロイ・設定変更 | git log / CloudTrail |
+
+### コンテナ restart loop の決定的シグナル
+- カナリアが Pending → InProgress まで進んだのに完了しない場合、メモリ逼迫 → restart loop を疑う
+- `aws ec2 get-console-output --latest` のカーネルログで **異なる `veth` 名が約20秒間隔で生成・破棄を繰り返している**痕跡が決定的証拠
+- 同時に SSM Agent も応答阻害される（Agent もホスト OS のリソースで動いているため）
+
+### テスト観点
+- [ ] `deploy.yml` のリカバリ機構が「事前 PingStatus 検査 → リカバリ → Online 連続検知 + 60秒待機 → カナリア → 本コマンド」の4段で構成されているか
+- [ ] 失敗時に `StatusDetails` / `StandardOutputContent` / `StandardErrorContent` の 3 点を出力するロジックが SSM 経由の全ステップで揃っているか
+- [ ] `Cancelled` ステータスもエラーハンドラの分岐に入っているか
+- [ ] リカバリは最大 2 回までで、それ以上は exit 1 で明示的失敗するか
+- [ ] 切り分けチェックリスト（AWS Health / EC2 / PingStatus / SG / 直近変更）が `docs/troubles/` または README に記載され参照可能か
+
+---
+
+## カテゴリ14: CD と systemd の compose 経路整合（023・028・029 起因）
+
+### 同じ compose を複数経路で呼ぶ場合の整合
+- Amazia は **CD（GitHub Actions → SSM → docker-compose）** と **systemd unit（EC2 起動時 → docker compose）** の 2 経路で同じ compose 構成を扱う
+- 経路間で記法・オプションが揃っていないと、片方の修正が片方に反映されず潜在不具合になる
+
+| 整合項目 | 過去のミス |
+|---------|----------|
+| `--remove-orphans` | systemd 側のみ付与・CD 側に抜けて 023 |
+| `docker-compose` v1（ハイフン）/ `docker compose` v2（スペース） | systemd は v2、deploy.yml は v1 で混在（029 で復旧時に表面化） |
+| `.env` ファイル | systemd の `EnvironmentFile=-/path/.env.production` が `-` 接頭辞で「不在でもエラーなし」になっており、不在に気付きにくい（029） |
+
+### CD 中断時の Docker 残骸対策
+- `ECR pull` 中に GitHub Actions Cancel すると、新旧イメージや dangling network が中途半端に残る
+- その状態で stop/start すると systemd 起動の `docker compose up -d` が name conflict / network in-use で失敗 → restart loop（028）
+- `down`/`up` の双方で `--remove-orphans` を使い、即時復旧時は `docker rm -f` でコンテナを束で消す
+
+### `.env` 不在の検知（029 起因）
+- `docker-compose.yml` の `${JWT_SECRET}` のような **デフォルト値なしの参照**は `.env` 不在で空文字に解決される
+- Spring/Laravel が空文字で起動しようとするため、症状が「ログインできない」「セッションが効かない」など多岐にわたり原因特定が難しい
+- 本番デプロイ時は `.env` 生成を CD 側で担保し、systemd unit の `EnvironmentFile` も先頭 `-` を外して「不在ならエラー」にすることを検討（少なくとも検出する手段を別途用意する）
+
+### Amazon Linux 2023 で `docker compose` v2 プラグインが標準提供されない
+- `dnf install docker` だけでは `/usr/libexec/docker/cli-plugins/docker-compose` が入らない
+- 何らかのタイミングで（OS アップデート等）プラグインが消失すると `docker compose ...` が `compose is not a docker command` で exit 125
+- **EC2 user data または setup スクリプトで Docker 公式バイナリを `curl` 取得してインストール**する手順を恒久化する（標準リポジトリ非依存）
+
+### テスト観点
+- [ ] CD と systemd で `docker-compose` v1/v2 の記法が統一されているか（`docker compose` v2 に寄せるのが推奨）
+- [ ] `down`/`up` の両方で `--remove-orphans` を使っているか
+- [ ] EC2 上で `docker compose version` が成功するか（プラグイン存在確認）を CI / デプロイ前ヘルスチェックに含めるか
+- [ ] systemd unit の `EnvironmentFile` が指すファイルの存在を、デプロイ前にチェックする手段があるか
+- [ ] EC2 setup スクリプト / user data に `docker compose` v2 プラグインの公式バイナリ取得が含まれているか
+
+---
+
+## カテゴリ15: Laravel migration と Spring data.sql の DB 共有齟齬（018・029 再発）
+
+### 構造的弱点
+- Amazia は MySQL を Laravel と Spring の双方が触る前提で組まれている
+- Laravel migration は標準カラムのみを定義し、Spring の業務カラム（`employee_id` / `password_hash` / `role_id` / `active_flag` / `failed_attempts` / `locked_until` 等）を含まない
+- Spring `data.sql` 側は `INSERT IGNORE` 等で業務カラムにデータを入れる前提だが、テーブル/カラム自体の作成責務が曖昧
+- mysql volume を介して片方の状態が崩れると、他方の起動が破綻する（029 で 018 と同種の事象が再発）
+
+### どこに責務を持たせるか（規約案）
+1. **Laravel migration に業務カラム追加 migration を新設**するのが最も明示的
+2. もしくは **Spring `data.sql` 側で `CREATE TABLE IF NOT EXISTS` 相当を担う**
+3. いずれにせよ「`users` テーブルのカラム集合の正本はどこか」を決め、両側で同じものが見える状態を保つ
+
+### `users.id` の型整合
+- Laravel の `users.id` は `BIGINT UNSIGNED`、Spring JPA の自動生成 FK はデフォルト `BIGINT SIGNED`
+- `roles` / `permissions` / `role_permissions` の id・FK も `BIGINT UNSIGNED` に揃える必要がある
+- 不一致のまま FK 制約を張ると ALTER 失敗や JPA の警告が出る
+
+### `mysql volume` を吹き飛ばすリスク
+- `docker compose down -v` でローカル DB を消すのは開発で頻発する操作
+- 本番でも、検証目的で同操作をすると ALTER 直打ちで応急処置した状態（業務カラム）も消える
+- 応急処置は **必ず migration 化または `data.sql` の冪等 DDL に反映**して、`-v` で消えても再現するようにする
+
+### テスト観点
+- [ ] `users` テーブルのカラム集合の正本（Laravel migration / Spring data.sql / 手動 ALTER のいずれか）が決まり、ドキュメント化されているか
+- [ ] `docker compose down -v && up --build` 後に Spring が data.sql 実行を成功させられるか（018 のフェーズ完了条件と整合）
+- [ ] Laravel migration と Spring data.sql に重複した DDL がないか（あればどちらが正本か明示）
+- [ ] FK 型（`BIGINT UNSIGNED`）が両側で揃っているか
+
+---
+
 ## カテゴリ12: アップロードファイルの永続化（030 起因）
 
 ### 本番とローカルの docker-compose 思想を揃える
@@ -291,20 +441,26 @@
 3. **ブラウザ確認**: 実際にアクセスして画面が動作し、スクリーンショットをPRに添付
 4. **環境変数**: `docker-compose.yml`・`phpunit.xml`・`.env.example` がセット更新済み
 5. **廃止フィールド**: 設計変更に伴うフィールド削除がエンティティ・フォーム・コントローラーで揃っている
-6. **Docker 初回起動**: `docker compose down -v && docker compose up --build` で DB 初期化からエラーなく起動する（018 起因）
+6. **Docker 初回起動**: `docker compose down -v && docker compose up --build` で DB 初期化からエラーなく起動する（018・029 起因）
 7. **認証フロー E2E**: ログイン → リロード → 自動リフレッシュのフローが通る（019・020 起因）
 8. **両レイヤー疎通**: デプロイ後に Console（8000）と Core（8080）を直接 curl して、新エンドポイントが両方とも応答する（016 起因）
+9. **本番環境での実機確認**: 認証絡み・Cookie 絡み・画像配信絡みの機能は **本番ドメインで** ログイン → リロード → 画像表示まで通す（030・031・032・033 起因）。ローカル動作確認だけでは Cookie/JWT/プロキシの不整合は検知できない
+10. **デプロイ機構の健全性**: `deploy.yml` のリカバリ + カナリア機構が動いている前提で、過去 N 回のデプロイで Failed なく走っているか（022・024・025・026 起因）
 
 ---
 
-## 構造的な再発パターン（001〜020 通算）
+## 構造的な再発パターン（001〜030 通算）
 
-[20260503_trouble_analysis.md](../analysis/20260503_trouble_analysis.md)・[20260504_trouble_analysis.md](../analysis/20260504_trouble_analysis.md)・[20260505_trouble_analysis.md](../analysis/20260505_trouble_analysis.md) の合算で、5 つの再発パターンが認められる。新規実装・修正の際は、自分の作業がどのパターンを再生産しないかを意識する。
+[20260503](../analysis/20260503_trouble_analysis.md)・[20260504](../analysis/20260504_trouble_analysis.md)・[20260505](../analysis/20260505_trouble_analysis.md)・[20260506](../analysis/20260506_trouble_analysis.md) の合算で、以下の再発パターンが認められる。新規実装・修正の際は、自分の作業がどのパターンを再生産しないかを意識する。
 
 | パターン | 該当 |
 |---------|------|
 | デプロイ後ヘルスチェック不在 | 003, 005, 008, 010, 011, 013, 014, 016 |
-| docker-compose / 環境変数の管理漏れ | 002, 004, 008, 009, 010, 015, 018 |
+| docker-compose / 環境変数の管理漏れ | 002, 004, 008, 009, 010, 015, 018, 029 |
 | フロント / UI の実装検証不在 | 007, 011, 012, 013, 014 |
-| 認証・Cookie・プロキシ層の設計検証不在 | 019, 020 |
+| 認証・Cookie・プロキシ層の設計検証不在 | 019, 020, 021, 031, 032, 033 |
 | AWS 運用（コスト・ディスク・デプロイ統合）の未整備 | 016, 017 |
+| **SSM デプロイ機構の連鎖補強**（022 → 024 → 025 → 026） | 022, 024, 025, 026 |
+| **CD と systemd の compose 経路不整合**（v1/v2・`--remove-orphans`・`.env`） | 023, 028, 029 |
+| **Laravel migration と Spring data.sql の DB 共有齟齬の再発** | 018, 029 |
+| **本番初動でのみ顕在化する潜在不具合**（ローカルで通っていても本番で踏む） | 030, 031, 032, 033 |
