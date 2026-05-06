@@ -41,4 +41,25 @@ class UpdateProductTest extends TestCase
         $this->putJson('/api/products/999', ['name' => '商品X', 'price' => 1000, 'stock' => 10])
              ->assertStatus(404);
     }
+
+    public function test_予約発売4カラム更新リクエストがCoreに転送されること(): void
+    {
+        Http::fake(["{$this->coreApiUrl}/1" => Http::response(['id' => 1, 'name' => '予約商品'], 200)]);
+
+        $this->putJson('/api/products/1', [
+            'name'              => '予約商品',
+            'releaseDate'       => '2026-09-01',
+            'preorderStartDate' => '2026-08-01',
+            'acceptPreorder'    => true,
+            'acceptBackorder'   => true,
+        ])->assertStatus(200);
+
+        Http::assertSent(fn($req) =>
+            $req->url() === "{$this->coreApiUrl}/1"
+            && $req['releaseDate']       === '2026-09-01'
+            && $req['preorderStartDate'] === '2026-08-01'
+            && $req['acceptPreorder']    === true
+            && $req['acceptBackorder']   === true
+        );
+    }
 }

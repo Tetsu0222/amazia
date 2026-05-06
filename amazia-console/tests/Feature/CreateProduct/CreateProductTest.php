@@ -61,4 +61,43 @@ class CreateProductTest extends TestCase
             && $req['publishStart'] === '2026-01-01T00:00:00'
         );
     }
+
+    public function test_予約発売4カラムがCoreに転送されること(): void
+    {
+        Http::fake([
+            "{$this->coreApiUrl}" => Http::response(['id' => 1, 'name' => '予約商品'], 201),
+        ]);
+
+        $this->postJson('/api/products', [
+            'name'              => '予約商品',
+            'releaseDate'       => '2026-08-01',
+            'preorderStartDate' => '2026-07-01',
+            'acceptPreorder'    => true,
+            'acceptBackorder'   => false,
+        ])->assertStatus(201);
+
+        Http::assertSent(fn($req) =>
+            $req->url() === $this->coreApiUrl
+            && $req['releaseDate']       === '2026-08-01'
+            && $req['preorderStartDate'] === '2026-07-01'
+            && $req['acceptPreorder']    === true
+            && $req['acceptBackorder']   === false
+        );
+    }
+
+    public function test_予約発売4カラムが未指定なら既定値が転送されること(): void
+    {
+        Http::fake([
+            "{$this->coreApiUrl}" => Http::response(['id' => 1, 'name' => '通常商品'], 201),
+        ]);
+
+        $this->postJson('/api/products', ['name' => '通常商品'])->assertStatus(201);
+
+        Http::assertSent(fn($req) =>
+            $req['releaseDate']       === null
+            && $req['preorderStartDate'] === null
+            && $req['acceptPreorder']    === false
+            && $req['acceptBackorder']   === false
+        );
+    }
 }

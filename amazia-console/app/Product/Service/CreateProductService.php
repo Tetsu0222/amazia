@@ -26,11 +26,15 @@ class CreateProductService
     private function buildPayload(array $data): array
     {
         return [
-            'name'         => $data['name']        ?? null,
-            'description'  => $data['description'] ?? null,
-            'statusCode'   => $data['statusCode']   ?? null,
-            'publishStart' => $data['publishStart'] ?? null,
-            'publishEnd'   => $data['publishEnd']   ?? null,
+            'name'              => $data['name']              ?? null,
+            'description'       => $data['description']       ?? null,
+            'statusCode'        => $data['statusCode']        ?? null,
+            'publishStart'      => $data['publishStart']      ?? null,
+            'publishEnd'        => $data['publishEnd']        ?? null,
+            'releaseDate'       => $data['releaseDate']       ?? null,
+            'preorderStartDate' => $data['preorderStartDate'] ?? null,
+            'acceptPreorder'    => $data['acceptPreorder']    ?? false,
+            'acceptBackorder'   => $data['acceptBackorder']   ?? false,
         ];
     }
 }

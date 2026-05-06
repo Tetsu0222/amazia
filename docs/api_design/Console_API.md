@@ -100,7 +100,16 @@
 | パラメータ | 型 | 必須 | 説明 |
 |------------|-----|------|------|
 | name | string | ○ | 商品名 |
-| status | string | ○ | ステータス |
+| description | string | × | 説明 |
+| statusCode | string | × | ステータスコード |
+| publishStart | datetime | × | 公開開始日時（ISO 8601） |
+| publishEnd | datetime | × | 公開終了日時（ISO 8601） |
+| releaseDate | date | × | 発売日（YYYY-MM-DD）。フェーズ14.5 追加 |
+| preorderStartDate | date | × | 予約開始日（YYYY-MM-DD）。フェーズ14.5 追加 |
+| acceptPreorder | boolean | × | 予約購入受付フラグ。既定 false。フェーズ14.5 追加 |
+| acceptBackorder | boolean | × | 在庫切れ予約継続フラグ。既定 false。フェーズ14.5 追加 |
+
+そのまま Core `POST /api/products` に中継する。
 
 ---
 
@@ -118,6 +127,10 @@
 | パラメータ | 型 | 必須 | 説明 |
 |------------|-----|------|------|
 | id | integer | ○ | 商品ID |
+
+**リクエストボディ**
+
+商品登録と同じパラメータ（フェーズ14.5 追加 4 カラム含む）を Core `PUT /api/products/{id}` に中継する。
 
 ---
 

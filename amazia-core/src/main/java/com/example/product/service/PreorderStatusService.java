@@ -1,5 +1,6 @@
 package com.example.product.service;
 
+import com.example.product.dto.PreorderStatusResponse;
 import com.example.product.entity.PreorderStatus;
 import com.example.product.entity.Product;
 import com.example.product.repository.ProductRepository;
@@ -30,7 +31,16 @@ public class PreorderStatusService {
     public PreorderStatus judge(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return judgeInternal(product);
+    }
 
+    public PreorderStatusResponse getResponse(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return PreorderStatusResponse.of(product, judgeInternal(product));
+    }
+
+    private PreorderStatus judgeInternal(Product product) {
         LocalDate today = LocalDate.now(clock);
 
         if (product.getPublishStart() != null
@@ -48,7 +58,7 @@ public class PreorderStatusService {
             return PreorderStatus.PRE_ORDER;
         }
 
-        long totalStock = stockRepository.sumQuantityByProductId(productId);
+        long totalStock = stockRepository.sumQuantityByProductId(product.getId());
         if (totalStock > 0) {
             return PreorderStatus.ON_SALE;
         }

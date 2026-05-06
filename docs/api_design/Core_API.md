@@ -970,3 +970,70 @@ Console 管理画面向けの売上・在庫一覧 API。
 **仕様**
 - SKU 単位で `quantity` / 直近の入荷履歴を集約して返す
 - フェーズ14時点では Console 在庫画面の表示元として利用
+
+---
+
+## 予約ステータス API（フェーズ14.5追加）
+
+設計書: [phase14_5_preorder_status.md](../design/phase11_20/phase14_5_preorder_status.md)
+
+### 予約ステータス取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/products/{id}/preorder-status` |
+| コントローラー | `GetPreorderStatusController` |
+| サービス | `PreorderStatusService` |
+
+**パスパラメータ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| id | integer | ○ | 商品ID |
+
+**レスポンス例**
+```json
+{
+  "productId": 1,
+  "status": "PRE_ORDER",
+  "releaseDate": "2026-08-01",
+  "preorderStartDate": "2026-07-01",
+  "acceptPreorder": true,
+  "acceptBackorder": false
+}
+```
+
+**ステータス値（6 種）**
+
+| status | 意味 |
+|--------|------|
+| NOT_PUBLIC | 公開開始日未到来 |
+| PRE_ORDER_NOT_STARTED | 予約開始日未到来 |
+| PRE_ORDER | 予約受付中（発売日未到来） |
+| ON_SALE | 通常販売中（在庫あり） |
+| BACK_ORDER | 在庫切れ・予約継続受付中 |
+| SOLD_OUT | 完売 |
+
+**判定基準日**: JST 0:00 起点（`Asia/Tokyo`）。判定優先順位は設計書 §2-2 を参照。
+
+**エラー**
+
+| HTTPステータス | 説明 |
+|----------------|------|
+| 404 | 指定 ID の商品が存在しない |
+
+---
+
+## 商品登録・更新リクエスト拡張（フェーズ14.5追記）
+
+`POST /api/products` / `PUT /api/products/{id}` に予約・発売関連 4 カラムを追加。
+
+| パラメータ | 型 | 必須 | 既定 | 説明 |
+|------------|-----|------|-----|------|
+| releaseDate | date (YYYY-MM-DD) | × | NULL | 発売日。NULL = 公開即発売 |
+| preorderStartDate | date (YYYY-MM-DD) | × | NULL | 予約開始日。NULL = 公開と同時に予約可 |
+| acceptPreorder | boolean | × | false | 予約購入を受け付けるか |
+| acceptBackorder | boolean | × | false | 在庫切れ時に予約継続するか |
+
+レスポンスにも同 4 カラムが含まれる（Product Entity を返す既存挙動を踏襲）。

@@ -160,7 +160,20 @@ WHERE s.sku_id IN (SELECT id FROM product_skus WHERE product_id = :productId)
 
 ---
 
-## 3. Step C-3：Controller + Console 商品登録 UI 改修
+## 3. Step C-3：Controller + Console 商品登録 UI 改修 ✅ 完了（2026-05-07）
+
+### 完了サマリ
+- Core: `PreorderStatusResponse` DTO 新規追加（`com.example.product.dto`）
+- Core: `PreorderStatusService` に `getResponse(productId)` メソッドを追加（Controller を薄く保つため Service 側で DTO 化）
+- Core: `GetPreorderStatusController` 新規追加（`GET /api/products/{id}/preorder-status`）
+- Core: `GetPreorderStatusControllerTest` 新規（3 件: PRE_ORDER / ON_SALE / 404）
+- Console Laravel: `CreateProductService` / `UpdateProductService` の payload に 4 カラム追加
+- Console PHPUnit: `CreateProductTest` に 2 件追加（4 カラム転送 / 既定値）、`UpdateProductTest` に 1 件追加
+- Console Vue: `ProductForm.vue` に「予約・発売」セクション追加（DatePicker 2 + Checkbox 2、編集時読み込み対応）
+- 設計書更新: `Core_API.md` に予約ステータス API + 商品 CRUD 4 カラム追記、`Console_API.md` に商品登録/更新の 4 カラム追記
+- amazia-core `mvn test` 250/250 グリーン（C-2 完了時 247 → +3 件）
+- amazia-console `phpunit` 83/83 グリーン（既存 +3 件）
+
 
 ### 3-1. Core Controller
 

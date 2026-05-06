@@ -64,6 +64,46 @@
         </a-col>
       </a-row>
 
+      <a-divider orientation="left">予約・発売</a-divider>
+
+      <a-row :gutter="16">
+        <a-col :span="12">
+          <a-form-item label="予約開始日" name="preorderStartDate">
+            <a-date-picker
+              v-model:value="form.preorderStartDate"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              placeholder="未設定 = 公開と同時に予約可"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="発売日" name="releaseDate">
+            <a-date-picker
+              v-model:value="form.releaseDate"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              placeholder="未設定 = 公開即発売"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row :gutter="16">
+        <a-col :span="12">
+          <a-form-item name="acceptPreorder">
+            <a-checkbox v-model:checked="form.acceptPreorder">予約購入を受け付ける</a-checkbox>
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item name="acceptBackorder">
+            <a-checkbox v-model:checked="form.acceptBackorder">在庫切れ時に予約継続する</a-checkbox>
+          </a-form-item>
+        </a-col>
+      </a-row>
+
       <a-form-item>
         <a-space>
           <a-button type="primary" html-type="submit" :loading="submitting">
@@ -100,6 +140,10 @@ const form = ref({
   statusCode: null,
   publishStart: null,
   publishEnd: null,
+  preorderStartDate: null,
+  releaseDate: null,
+  acceptPreorder: false,
+  acceptBackorder: false,
 });
 
 const rules = {
@@ -120,11 +164,15 @@ onMounted(async () => {
     try {
       const product = await getProduct(route.params.id);
       form.value = {
-        name:         product.name,
-        description:  product.description ?? '',
-        statusCode:   product.statusCode ?? null,
-        publishStart: product.publishStart ?? null,
-        publishEnd:   product.publishEnd ?? null,
+        name:              product.name,
+        description:       product.description ?? '',
+        statusCode:        product.statusCode ?? null,
+        publishStart:      product.publishStart ?? null,
+        publishEnd:        product.publishEnd ?? null,
+        preorderStartDate: product.preorderStartDate ?? null,
+        releaseDate:       product.releaseDate ?? null,
+        acceptPreorder:    product.acceptPreorder ?? false,
+        acceptBackorder:   product.acceptBackorder ?? false,
       };
     } catch {
       message.error('商品データの取得に失敗しました');
