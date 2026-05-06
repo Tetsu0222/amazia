@@ -222,8 +222,8 @@ flowchart TD
 | Phase 8 | 商品マスタ機能 | ✅ 完了 | [phase8_product_master.md](docs/design/phase6_10/phase8_product_master.md) |
 | Phase 9 | 商品マスタへの画像登録 | ✅ 完了 | [phase9_product_image.md](docs/design/phase6_10/phase9_product_image.md) |
 | Phase 10 | 在庫管理・価格管理・商品一覧改修 | ✅ 完了 | [phase10_inventory_price_management.md](docs/design/phase6_10/phase10_inventory_price_management.md) |
-| Phase 11 | Amazia Console ログイン画面 | 🔄 着手中 | [phase11_console_auth.md](docs/design/phase11_20/phase11_console_auth.md) |
-| Phase 12 | ワークフロー機能（承認フロー）| 🔲 未着手 | [phase12_workflow_approval.md](docs/design/phase11_20/phase12_workflow_approval.md) |
+| Phase 11 | Amazia Console ログイン画面 | ✅ 完了 | [phase11_console_auth.md](docs/design/phase11_20/phase11_console_auth.md) |
+| Phase 12 | ワークフロー機能（承認フロー）| ✅ 完了 | [phase12_workflow_approval.md](docs/design/phase11_20/phase12_workflow_approval.md) |
 | Phase 13 | Amazia Market ログイン・会員登録機能 | 🔲 未着手 | [phase13_market_auth.md](docs/design/phase11_20/phase13_market_auth.md) |
 | Phase 14 | 購入機能 | 🔲 未着手 | [phase14_shipping.md](docs/design/phase11_20/phase14_shipping.md) |
 | Phase 15 | 配送管理 | 🔲 未着手 | [phase15_delivery_management.md](docs/design/phase11_20/phase15_delivery_management.md) |
@@ -234,6 +234,8 @@ flowchart TD
 | Phase 20 | ドキュメント整理 | 🔲 未着手 | [phase20_documentation_overhaul.md](docs/design/phase11_20/phase20_documentation_overhaul.md) |
 | Phase X-1 | デプロイパイプライン高速化 | 🔲 未着手（随時） | [phaseX-1_deploy_optimization.md](docs/design/phaseX/phaseX-1_deploy_optimization.md) |
 | Phase X-2 | デプロイパイプライン再設計 | ✅ 完了 | [phaseX-2_deploy_pipeline_redesign.md](docs/design/phaseX/phaseX-2_deploy_pipeline_redesign.md) |
+| Phase X-3 | HTTPS化（CloudFront + DDNS / 1ドメイン構成） | 🟡 AWS構築完了・デプロイ待ち | [phaseX-3_https_via_cloudfront.md](docs/design/phaseX/phaseX-3_https_via_cloudfront.md) |
+| Phase X-4 | t3.micro 復帰のためのメモリ最適化（Spring Heap制限 + Swap） | 🔲 未着手 | [phaseX-4_memory_optimization_for_t3_micro.md](docs/design/phaseX/phaseX-4_memory_optimization_for_t3_micro.md) |
 
 ---
 
