@@ -1,7 +1,21 @@
 # フェーズX-4：t3.micro 復帰のためのメモリ最適化（Spring Heap 制限 + Swap）
 
 ## ステータス
-🔲 未着手
+✅ 完了（2026-05-06）
+
+### 実構成
+- インスタンスタイプ: **t3.micro（1024MB / 無料枠 750h）に復帰**
+- Spring Heap: `JAVA_TOOL_OPTIONS=-Xmx384m -Xss256k -XX:MaxMetaspaceSize=128m`（[docker-compose.yml:30](../../../docker-compose.yml#L30)）
+- Swap: `/swapfile` 2GB、`vm.swappiness=10`、`/etc/fstab` で永続化
+- 月額課金: **$0 復帰**
+
+### 実測値（2026-05-06）
+- amazia-core メモリ: **219MB**（Heap 制限後・前回 293MB から 74MB 減）
+- 軽負荷試験（3経路 × 60秒 = 180リクエスト）: **全て 200**
+- 負荷ピーク時 Swap 使用: **257MB**（基準 500MB 以下 ✅）
+- 負荷ピーク時 Mem available: **60MB**（枯渇寸前だが Swap が機能）
+- OOM Killer 発動: **なし**（`dmesg | grep -i oom` 何も出ず）
+- スキーマ健全性: t3.small → t3.micro 切替前後で完全一致（roles=5 / permissions=13 / role_permissions=57）
 
 ## 位置付け
 時系列フェーズ（1〜20）に依存しない横断的インフラ改善フェーズ。
