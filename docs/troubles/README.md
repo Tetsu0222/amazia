@@ -40,6 +40,7 @@
 | 030 | [HTTPS化を CloudFront + DuckDNS 1ドメイン構成に変更](030_https_via_cloudfront_duckdns_single_domain.md) | フェーズ11 §3 ALB 案を ALB 時間課金（無料枠不可）と整合させるため CloudFront + DuckDNS に切替・コード変更完了 | 🟡 AWS 側作業待ち | - | - |
 | 031 | [Console（Laravel）の Cookie 中継で Set-Cookie が落ちる](031_console_cookie_relay_drops_set_cookie.md) | Guzzle CookieJar 未有効化のため Spring の Set-Cookie がブラウザに届かず本番ログイン後 401・生ヘッダ透過に修正 | ✅ 解決済 | - | - |
 | 032 | [JWT 署名アルゴリズム不一致で API が 401](032_jwt_alg_mismatch_console_vs_core.md) | Core が HS512 で発行するトークンを Console が SHA-256 固定で検証していて必ず署名不一致・alg ヘッダ追従に修正 | ✅ 解決済 | - | - |
+| 033 | [Console 経由の SKU 画像配信が auth.jwt 配下にあり 401](033_console_image_file_route_under_auth_jwt.md) | `<img src>` は Authorization を運ばないのに画像配信ルートが auth.jwt 内にあり必ず 401・公開ルートに移動 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

@@ -15,4 +15,6 @@ Route::post('/skus/stocks/import',        \App\Sku\Controller\ImportProductSkuSt
 
 Route::get('/skus/{id}/images',                      \App\Sku\Controller\ListProductSkuImageController::class);
 Route::post('/skus/{id}/images',                     \App\Sku\Controller\CreateProductSkuImageController::class);
-Route::get('/skus/{id}/image-file/{path}',           \App\Sku\Controller\ProxySkuImageController::class)->where('path', '.+');
+// /skus/{id}/image-file/{path} は <img src> から呼ばれるため認証不要として
+// routes/api.php に直接定義した（auth.jwt の外）。
+
