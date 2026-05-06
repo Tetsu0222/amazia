@@ -1,5 +1,7 @@
 package com.example.salesreturn.service;
 
+import com.example.operationlog.entity.OperationLog;
+import com.example.operationlog.repository.OperationLogRepository;
 import com.example.sales.entity.Sales;
 import com.example.sales.repository.SalesRepository;
 import com.example.salesreturn.entity.SalesReturn;
@@ -24,16 +26,30 @@ import org.springframework.web.server.ResponseStatusException;
  *      reference_type='sales_return', reference_id=sales_return.id, created_by_user_id=管理者
  *      を記録
  *   4. sales.shipping_status を RETURNED に更新
+ *   5. operation_logs に管理者操作を記録（B-5-8）
  *
  * 遷移ガード：APPROVED 以外（REQUESTED / REJECTED / REFUNDED）からの遷移は 409 CONFLICT。
+ *
+ * B-5-8 命名規約:
+ *   action      : refund_sales_return
+ *   target_type : sales_return
+ *   target_id   : sales_return.id
+ *   screen_name : console.sales_return.approve
+ *   api_name    : POST /api/sales-returns/:id/refund
  */
 @Service
 public class RefundSalesReturnService {
+
+    private static final String ACTION = "refund_sales_return";
+    private static final String TARGET_TYPE = "sales_return";
+    private static final String SCREEN_NAME = "console.sales_return.approve";
+    private static final String API_NAME = "POST /api/sales-returns/:id/refund";
 
     private final SalesReturnRepository salesReturnRepository;
     private final SalesRepository salesRepository;
     private final ProductSkuStockRepository skuStockRepository;
     private final ProductSkuStockTransactionRepository skuStockTxRepository;
+    private final OperationLogRepository operationLogRepository;
     private final long returnedStatusId;
     private final String txTypeReturn;
 
@@ -41,12 +57,14 @@ public class RefundSalesReturnService {
                                     SalesRepository salesRepository,
                                     ProductSkuStockRepository skuStockRepository,
                                     ProductSkuStockTransactionRepository skuStockTxRepository,
+                                    OperationLogRepository operationLogRepository,
                                     @Value("${amazia.sales.shipping-statuses.returned-id}") long returnedStatusId,
                                     @Value("${amazia.sales.sku-stock-tx-types.return}") String txTypeReturn) {
         this.salesReturnRepository = salesReturnRepository;
         this.salesRepository = salesRepository;
         this.skuStockRepository = skuStockRepository;
         this.skuStockTxRepository = skuStockTxRepository;
+        this.operationLogRepository = operationLogRepository;
         this.returnedStatusId = returnedStatusId;
         this.txTypeReturn = txTypeReturn;
     }
@@ -92,6 +110,20 @@ public class RefundSalesReturnService {
         sales.setShippingStatusId(returnedStatusId);
         salesRepository.save(sales);
 
+        // 5. operation_logs 記録（B-5-8）
+        recordOperationLog(approverUserId, saved.getId());
+
         return saved;
+    }
+
+    private void recordOperationLog(Long approverUserId, Long salesReturnId) {
+        OperationLog log = new OperationLog();
+        log.setUserId(approverUserId);
+        log.setAction(ACTION);
+        log.setTargetType(TARGET_TYPE);
+        log.setTargetId(salesReturnId);
+        log.setScreenName(SCREEN_NAME);
+        log.setApiName(API_NAME);
+        operationLogRepository.save(log);
     }
 }

@@ -1,5 +1,7 @@
 package com.example.salesreturn.service;
 
+import com.example.operationlog.entity.OperationLog;
+import com.example.operationlog.repository.OperationLogRepository;
 import com.example.sales.entity.Sales;
 import com.example.sales.repository.SalesRepository;
 import com.example.salesreturn.entity.SalesReturn;
@@ -21,19 +23,34 @@ import java.time.LocalDateTime;
  * 在庫戻しは行わない（返金完了時 = B-5-3 で実行）。
  *
  * 遷移ガード：REQUESTED 以外からの遷移は 409 CONFLICT。
+ *
+ * B-5-8: operation_logs に管理者操作を記録（命名規約は operation_logs_naming.md）。
+ *   action      : approve_sales_return
+ *   target_type : sales_return
+ *   target_id   : sales_return.id
+ *   screen_name : console.sales_return.approve
+ *   api_name    : POST /api/sales-returns/:id/approve
  */
 @Service
 public class ApproveSalesReturnService {
 
+    private static final String ACTION = "approve_sales_return";
+    private static final String TARGET_TYPE = "sales_return";
+    private static final String SCREEN_NAME = "console.sales_return.approve";
+    private static final String API_NAME = "POST /api/sales-returns/:id/approve";
+
     private final SalesReturnRepository salesReturnRepository;
     private final SalesRepository salesRepository;
+    private final OperationLogRepository operationLogRepository;
     private final long returnRequestedStatusId;
 
     public ApproveSalesReturnService(SalesReturnRepository salesReturnRepository,
                                      SalesRepository salesRepository,
+                                     OperationLogRepository operationLogRepository,
                                      @Value("${amazia.sales.shipping-statuses.return-requested-id}") long returnRequestedStatusId) {
         this.salesReturnRepository = salesReturnRepository;
         this.salesRepository = salesRepository;
+        this.operationLogRepository = operationLogRepository;
         this.returnRequestedStatusId = returnRequestedStatusId;
     }
 
@@ -57,6 +74,19 @@ public class ApproveSalesReturnService {
         sales.setShippingStatusId(returnRequestedStatusId);
         salesRepository.save(sales);
 
+        recordOperationLog(approverUserId, saved.getId());
+
         return saved;
+    }
+
+    private void recordOperationLog(Long approverUserId, Long salesReturnId) {
+        OperationLog log = new OperationLog();
+        log.setUserId(approverUserId);
+        log.setAction(ACTION);
+        log.setTargetType(TARGET_TYPE);
+        log.setTargetId(salesReturnId);
+        log.setScreenName(SCREEN_NAME);
+        log.setApiName(API_NAME);
+        operationLogRepository.save(log);
     }
 }
