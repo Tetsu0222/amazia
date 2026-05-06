@@ -45,3 +45,19 @@ INSERT INTO role_permissions (role_id, permission_id)
         'skus.list', 'sales.list',
         'workflows.list', 'workflows.detail', 'workflows.request'
       );
+
+-- フェーズ14 マスタ（V6 / V9 と整合）
+-- created_at は JPA Entity の @PrePersist がここでは効かない（JDBC 直接 INSERT のため）。
+-- H2 は CURRENT_TIMESTAMP がカラム生成時にデフォルト値として設定されないため、明示する。
+INSERT INTO payment_methods (id, name, description, created_at) VALUES (1, 'credit_card',      'クレジットカード', CURRENT_TIMESTAMP);
+INSERT INTO payment_methods (id, name, description, created_at) VALUES (2, 'd_payment',        'd払い',           CURRENT_TIMESTAMP);
+INSERT INTO payment_methods (id, name, description, created_at) VALUES (3, 'cash_on_delivery', '代引き',          CURRENT_TIMESTAMP);
+
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (1, 'PENDING',          '配送準備中', '注文確定後・出荷前',     CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (2, 'SHIPPED',          '配送済',     '発送完了',               CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (3, 'DELIVERED',        '配送完了',   '配達完了',               CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (4, 'RETURN_REQUESTED', '返品申請中', '返品申請を受付中',       CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (5, 'RETURNED',         '返品完了',   '返品処理完了',           CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (6, 'CANCELED',         '発送前キャンセル', '将来 phase21',     CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (7, 'DELIVERY_FAILED',  '配達失敗',         '将来 phase21',     CURRENT_TIMESTAMP);
+INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (8, 'RESCHEDULED',      '再配達手配中',     '将来 phase21',     CURRENT_TIMESTAMP);

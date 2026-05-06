@@ -7,10 +7,12 @@ import {
 } from '@mui/material';
 import { getMarketProduct } from '../api/products';
 import { NOIMAGE } from '../constants';
+import { useAuth } from '../../customer/context/useAuth';
 
 export default function ProductDetail() {
   const { id }     = useParams();
   const navigate   = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -184,6 +186,21 @@ export default function ProductDetail() {
                     <Chip label="在庫なし" color="error" size="small" />
                   )}
                 </Box>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={selectedSku.stock <= 0}
+                  onClick={() => {
+                    const target = `/checkout?sku_id=${selectedSku.id}&quantity=1`;
+                    if (!isAuthenticated) {
+                      navigate('/login', { state: { from: target } });
+                    } else {
+                      navigate(target);
+                    }
+                  }}
+                >
+                  購入する
+                </Button>
               </Stack>
             )}
           </Stack>

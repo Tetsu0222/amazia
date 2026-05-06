@@ -10,6 +10,8 @@ import MyPage from './features/customer/pages/MyPage';
 import { AuthProvider } from './features/customer/context/AuthContext';
 import ProtectedRoute from './features/customer/components/ProtectedRoute';
 import AppHeader from './components/AppHeader';
+import Checkout from './features/checkout/pages/Checkout';
+import CheckoutComplete from './features/checkout/pages/CheckoutComplete';
 
 function Layout() {
   return (
@@ -38,6 +40,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <MyPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute>
+                  <Checkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/complete"
+              element={
+                <ProtectedRoute>
+                  <CheckoutComplete />
                 </ProtectedRoute>
               }
             />

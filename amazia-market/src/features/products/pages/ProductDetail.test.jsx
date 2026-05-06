@@ -7,12 +7,18 @@ import * as api from '../api/products';
 
 vi.mock('../api/products');
 
+// useAuth は describe ブロックごとに上書きできるよう変数経由でモック化
+let mockAuthValue = { isAuthenticated: false, customer: null, initializing: false };
+vi.mock('../../customer/context/useAuth', () => ({
+  useAuth: () => mockAuthValue,
+}));
+
 const PRODUCT_DATA = {
   product: { name: 'テストシャツ', description: '説明文です' },
   skus: [
-    { color: '赤', size: 'S', price: 3000, stock: 10, images: [] },
-    { color: '赤', size: 'M', price: 3200, stock: 0,  images: [] },
-    { color: '青', size: 'S', price: 2800, stock: 5,  images: [] },
+    { id: 101, color: '赤', size: 'S', price: 3000, stock: 10, images: [] },
+    { id: 102, color: '赤', size: 'M', price: 3200, stock: 0,  images: [] },
+    { id: 103, color: '青', size: 'S', price: 2800, stock: 5,  images: [] },
   ],
 };
 
@@ -21,6 +27,8 @@ function renderProductDetail(id = '1') {
     <MemoryRouter initialEntries={[`/products/${id}`]}>
       <Routes>
         <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/login" element={<div data-testid="login-page">ログイン画面</div>} />
+        <Route path="/checkout" element={<div data-testid="checkout-page">チェックアウト</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -29,6 +37,7 @@ function renderProductDetail(id = '1') {
 describe('ProductDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthValue = { isAuthenticated: false, customer: null, initializing: false };
   });
 
   it('ローディング中はスピナーを表示する', () => {
@@ -102,5 +111,54 @@ describe('ProductDetail', () => {
     await userEvent.click(screen.getByText('青'));
     expect(screen.queryByText('¥3,000')).not.toBeInTheDocument();
     expect(screen.getByText('色とサイズを選択してください')).toBeInTheDocument();
+  });
+
+  // フェーズ14 r4: 購入導線（ユーザー指示の核心「購入ボタン押下⇒未ログイン⇒ログイン画面」）
+  it('未ログイン状態で購入ボタンを押すと /login へリダイレクトする', async () => {
+    mockAuthValue = { isAuthenticated: false, customer: null, initializing: false };
+    api.getMarketProduct.mockResolvedValue(PRODUCT_DATA);
+    renderProductDetail();
+
+    await waitFor(() => screen.getByText('赤'));
+    await userEvent.click(screen.getByText('赤'));
+    await userEvent.click(screen.getByText('S'));
+
+    const buyButton = screen.getByRole('button', { name: '購入する' });
+    expect(buyButton).toBeEnabled();
+    await userEvent.click(buyButton);
+
+    expect(screen.getByTestId('login-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-page')).not.toBeInTheDocument();
+  });
+
+  it('ログイン済みで購入ボタンを押すと /checkout へ遷移する', async () => {
+    mockAuthValue = {
+      isAuthenticated: true,
+      customer: { id: 1, nameLast: '山田', nameFirst: '太郎' },
+      initializing: false,
+    };
+    api.getMarketProduct.mockResolvedValue(PRODUCT_DATA);
+    renderProductDetail();
+
+    await waitFor(() => screen.getByText('赤'));
+    await userEvent.click(screen.getByText('赤'));
+    await userEvent.click(screen.getByText('S'));
+
+    await userEvent.click(screen.getByRole('button', { name: '購入する' }));
+
+    expect(screen.getByTestId('checkout-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+  });
+
+  it('在庫切れの SKU を選択すると購入ボタンが無効化される', async () => {
+    mockAuthValue = { isAuthenticated: true, customer: { id: 1 }, initializing: false };
+    api.getMarketProduct.mockResolvedValue(PRODUCT_DATA);
+    renderProductDetail();
+
+    await waitFor(() => screen.getByText('赤'));
+    await userEvent.click(screen.getByText('赤'));
+    await userEvent.click(screen.getByText('M')); // 在庫 0
+
+    expect(screen.getByRole('button', { name: '購入する' })).toBeDisabled();
   });
 });
