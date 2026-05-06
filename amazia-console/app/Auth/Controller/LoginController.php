@@ -21,16 +21,14 @@ class LoginController extends Controller
 
         $httpResponse = response()->json($response->json(), $response->status());
 
-        foreach ($response->cookies() as $cookie) {
-            $httpResponse->cookie(
-                $cookie->getName(),
-                $cookie->getValue(),
-                $cookie->getMaxAge() / 60,
-                $cookie->getPath(),
-                null,                   // domain=amazia-core（コンテナ名）をブラウザに渡さない
-                $cookie->getSecure(),
-                $cookie->getHttpOnly()
-            );
+        // Spring が返した Set-Cookie ヘッダをそのままブラウザへ透過する。
+        // Laravel の cookie() / Guzzle CookieJar 経由では Domain や属性が
+        // 再構築されてしまい、CloudFront 経由の本番環境で必要な属性
+        // （Domain=www.amazia-portfolio.dedyn.io / Path=/console/api/auth/refresh /
+        //  Secure / HttpOnly）が落ちる事象が発生したため生ヘッダで素通しする。
+        // 詳細はトラブル031を参照。
+        foreach ($response->getHeaders()['Set-Cookie'] ?? [] as $rawCookie) {
+            $httpResponse->headers->set('Set-Cookie', $rawCookie, false);
         }
 
         return $httpResponse;

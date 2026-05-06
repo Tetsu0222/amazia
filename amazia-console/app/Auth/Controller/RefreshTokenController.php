@@ -22,16 +22,9 @@ class RefreshTokenController extends Controller
 
         $httpResponse = response()->json($response->json(), $response->status());
 
-        foreach ($response->cookies() as $cookie) {
-            $httpResponse->cookie(
-                $cookie->getName(),
-                $cookie->getValue(),
-                $cookie->getMaxAge() / 60,
-                $cookie->getPath(),
-                null,
-                $cookie->getSecure(),
-                $cookie->getHttpOnly()
-            );
+        // Spring が返した Set-Cookie ヘッダをそのまま透過する（031 経緯）。
+        foreach ($response->getHeaders()['Set-Cookie'] ?? [] as $rawCookie) {
+            $httpResponse->headers->set('Set-Cookie', $rawCookie, false);
         }
 
         return $httpResponse;

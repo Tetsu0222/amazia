@@ -210,3 +210,15 @@ unzip と docker-compose up の間に以下 3 コマンドを差し込む：
 ### 教訓
 - **本番とローカルの docker-compose を同じ思想で書くか、差分を明示的に記録する**。永続化が片方しかないのは事故のもと
 - **アップロード機能を実装したら、本番のストレージ永続化を同タイミングで設計する**（フェーズ9 SKU 画像実装時に本対応すべきだった）
+
+---
+
+## 関連トラブル（X-3 動作確認の過程で発見）
+
+### refresh_tokens テーブル不在
+本番 MySQL に `refresh_tokens` テーブルが存在しなかったため、Core 側ログイン処理で 500 が発生。`schema.sql` に `CREATE TABLE IF NOT EXISTS refresh_tokens / password_reset_tokens` を追記して恒久対策。`users.id` が `BIGINT UNSIGNED` のため FK 型を合わせる必要があった（029 と同種の Laravel/Spring スキーマ齟齬）。
+
+### Console（Laravel）の Set-Cookie 中継が機能していない（[031](031_console_cookie_relay_drops_set_cookie.md)）
+Spring が正しく `Set-Cookie` を返しているのに、Laravel の Guzzle ラッパーが CookieJar を有効化していないためブラウザへ転送される `Set-Cookie` が空になっていた。Spring のレスポンスヘッダを生のまま透過する方式に変更。
+
+これら 2 件は X-3 が直接の原因ではないが、本番動作確認をしたのが X-3 完了後だったため、X-3 のデプロイで踏み抜いた形。031 として独立起票しつつ、ここからもクロスリンクして経緯を追えるようにする。

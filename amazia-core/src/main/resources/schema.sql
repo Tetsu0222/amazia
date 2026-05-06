@@ -5,6 +5,32 @@
 -- テスト環境(H2)では application-test.properties で schema-locations を空にして
 -- このスクリプトを読み込まない。テストは ddl-auto=create-drop で JPA が生成する。
 
+-- リフレッシュトークン（V1 マイグレーション相当）
+-- 本番 MySQL に過去のいずれかの段階で作られていなかった場合のフォールバック。
+-- users.id が Laravel 由来で BIGINT UNSIGNED のため、FK の型を合わせる必要がある（029 と同種の経緯）。
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    token_hash VARCHAR(255)    NOT NULL UNIQUE,
+    expires_at DATETIME        NOT NULL,
+    revoked    BOOLEAN         NOT NULL DEFAULT FALSE,
+    created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_refresh_tokens_user (user_id),
+    CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- パスワード再発行トークン（V1 マイグレーション相当）
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    token_hash VARCHAR(255)    NOT NULL UNIQUE,
+    expires_at DATETIME        NOT NULL,
+    used       BOOLEAN         NOT NULL DEFAULT FALSE,
+    created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_password_reset_tokens_user (user_id),
+    CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS workflow_requests (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     target_type   VARCHAR(20)  NOT NULL,
