@@ -24,6 +24,18 @@ public class ProductSkuStockTransaction {
     @Column(nullable = false)
     private Integer quantity;
 
+    @Column(name = "reference_type", length = 50)
+    private String referenceType;
+
+    @Column(name = "reference_id")
+    private Long referenceId;
+
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
+    @Column(columnDefinition = "TEXT")
+    private String comment;
+
     private LocalDateTime createdAt;
 
     @PrePersist
@@ -38,5 +50,13 @@ public class ProductSkuStockTransaction {
     public void setType(String type) { this.type = type; }
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    public String getReferenceType() { return referenceType; }
+    public void setReferenceType(String referenceType) { this.referenceType = referenceType; }
+    public Long getReferenceId() { return referenceId; }
+    public void setReferenceId(Long referenceId) { this.referenceId = referenceId; }
+    public Long getCreatedByUserId() { return createdByUserId; }
+    public void setCreatedByUserId(Long createdByUserId) { this.createdByUserId = createdByUserId; }
+    public String getComment() { return comment; }
+    public void setComment(String comment) { this.comment = comment; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

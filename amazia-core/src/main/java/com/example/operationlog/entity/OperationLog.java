@@ -23,6 +23,12 @@ public class OperationLog {
     @Column(name = "target_id")
     private Long targetId;
 
+    @Column(name = "screen_name", length = 100)
+    private String screenName;
+
+    @Column(name = "api_name", length = 100)
+    private String apiName;
+
     @Column(columnDefinition = "TEXT")
     private String comment;
 
@@ -43,6 +49,10 @@ public class OperationLog {
     public void setTargetType(String targetType) { this.targetType = targetType; }
     public Long getTargetId() { return targetId; }
     public void setTargetId(Long targetId) { this.targetId = targetId; }
+    public String getScreenName() { return screenName; }
+    public void setScreenName(String screenName) { this.screenName = screenName; }
+    public String getApiName() { return apiName; }
+    public void setApiName(String apiName) { this.apiName = apiName; }
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
     public LocalDateTime getCreatedAt() { return createdAt; }

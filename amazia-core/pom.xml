@@ -97,6 +97,14 @@
             <artifactId>ses</artifactId>
             <version>2.25.60</version>
         </dependency>
+
+        <!-- UUID v7 採番（フェーズ14: payment_id 採番用 / License: MIT） -->
+        <!-- 選定基準（設計書 r4 / S14-11）: License MIT、最新リリース 2025-04-13、Star ~670、UUID v7 ネイティブ対応 -->
+        <dependency>
+            <groupId>com.github.f4b6a3</groupId>
+            <artifactId>uuid-creator</artifactId>
+            <version>6.1.1</version>
+        </dependency>
     </dependencies>
 
     <build>

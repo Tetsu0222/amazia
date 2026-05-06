@@ -20,6 +20,9 @@ public class SalesReturn {
     @Column(columnDefinition = "TEXT")
     private String reason;
 
+    @Column(nullable = false)
+    private Integer quantity;
+
     @Column(name = "approver_id")
     private Long approverId;
 
@@ -57,6 +60,8 @@ public class SalesReturn {
     public void setStatus(String status) { this.status = status; }
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public Long getApproverId() { return approverId; }
     public void setApproverId(Long approverId) { this.approverId = approverId; }
     public LocalDateTime getApprovedAt() { return approvedAt; }
