@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Grid, Card, CardActionArea,
-  CardMedia, CardContent, CircularProgress, Alert, Box,
+  CardMedia, CardContent, CircularProgress, Alert, Box, Chip,
 } from '@mui/material';
 import { getMarketProducts } from '../api/products';
 import { NOIMAGE } from '../constants';
+import { PREORDER_STATUS, getPreorderStatusMeta } from '../preorderStatus';
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
@@ -30,7 +31,9 @@ export default function ProductList() {
         <Typography color="text.secondary">現在表示できる商品がありません。</Typography>
       )}
       <Grid container spacing={3}>
-        {products.map(p => (
+        {products.map(p => {
+          const meta = getPreorderStatusMeta(p.preorderStatus);
+          return (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={p.productId}>
             <Card sx={{ height: '100%' }}>
               <CardActionArea
@@ -49,6 +52,14 @@ export default function ProductList() {
                   <Typography variant="subtitle1" fontWeight="bold" noWrap>
                     {p.productName}
                   </Typography>
+                  {meta && (
+                    <Chip
+                      label={meta.label}
+                      color={meta.chipColor}
+                      size="small"
+                      sx={{ mt: 0.5 }}
+                    />
+                  )}
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="body2" color="text.secondary">
                       {p.description ?? ''}
@@ -56,15 +67,33 @@ export default function ProductList() {
                     <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
                       ¥{p.minPrice != null ? p.minPrice.toLocaleString() : '—'} 〜
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      在庫：{p.totalStock} 個
-                    </Typography>
+                    {p.preorderStatus === PREORDER_STATUS.ON_SALE && (
+                      <Typography variant="body2" color="text.secondary">
+                        在庫：{p.totalStock} 個
+                      </Typography>
+                    )}
+                    {p.preorderStatus === PREORDER_STATUS.PRE_ORDER && p.releaseDate && (
+                      <Typography variant="body2" color="text.secondary">
+                        発売日：{p.releaseDate}
+                      </Typography>
+                    )}
+                    {p.preorderStatus === PREORDER_STATUS.PRE_ORDER_NOT_STARTED && p.preorderStartDate && (
+                      <Typography variant="body2" color="text.secondary">
+                        予約開始：{p.preorderStartDate}
+                      </Typography>
+                    )}
+                    {p.preorderStatus === PREORDER_STATUS.BACK_ORDER && (
+                      <Typography variant="body2" color="text.secondary">
+                        在庫切れ（再入荷予約受付中）
+                      </Typography>
+                    )}
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
-        ))}
+          );
+        })}
       </Grid>
     </Container>
   );

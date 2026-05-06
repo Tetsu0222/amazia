@@ -22,8 +22,10 @@
 | 実装ファイル | `src/features/products/api/products.js` の `getMarketProducts()` |
 
 **仕様**
-- SKUなし・在庫0の商品は除外済み（Core側）
-- mainImage が null の場合はフロントでNOIMAGE表示
+- SKU なしの商品は除外済み（Core 側）
+- フェーズ14.5: `preorderStatus = NOT_PUBLIC` の商品は除外。在庫 0 商品も `SOLD_OUT`/`BACK_ORDER`/`PRE_ORDER` 等として一覧に含まれる
+- `mainImage` が null の場合はフロントで NOIMAGE 表示
+- `preorderStatus` に応じて `ProductList.jsx` がラベル（通常販売 / 予約受付中 / 完売 等）と補足表示（在庫数 / 発売日 / 予約開始日）を切り替える
 
 **レスポンス例**
 ```json
@@ -34,10 +36,17 @@
     "description": "説明",
     "minPrice": 1000,
     "totalStock": 50,
-    "mainImage": "1/uuid.png"
+    "mainImage": "1/uuid.png",
+    "preorderStatus": "ON_SALE",
+    "releaseDate": null,
+    "preorderStartDate": null,
+    "acceptPreorder": false,
+    "acceptBackorder": false
   }
 ]
 ```
+
+`preorderStatus` 値: `PRE_ORDER_NOT_STARTED` / `PRE_ORDER` / `ON_SALE` / `BACK_ORDER` / `SOLD_OUT`（`NOT_PUBLIC` は Core 側で除外済）。
 
 ---
 
@@ -53,7 +62,13 @@
 **レスポンス例**
 ```json
 {
-  "product": { "id": 1, "name": "商品A", "description": "説明" },
+  "product": {
+    "id": 1, "name": "商品A", "description": "説明",
+    "releaseDate": "2026-08-01",
+    "preorderStartDate": "2026-07-01",
+    "acceptPreorder": true,
+    "acceptBackorder": false
+  },
   "skus": [
     {
       "skuId": 1,
@@ -65,9 +80,12 @@
       "stock": 50,
       "images": ["1/uuid.png"]
     }
-  ]
+  ],
+  "preorderStatus": "PRE_ORDER"
 }
 ```
+
+`ProductDetail.jsx` は `preorderStatus` でステータスラベル（Chip）と購入ボタン文言（購入する / 予約する / 非表示）を切り替える。`PRE_ORDER` / `BACK_ORDER` のときは checkout に `&preorder=1` を付加して遷移する。
 
 ---
 

@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { getMarketProduct } from '../api/products';
 import { NOIMAGE } from '../constants';
+import { PREORDER_STATUS, getPreorderStatusMeta } from '../preorderStatus';
 import { useAuth } from '../../customer/context/useAuth';
 
 export default function ProductDetail() {
@@ -71,12 +72,34 @@ export default function ProductDetail() {
   if (error)   return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
 
   const { product } = data;
+  const preorderStatus = data.preorderStatus;
+  const statusMeta = getPreorderStatusMeta(preorderStatus);
+  const isPreorderFlow = preorderStatus === PREORDER_STATUS.PRE_ORDER
+                      || preorderStatus === PREORDER_STATUS.BACK_ORDER;
 
   return (
     <Container sx={{ mt: 4, maxWidth: 800 }}>
       <Button onClick={() => navigate('/')} sx={{ mb: 2 }}>← 一覧へ戻る</Button>
       <Paper sx={{ p: 3 }}>
         <Typography variant="h5" gutterBottom>{product.name}</Typography>
+        {statusMeta && (
+          <Chip
+            label={statusMeta.label}
+            color={statusMeta.chipColor}
+            size="small"
+            sx={{ mb: 1 }}
+          />
+        )}
+        {preorderStatus === PREORDER_STATUS.PRE_ORDER && product.releaseDate && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            発売日：{product.releaseDate}
+          </Typography>
+        )}
+        {preorderStatus === PREORDER_STATUS.PRE_ORDER_NOT_STARTED && product.preorderStartDate && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            予約開始：{product.preorderStartDate}
+          </Typography>
+        )}
         <Divider sx={{ mb: 2 }} />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
@@ -179,28 +202,44 @@ export default function ProductDetail() {
                 <Typography variant="h5" color="primary">
                   ¥{selectedSku.price != null ? selectedSku.price.toLocaleString() : '—'}
                 </Typography>
-                <Box>
-                  {selectedSku.stock > 0 ? (
-                    <Chip label={`在庫 ${selectedSku.stock} 個`} color="success" size="small" />
-                  ) : (
-                    <Chip label="在庫なし" color="error" size="small" />
-                  )}
-                </Box>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  disabled={selectedSku.stock <= 0}
-                  onClick={() => {
-                    const target = `/checkout?product_id=${id}&sku_id=${selectedSku.skuId}&quantity=1`;
-                    if (!isAuthenticated) {
-                      navigate('/login', { state: { from: target } });
-                    } else {
-                      navigate(target);
+                {/* ON_SALE の在庫表示は SKU 単位の数値、その他は商品ステータスに準拠 */}
+                {preorderStatus === PREORDER_STATUS.ON_SALE && (
+                  <Box>
+                    {selectedSku.stock > 0 ? (
+                      <Chip label={`在庫 ${selectedSku.stock} 個`} color="success" size="small" />
+                    ) : (
+                      <Chip label="在庫なし" color="error" size="small" />
+                    )}
+                  </Box>
+                )}
+                {preorderStatus === PREORDER_STATUS.BACK_ORDER && (
+                  <Box>
+                    <Chip label="在庫切れ（再入荷予約受付中）" color="warning" size="small" />
+                  </Box>
+                )}
+
+                {/* ボタン分岐: SOLD_OUT は非表示 / NOT_STARTED は非活性 / PRE_ORDER・BACK_ORDER は予約 / ON_SALE は購入 */}
+                {statusMeta?.buttonAction === 'hidden' ? null : (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    disabled={
+                      statusMeta?.buttonAction === 'disabled'
+                      || (preorderStatus === PREORDER_STATUS.ON_SALE && selectedSku.stock <= 0)
                     }
-                  }}
-                >
-                  購入する
-                </Button>
+                    onClick={() => {
+                      const target = `/checkout?product_id=${id}&sku_id=${selectedSku.skuId}&quantity=1`
+                                   + (isPreorderFlow ? '&preorder=1' : '');
+                      if (!isAuthenticated) {
+                        navigate('/login', { state: { from: target } });
+                      } else {
+                        navigate(target);
+                      }
+                    }}
+                  >
+                    {statusMeta?.buttonLabel ?? '購入する'}
+                  </Button>
+                )}
               </Stack>
             )}
           </Stack>

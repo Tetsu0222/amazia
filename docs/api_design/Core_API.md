@@ -420,7 +420,8 @@
 
 **仕様**
 - SKUが1つもない商品は除外
-- 全SKUの在庫合計が0の商品は除外
+- フェーズ14.5: `preorderStatus = NOT_PUBLIC` の商品は除外（公開期間外）
+- フェーズ14.5: 在庫合計0の商品も `SOLD_OUT` / `BACK_ORDER` / `PRE_ORDER` 等として一覧に含まれる（旧仕様の「在庫0は除外」は撤廃）
 
 **レスポンス例**
 ```json
@@ -431,10 +432,17 @@
     "description": "説明",
     "minPrice": 1000,
     "totalStock": 50,
-    "mainImage": "1/uuid.png"
+    "mainImage": "1/uuid.png",
+    "preorderStatus": "ON_SALE",
+    "releaseDate": null,
+    "preorderStartDate": null,
+    "acceptPreorder": false,
+    "acceptBackorder": false
   }
 ]
 ```
+
+`preorderStatus` 値は [予約ステータス API](#予約ステータス取得) と同じ 6 種。
 
 ---
 
@@ -449,7 +457,13 @@
 **レスポンス例**
 ```json
 {
-  "product": { "id": 1, "name": "商品A", "description": "説明" },
+  "product": {
+    "id": 1, "name": "商品A", "description": "説明",
+    "releaseDate": "2026-08-01",
+    "preorderStartDate": "2026-07-01",
+    "acceptPreorder": true,
+    "acceptBackorder": false
+  },
   "skus": [
     {
       "skuId": 1,
@@ -461,9 +475,12 @@
       "stock": 50,
       "images": ["1/uuid.png"]
     }
-  ]
+  ],
+  "preorderStatus": "PRE_ORDER"
 }
 ```
+
+フェーズ14.5: `preorderStatus` をトップレベルに、4 カラム（`releaseDate` / `preorderStartDate` / `acceptPreorder` / `acceptBackorder`）を `product` 配下に追加。
 
 ---
 

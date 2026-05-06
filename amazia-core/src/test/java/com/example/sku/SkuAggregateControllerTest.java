@@ -98,16 +98,13 @@ public class SkuAggregateControllerTest {
                 .andExpect(jsonPath("$[0].productId").value(productId))
                 .andExpect(jsonPath("$[0].minPrice").value(1000))
                 .andExpect(jsonPath("$[0].totalStock").value(15))
-                .andExpect(jsonPath("$[0].mainImage").isNotEmpty());
+                .andExpect(jsonPath("$[0].mainImage").isNotEmpty())
+                .andExpect(jsonPath("$[0].preorderStatus").value("ON_SALE"));
     }
 
+    // フェーズ14.5 §4-2: 在庫切れ商品も Market 一覧に含める（ステータスで分岐）
     @Test
-    void 在庫が0の商品はSKU集約一覧に含まれないこと() throws Exception {
-        ProductSku sku3 = new ProductSku();
-        sku3.setSkuCode("SKU003");
-        sku3.setColor("Green");
-        sku3.setSize("S");
-
+    void 在庫が0の商品もSKU集約一覧に含まれSOLD_OUTで返ること() throws Exception {
         Product noStockProduct = new Product();
         noStockProduct.setName("在庫なし商品");
         noStockProduct.setDescription("説明");
@@ -115,6 +112,10 @@ public class SkuAggregateControllerTest {
         noStockProduct.setStock(0);
         Long noStockId = productRepository.save(noStockProduct).getId();
 
+        ProductSku sku3 = new ProductSku();
+        sku3.setSkuCode("SKU003");
+        sku3.setColor("Green");
+        sku3.setSize("S");
         sku3.setProductId(noStockId);
         Long sku3Id = skuRepository.save(sku3).getId();
 
@@ -131,7 +132,38 @@ public class SkuAggregateControllerTest {
 
         mockMvc.perform(get("/api/products/market"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.productId == " + noStockId + ")].preorderStatus")
+                        .value(org.hamcrest.Matchers.contains("SOLD_OUT")));
+    }
+
+    // フェーズ14.5 §4-2: 公開期間外の商品は NOT_PUBLIC として一覧から除外される
+    @Test
+    void 公開開始前の商品はNOT_PUBLICとして一覧から除外されること() throws Exception {
+        Product future = new Product();
+        future.setName("未公開商品");
+        future.setDescription("");
+        future.setPrice(0);
+        future.setStock(0);
+        future.setPublishStart(java.time.LocalDateTime.now().plusDays(7));
+        Long futureId = productRepository.save(future).getId();
+
+        ProductSku sku = new ProductSku();
+        sku.setProductId(futureId);
+        sku.setSkuCode("SKU-FUTURE");
+        sku.setColor("White");
+        sku.setSize("M");
+        Long fSkuId = skuRepository.save(sku).getId();
+
+        ProductSkuStock s = new ProductSkuStock();
+        s.setSkuId(fSkuId);
+        s.setQuantity(10);
+        stockRepository.save(s);
+
+        mockMvc.perform(get("/api/products/market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].productId").value(productId));
     }
 
     @Test
@@ -156,7 +188,8 @@ public class SkuAggregateControllerTest {
                 .andExpect(jsonPath("$.skus.length()").value(2))
                 .andExpect(jsonPath("$.skus[0].color").value("Red"))
                 .andExpect(jsonPath("$.skus[0].price").value(1000))
-                .andExpect(jsonPath("$.skus[0].stock").value(10));
+                .andExpect(jsonPath("$.skus[0].stock").value(10))
+                .andExpect(jsonPath("$.preorderStatus").value("ON_SALE"));
     }
 
     @Test
