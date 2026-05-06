@@ -18,6 +18,7 @@ import WorkflowList               from '../features/workflows/pages/WorkflowList
 import WorkflowDetail             from '../features/workflows/pages/WorkflowDetail.vue';
 import WorkflowRequestForm        from '../features/workflows/pages/WorkflowRequestForm.vue';
 import SalesList                  from '../features/sales/pages/SalesList.vue';
+import SalesReturnList            from '../features/salesReturn/pages/SalesReturnList.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -42,6 +43,7 @@ const routes = [
   { path: '/workflows/:id',            component: WorkflowDetail,      meta: { requiresAuth: true } },
 
   { path: '/sales',                    component: SalesList,           meta: { requiresAuth: true } },
+  { path: '/sales-returns',            component: SalesReturnList,     meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

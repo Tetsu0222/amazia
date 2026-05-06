@@ -18,6 +18,7 @@
           <a-menu-item key="/skus">SKU管理</a-menu-item>
           <a-menu-item key="/products/market-view">商品一覧（SKU集約版）</a-menu-item>
           <a-menu-item key="/sales">売上管理</a-menu-item>
+          <a-menu-item key="/sales-returns">返品管理</a-menu-item>
           <a-menu-item key="/workflows">ワークフロー</a-menu-item>
           <a-menu-item v-if="isAdmin" key="/users">社員管理</a-menu-item>
           <a-menu-divider />
