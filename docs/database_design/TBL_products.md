@@ -24,6 +24,10 @@
 | 9 | version | 楽観ロックバージョン | BIGINT | - | NOT NULL | 0 | フェーズ12追加。JPA `@Version` 用 |
 | 10 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
 | 11 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
+| 12 | release_date | 発売日 | DATE | - | NULL | NULL | フェーズ14.5追加。NULL のとき「公開即発売 = `ON_SALE` 起点」 |
+| 13 | preorder_start_date | 予約開始日 | DATE | - | NULL | NULL | フェーズ14.5追加。NULL のとき「公開と同時に予約可」 |
+| 14 | accept_preorder | 予約購入受付フラグ | BOOLEAN | - | NOT NULL | FALSE | フェーズ14.5追加。発売日前の予約購入を受け付けるか |
+| 15 | accept_backorder | 在庫切れ予約継続フラグ | BOOLEAN | - | NOT NULL | FALSE | フェーズ14.5追加。発売日後・在庫切れ時に予約を受け付けるか |
 
 ## インデックス
 
@@ -43,8 +47,10 @@
 | フェーズ | 内容 |
 |---------|------|
 | フェーズ12 | `version`（BIGINT NOT NULL DEFAULT 0）を追加。JPA `@Version` で楽観ロックを実現する |
+| フェーズ14.5 | 予約ステータス判定用の 4 カラム（`release_date` / `preorder_start_date` / `accept_preorder` / `accept_backorder`）を追加。設計書 [phase14_5_preorder_status.md](../design/phase11_20/phase14_5_preorder_status.md) §2-3 |
 
 ## マイグレーションファイル
 
 - JPA `@Entity` により自動生成（`spring.jpa.hibernate.ddl-auto`）
 - `version` カラムは `amazia-core/src/main/resources/schema.sql` の ALTER TABLE で追加（既存環境向けフォールバック）
+- フェーズ14.5 の 4 カラムも `schema.sql` の ALTER TABLE で追加（同上）

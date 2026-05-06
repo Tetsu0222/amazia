@@ -270,3 +270,15 @@ ALTER TABLE product_sku_stock_transactions ADD COLUMN comment            TEXT   
 CREATE INDEX idx_sku_stock_tx_reference  ON product_sku_stock_transactions (reference_type, reference_id);
 CREATE INDEX idx_sku_stock_tx_created_by ON product_sku_stock_transactions (created_by_user_id);
 CREATE INDEX idx_sku_stock_tx_created_at ON product_sku_stock_transactions (created_at);
+
+-- ============================================================================
+-- フェーズ14.5: 予約ステータス判定（設計書 phase14_5_preorder_status.md §2-3）
+--   既存 products テーブルに 4 カラム追加。
+--   release_date / preorder_start_date は NULL 許容（NULL 時の意味は設計書参照）。
+--   accept_preorder / accept_backorder は NOT NULL DEFAULT FALSE。
+--   重複実行は spring.sql.init.continue-on-error=true で許容。
+-- ============================================================================
+ALTER TABLE products ADD COLUMN release_date         DATE    NULL;
+ALTER TABLE products ADD COLUMN preorder_start_date  DATE    NULL;
+ALTER TABLE products ADD COLUMN accept_preorder      BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE products ADD COLUMN accept_backorder     BOOLEAN NOT NULL DEFAULT FALSE;

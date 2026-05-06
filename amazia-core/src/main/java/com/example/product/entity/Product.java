@@ -3,6 +3,7 @@ package com.example.product.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,6 +28,16 @@ public class Product {
     private LocalDateTime publishStart;
 
     private LocalDateTime publishEnd;
+
+    private LocalDate releaseDate;
+
+    private LocalDate preorderStartDate;
+
+    @Column(nullable = false)
+    private boolean acceptPreorder;
+
+    @Column(nullable = false)
+    private boolean acceptBackorder;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -69,6 +80,14 @@ public class Product {
     public void setPublishStart(LocalDateTime publishStart) { this.publishStart = publishStart; }
     public LocalDateTime getPublishEnd() { return publishEnd; }
     public void setPublishEnd(LocalDateTime publishEnd) { this.publishEnd = publishEnd; }
+    public LocalDate getReleaseDate() { return releaseDate; }
+    public void setReleaseDate(LocalDate releaseDate) { this.releaseDate = releaseDate; }
+    public LocalDate getPreorderStartDate() { return preorderStartDate; }
+    public void setPreorderStartDate(LocalDate preorderStartDate) { this.preorderStartDate = preorderStartDate; }
+    public boolean isAcceptPreorder() { return acceptPreorder; }
+    public void setAcceptPreorder(boolean acceptPreorder) { this.acceptPreorder = acceptPreorder; }
+    public boolean isAcceptBackorder() { return acceptBackorder; }
+    public void setAcceptBackorder(boolean acceptBackorder) { this.acceptBackorder = acceptBackorder; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }
