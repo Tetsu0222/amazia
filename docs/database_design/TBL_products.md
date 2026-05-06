@@ -48,9 +48,11 @@
 |---------|------|
 | フェーズ12 | `version`（BIGINT NOT NULL DEFAULT 0）を追加。JPA `@Version` で楽観ロックを実現する |
 | フェーズ14.5 | 予約ステータス判定用の 4 カラム（`release_date` / `preorder_start_date` / `accept_preorder` / `accept_backorder`）を追加。設計書 [phase14_5_preorder_status.md](../design/phase11_20/phase14_5_preorder_status.md) §2-3 |
+| フェーズ14.5 P2 | 旧カラム `price` / `stock` を NOT NULL → NULL 許容に修正。フェーズ10で SKU 側に移行済みだったが本番 MySQL の旧 NOT NULL 制約が残っており、Console UI 経由の商品登録が 500 になる不具合を解消（[038_products_price_stock_not_null_drift.md](../troubles/038_products_price_stock_not_null_drift.md)） |
 
 ## マイグレーションファイル
 
 - JPA `@Entity` により自動生成（`spring.jpa.hibernate.ddl-auto`）
 - `version` カラムは `amazia-core/src/main/resources/schema.sql` の ALTER TABLE で追加（既存環境向けフォールバック）
 - フェーズ14.5 の 4 カラムも `schema.sql` の ALTER TABLE で追加（同上）
+- フェーズ14.5 P2: `schema.sql` 末尾で `ALTER TABLE products MODIFY COLUMN price/stock INT NULL` を冪等に実行

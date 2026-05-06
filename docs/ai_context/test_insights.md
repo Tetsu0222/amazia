@@ -133,6 +133,21 @@
 - [ ] JSON 列に保存した payload が読み取り側で `ObjectMapper.readValue` できるかを実テストで通す（往復検証）
 - [ ] 過去に Phase 11 でも同種の ApplicationContext 失敗（76b2dd23 / a3c565cc）があり、Phase 導入時の H2 互換性は再発パターンとして要警戒
 
+### Entity と本番 MySQL の NOT NULL 制約乖離（038 起因）
+- H2 + `ddl-auto=create-drop` のテストは Entity から都度スキーマ生成するため、本番 MySQL に残る旧 NOT NULL 制約は再現されない
+- Entity に `@Column(nullable=false)` が無く本番 MySQL だけが NOT NULL の場合、テストは緑でも UI 経由の最小ペイロード送信時に MySQL 1048（`Column 'X' cannot be null`）で 500 を起こす
+- 設計書で「廃止／NULL 許容に移行」と書かれた旧カラムは、**実際の ALTER MODIFY が schema.sql に書かれているか**を確認する。書かれていなければ本番 DB だけ古い制約で取り残される
+- Console PHPUnit は `Http::fake` で Core を偽装するため、この種の DB 制約違反は Console テストでも検知できない
+- 対策:
+  - 旧カラム廃止／NULL 許容変更は schema.sql 末尾に冪等な `ALTER TABLE ... MODIFY COLUMN ...` を必ず追記
+  - DB 設計書の「NULL」記述と Entity の `@Column` を双方向で確認する規律
+  - 重要 UI 画面（商品登録など）はフェーズ完了時にブラウザから実機リクエストを通して確認する
+
+### テスト観点（追加）
+- [ ] Entity が NULL 許容しているフィールドが本番 MySQL でも NULL 許容か（`DESCRIBE table` で確認）
+- [ ] 設計書 §カラム定義で「NULL」と書かれた旧カラムについて、schema.sql に MODIFY が書かれているか
+- [ ] フェーズの完了条件として、UI フォームから最小ペイロード（必須項目のみ）で送信して 2xx が返ることを実機確認
+
 ---
 
 ## カテゴリ7: Core API 依存の異常系テスト
@@ -466,7 +481,8 @@
 | **本番初動でのみ顕在化する潜在不具合**（ローカルで通っていても本番で踏む） | 030, 031, 032, 033 |
 | **API レスポンス契約とフロント参照名の乖離**（テストデータが実 JSON 形式と異なるためテストでは検知できない） | 035 |
 | **「外挿による誤認」**（実ファイル/設定を直接読まずに表面上の手がかりから前提を立てる、異レイヤーで同型再発） | 035, 037 |
-| **テスト DB 初期化方式と本番 DB 初期化方式の差異**（H2 + ddl-auto では通るが本番 MySQL + schema.sql では通らない） | 027, 037 |
+| **テスト DB 初期化方式と本番 DB 初期化方式の差異**（H2 + ddl-auto では通るが本番 MySQL + schema.sql では通らない） | 027, 037, 038 |
+| **Entity と本番 MySQL の NOT NULL 制約乖離**（旧カラムの ALTER MODIFY 漏れにより設計書通り NULL を送ると 1048 で 500） | 038 |
 
 ---
 

@@ -282,3 +282,14 @@ ALTER TABLE products ADD COLUMN release_date         DATE    NULL;
 ALTER TABLE products ADD COLUMN preorder_start_date  DATE    NULL;
 ALTER TABLE products ADD COLUMN accept_preorder      BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE products ADD COLUMN accept_backorder     BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ----------------------------------------------------------------------------
+-- フェーズ14.5 P2: products.price / products.stock を NULL 許容に揃える
+--   フェーズ10で価格・在庫は SKU 側へ移行済（TBL_products.md §カラム定義 #4-5）。
+--   旧 NOT NULL 制約が本番 MySQL に残ったままで Console UI 経由の登録が
+--   500 (MySQL 1048 Column 'price' cannot be null) になる不具合を解消する。
+--   詳細: docs/troubles/038_products_price_stock_not_null_drift.md
+--   MODIFY は冪等。重複実行は continue-on-error で許容。
+-- ----------------------------------------------------------------------------
+ALTER TABLE products MODIFY COLUMN price INT NULL;
+ALTER TABLE products MODIFY COLUMN stock INT NULL;
