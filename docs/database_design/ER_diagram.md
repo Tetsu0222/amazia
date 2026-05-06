@@ -2,6 +2,11 @@
 
 ER図はシステム規模が大きくなったため、フェーズごとに分割して記載する。
 
+> **方針**：ER図には **PK / FK のみ** を記載する（最も軽量）。
+> - 関係性だけ見たいときに最適
+> - 要件定義やレビューで使いやすい
+> - 各カラムの型・制約・用途は `TBL_*.md` を参照（二重管理のリスクゼロ）
+
 - [§1 Core 認証・認可（フェーズ11）](#1-core-認証認可フェーズ11)
 - [§2 Core 商品管理（フェーズ8〜10）](#2-core-商品管理フェーズ810)
 - [§3 Core ワークフロー（フェーズ12）](#3-core-ワークフローフェーズ12)
@@ -17,59 +22,36 @@ ER図はシステム規模が大きくなったため、フェーズごとに分
 ```mermaid
 erDiagram
     roles {
-        BIGINT_UNSIGNED id PK
-        VARCHAR code UK
-        VARCHAR name
+        BIGINT id PK
     }
 
     permissions {
-        BIGINT_UNSIGNED id PK
-        VARCHAR screen_id UK
-        VARCHAR name
+        BIGINT id PK
     }
 
     role_permissions {
-        BIGINT_UNSIGNED role_id FK
-        BIGINT_UNSIGNED permission_id FK
+        BIGINT role_id FK
+        BIGINT permission_id FK
     }
 
     users {
-        BIGINT_UNSIGNED id PK
-        VARCHAR employee_id UK
-        VARCHAR email UK
-        VARCHAR name
-        VARCHAR password_hash
-        BIGINT_UNSIGNED role_id FK
-        BOOLEAN active_flag
-        INT failed_attempts
-        DATETIME locked_until
-        DATETIME created_at
-        DATETIME updated_at
+        BIGINT id PK
+        BIGINT role_id FK
     }
 
     refresh_tokens {
-        BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED user_id FK
-        VARCHAR token_hash UK
-        DATETIME expires_at
-        BOOLEAN revoked
-        DATETIME created_at
+        BIGINT id PK
+        BIGINT user_id FK
     }
 
     password_reset_tokens {
-        BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED user_id FK
-        VARCHAR token_hash UK
-        DATETIME expires_at
-        BOOLEAN used
-        DATETIME created_at
+        BIGINT id PK
+        BIGINT user_id FK
     }
 
     password_histories {
-        BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED user_id FK
-        VARCHAR password_hash
-        DATETIME created_at
+        BIGINT id PK
+        BIGINT user_id FK
     }
 
     roles ||--o{ users : "1:N"
@@ -88,90 +70,42 @@ erDiagram
 erDiagram
     products {
         BIGINT id PK
-        VARCHAR name
-        TEXT description
-        VARCHAR status_code
-        DATETIME publish_start
-        DATETIME publish_end
-        DATE release_date
-        DATE preorder_start_date
-        BOOLEAN accept_preorder
-        BOOLEAN accept_backorder
-        BIGINT version
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     product_images {
         BIGINT id PK
         BIGINT product_id FK
-        VARCHAR image_path
-        INT sort_order
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     product_skus {
         BIGINT id PK
         BIGINT product_id FK
-        VARCHAR sku_code UK
-        VARCHAR color
-        VARCHAR size
-        VARCHAR status
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     product_sku_prices {
         BIGINT id PK
         BIGINT sku_id FK
-        INT price
-        DATE start_date
-        DATE end_date
-        BIGINT version
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     product_sku_price_history {
         BIGINT id PK
         BIGINT sku_id FK
-        INT price
-        DATE start_date
-        DATE end_date
-        VARCHAR status
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     product_sku_stocks {
         BIGINT id PK
         BIGINT sku_id FK
-        INT quantity
-        BIGINT version
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     product_sku_stock_transactions {
         BIGINT id PK
         BIGINT sku_id FK
-        VARCHAR type
-        INT quantity
-        VARCHAR reference_type
-        BIGINT reference_id
         BIGINT created_by_user_id FK
-        TEXT comment
-        DATETIME created_at
     }
 
     product_sku_images {
         BIGINT id PK
         BIGINT sku_id FK
-        VARCHAR image_path
-        INT sort_order
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     products ||--o{ product_images : "1:N"
@@ -191,27 +125,14 @@ erDiagram
 erDiagram
     workflow_requests {
         BIGINT id PK
-        VARCHAR target_type
-        BIGINT target_id
         BIGINT requested_by FK
-        VARCHAR status
-        JSON payload
-        DATETIME completed_at
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     workflow_requests_detail {
         BIGINT id PK
         BIGINT workflow_requests_id FK
-        INT step_number
-        VARCHAR target_role
-        BIGINT destination_user_id
-        VARCHAR destination_name
-        BIGINT approver_user_id
-        VARCHAR approver_name
-        VARCHAR status
-        DATETIME updated_at
+        BIGINT destination_user_id FK
+        BIGINT approver_user_id FK
     }
 
     workflow_requests ||--o{ workflow_requests_detail : "1:N"
@@ -229,55 +150,26 @@ erDiagram
 ```mermaid
 erDiagram
     market_customers {
-        BIGINT_UNSIGNED id PK
-        VARCHAR name_last
-        VARCHAR name_first
-        VARCHAR postal_code
-        VARCHAR address
-        DATE birthday
-        VARCHAR email UK
-        VARCHAR password_hash
-        VARCHAR payment_method
-        VARCHAR card_token
-        BOOLEAN active_flag
-        INT failed_attempts
-        DATETIME locked_until
-        DATETIME created_at
-        DATETIME updated_at
+        BIGINT id PK
     }
 
     market_customer_password_histories {
-        BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED customer_id FK
-        VARCHAR password_hash
-        DATETIME created_at
+        BIGINT id PK
+        BIGINT customer_id FK
     }
 
     market_customers_password_reset_tokens {
-        BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED customer_id FK
-        VARCHAR token_hash UK
-        DATETIME expires_at
-        BOOLEAN used
-        DATETIME created_at
+        BIGINT id PK
+        BIGINT customer_id FK
     }
 
     market_sessions {
         VARCHAR session_id PK
-        BIGINT_UNSIGNED customer_id FK
-        VARCHAR csrf_token
-        DATETIME expires_at
-        DATETIME created_at
-        DATETIME last_accessed_at
+        BIGINT customer_id FK
     }
 
     postal_addresses {
-        BIGINT_UNSIGNED id PK
-        VARCHAR postal_code
-        VARCHAR prefecture
-        VARCHAR city
-        VARCHAR town
-        DATETIME updated_at
+        BIGINT id PK
     }
 
     market_customers ||--o{ market_customer_password_histories : "1:N"
@@ -295,89 +187,48 @@ erDiagram
 ```mermaid
 erDiagram
     market_customers {
-        BIGINT_UNSIGNED id PK
-        VARCHAR email UK
+        BIGINT id PK
     }
 
     product_skus {
         BIGINT id PK
-        VARCHAR sku_code UK
     }
 
     users {
-        BIGINT_UNSIGNED id PK
-        VARCHAR employee_id UK
+        BIGINT id PK
     }
 
     address {
-        BIGINT_UNSIGNED id PK
-        BIGINT_UNSIGNED user_id FK
-        VARCHAR postal_code
-        VARCHAR prefecture
-        VARCHAR city
-        VARCHAR address_line
-        VARCHAR building
-        BOOLEAN is_active
-        DATETIME created_at
+        BIGINT id PK
+        BIGINT user_id FK
     }
 
     payment_methods {
         BIGINT id PK
-        VARCHAR name UK
-        VARCHAR description
-        DATETIME created_at
     }
 
     shipping_statuses {
         BIGINT id PK
-        VARCHAR code UK
-        VARCHAR name
-        VARCHAR description
-        DATETIME created_at
     }
 
     sales {
         BIGINT id PK
-        BIGINT_UNSIGNED user_id FK
+        BIGINT user_id FK
         BIGINT sku_id FK
-        INT quantity
-        INT amount
         BIGINT payment_method_id FK
-        BIGINT shipping_method_id
-        BIGINT_UNSIGNED shipping_address_id FK
+        BIGINT shipping_address_id FK
         BIGINT shipping_status_id FK
-        VARCHAR payment_id UK
-        BOOLEAN is_preorder
-        DATE sales_date
-        DATE shipping_date
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     sales_return {
         BIGINT id PK
         BIGINT sales_id FK
-        VARCHAR status
-        TEXT reason
-        INT quantity
         BIGINT approver_id FK
-        DATETIME approved_at
-        BOOLEAN notified_user
-        BOOLEAN notified_admin
-        DATETIME created_at
-        DATETIME updated_at
     }
 
     operation_logs {
         BIGINT id PK
         BIGINT user_id FK
-        VARCHAR action
-        VARCHAR target_type
-        BIGINT target_id
-        VARCHAR screen_name
-        VARCHAR api_name
-        TEXT comment
-        DATETIME created_at
     }
 
     market_customers ||--o{ address : "1:N"
@@ -456,8 +307,11 @@ erDiagram
 
 ## 備考
 
+### カラム詳細の参照先
+ER図は **PK / FK のみ** を表示する設計に統一した。各テーブルの全カラム・型・制約・インデックスは個別の `TBL_<テーブル名>.md` を参照すること（同じ情報を ER 図と TBL 定義書の両方に書くと、片方だけ更新されて乖離する事故が起きるため）。
+
 ### 共通ルール
-- BIGINT_UNSIGNED は users / market_customers / address など Laravel 由来 ID 系。Core オリジナルテーブルは BIGINT のため、FK では型を合わせる必要がある（029 / 037 起因）。
+- 物理型は `users` / `market_customers` / `address` など Laravel 由来 ID 系が `BIGINT_UNSIGNED`、Core オリジナルテーブルは `BIGINT`。FK では型を合わせる必要がある（029 / 037 起因）。ER 図上は簡略化のため `BIGINT` 表記で統一している。
 - `refresh_tokens` / `password_reset_tokens` / `market_customers_password_reset_tokens` はトークン実体ではなくハッシュ値のみ格納する。
 
 ### 商品管理（§2）
