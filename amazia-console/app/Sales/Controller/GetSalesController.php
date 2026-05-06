@@ -5,6 +5,12 @@ namespace App\Sales\Controller;
 use App\Http\Controllers\Controller;
 use App\Sales\Service\GetSalesService;
 
+/**
+ * 売上一覧取得 Controller（GET /api/sales）。
+ *
+ * Core の GET /api/sales を中継し、Console フロントへ JSON を返す。
+ * 認証は routes/api.php 側のミドルウェアで担保。
+ */
 class GetSalesController extends Controller
 {
     private GetSalesService $service;
@@ -16,6 +22,7 @@ class GetSalesController extends Controller
 
     public function __invoke()
     {
-        return response()->json($this->service->getSales());
+        $response = $this->service->list();
+        return response()->json($response->json(), $response->status());
     }
 }

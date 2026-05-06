@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface SalesRepository extends JpaRepository<Sales, Long> {
     List<Sales> findByUserIdOrderBySalesDateDesc(Long userId);
     Optional<Sales> findByPaymentId(String paymentId);
+    List<Sales> findAllByOrderBySalesDateDescIdDesc();
 }

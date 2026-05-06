@@ -6,19 +6,20 @@
  * 設計書: docs/design/phase11_20/phase14_shipping.md（r4）
  *
  * Service / Controller / テストからは `config('sales.payment_methods.credit_card_id')` のように参照する。
- * マスタ ID は Core 側 Flyway V6 / V9 の INSERT と整合させる。
+ * マスタ ID は Core 側 `schema.sql`（spring.sql.init で起動時実行）の INSERT IGNORE と整合させる。
+ * 本プロジェクトは Flyway 未導入（[037](../../../docs/troubles/037_flyway_misassumed_phase14_tables_missing.md)）。
  */
 
 return [
 
-    // 決済方法マスタ ID（V6 で INSERT 済み）
+    // 決済方法マスタ ID（Core schema.sql の INSERT IGNORE で投入済み）
     'payment_methods' => [
         'credit_card_id'      => 1,
         'd_payment_id'        => 2,
         'cash_on_delivery_id' => 3,
     ],
 
-    // 配送ステータスマスタ ID（V6 / V9 で INSERT 済み）
+    // 配送ステータスマスタ ID（Core schema.sql の INSERT IGNORE で投入済み）
     'shipping_statuses' => [
         'pending_id'           => 1,
         'shipped_id'           => 2,

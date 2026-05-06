@@ -17,6 +17,7 @@ import EditUserPage               from '../features/users/pages/EditUserPage.vue
 import WorkflowList               from '../features/workflows/pages/WorkflowList.vue';
 import WorkflowDetail             from '../features/workflows/pages/WorkflowDetail.vue';
 import WorkflowRequestForm        from '../features/workflows/pages/WorkflowRequestForm.vue';
+import SalesList                  from '../features/sales/pages/SalesList.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -39,6 +40,8 @@ const routes = [
   { path: '/workflows',                component: WorkflowList,        meta: { requiresAuth: true } },
   { path: '/workflows/new',            component: WorkflowRequestForm, meta: { requiresAuth: true } },
   { path: '/workflows/:id',            component: WorkflowDetail,      meta: { requiresAuth: true } },
+
+  { path: '/sales',                    component: SalesList,           meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({
