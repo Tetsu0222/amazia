@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 / Step 1.5 / Step 2 実装完了・2026-05-07）
+🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 実装完了・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -318,6 +318,104 @@ Core の `/api/products/preorders` を Pass-through。ルート定義は新規 `
 - 「見込み表示」トグルで集計が予約込みに切り替わる
 - 「見込み表示」中は注意書きが表示される
 - 購入区分別売上は常に通常／予約の両方を表示する
+
+---
+
+# Step 3：入荷登録画面の選択UI化と SKU管理画面からの機能移譲 ✅ 実装完了（2026-05-07）
+
+> 実装計画書: [phase16_step3_implementation_plan.md](../../implementation/phase16_step3_implementation_plan.md)
+
+## 3-1. 背景・目的
+
+phase15 で入荷管理画面（`/inbound`）を新設したが、入荷登録画面（`/inbound/create`）は商品 ID と SKU ID を**数値で直接入力**する作りで、運用者が ID を覚えていないと使えなかった。また同フェーズで SKU 管理画面（`/skus`）に在庫管理タブを統合した経緯から、入荷登録機能が「SKU 管理画面の在庫タブ」と「入荷管理画面」の両方に存在しており、どちらが正なのか曖昧だった。
+
+Step 3 では、入荷登録の窓口を「入荷管理画面」に一本化し、UI を ID 直入力から商品マスタ→SKU 連動セレクトに切り替える。
+
+## 3-2. 改善（入荷登録画面 / `InboundCreate.vue`）
+
+### 3-2-1. 商品マスタ→SKU 選択 UI 化
+
+| 項目 | Before | After |
+|------|--------|-------|
+| 商品の指定 | `<a-input-number>` で商品 ID を直接入力 | `<a-select>` で商品マスタ一覧から選択（show-search で名前検索可） |
+| SKU の指定 | `<a-input-number>` で SKU ID を直接入力 | `<a-select>` で「商品を選択するまで disabled」→ 選択後に `getProductSkus(productId)` で読み込み |
+| 商品変更時 | — | `selectedSkuId` をリセット |
+
+データソース：
+- 商品リスト：`getAdminProducts()`（公開期間外の商品も対象にするため admin 経由）
+- SKU リスト：`getProductSkus(productId)`
+
+### 3-2-2. 機械的な注意事項の表示変更
+
+現状の青枠アラート：
+> 倉庫はバックエンドが既定値（id=1 'default'）を自動セットします（並行運用期）。
+
+→ 運用フェーズ表現を外し、選択UI化を踏まえたシンプル案内に変更：
+> 商品とSKUを選択し、入荷数量と入荷日を入力してください。倉庫は自動でデフォルトが設定されます。
+
+## 3-3. 改善（SKU 管理画面 / `SkuList.vue`）
+
+入荷登録画面ができたため、SKU 管理画面からは入荷登録機能を撤去し、参照系（現在在庫＋入荷履歴）のみ残す。
+
+| 要素 | 操作 |
+|------|------|
+| `<template #extra>` の「Excel一括入荷」ボタン | **削除**（Excel は入荷管理画面に移譲） |
+| 在庫タブの「入荷登録」フォーム | **削除**（`stockForm` / `handleStockReceive` / `receiveSkuStock` import も除去） |
+| 在庫タブの「現在在庫」表示 | **残す**（参照用） |
+| 在庫タブの入荷履歴テーブル | **残す**（参照用） |
+| 在庫タブ冒頭 | 「入荷登録は『入荷管理』画面から行ってください。」の info アラートを追加 |
+
+## 3-4. 改善（入荷管理画面 / `InboundList.vue`）
+
+ヘッダー右側に「Excel一括入荷」ボタンを追加し、SKU 管理画面から移譲された Excel 一括入荷機能の入口とする。
+
+```html
+<template #extra>
+  <a-space>
+    <a-button @click="goImport">Excel一括入荷</a-button>
+    <a-button type="primary" @click="goCreate">入荷登録</a-button>
+  </a-space>
+</template>
+```
+
+`goImport` は `/inbound/import` に遷移する。
+
+## 3-5. 新設（`InboundStockImport.vue`）
+
+- 新規ファイル：`amazia-console/resources/vue/src/features/inbound/pages/InboundStockImport.vue`
+- 内容：旧 `SkuStockImport.vue` の UI を移植。`@back` 先を `/inbound` に変更。
+- 呼び出す API は既存の `importSkuStock(file)`（`POST /api/skus/stocks/import`）をそのまま流用。API 互換性を保つため Console / Core 側のエンドポイントは変更しない。
+
+## 3-6. 撤去
+
+- `amazia-console/resources/vue/src/features/skus/pages/SkuStockImport.vue` を削除
+- `router/index.js` から `/skus/stocks/import` ルートと `SkuStockImport` の import を削除
+- `SkuStockList.vue` の「Excel一括入荷」ボタンの遷移先を `/skus/stocks/import` → `/inbound/import` に変更（旧画面も新窓口に整合）
+
+## 3-7. DB 変更
+
+**なし**
+
+## 3-8. API 変更
+
+**なし**（`POST /api/inbounds`・`POST /api/skus/stocks/import` をそのまま流用）
+
+## 3-9. UI 変更まとめ（Console）
+
+| 画面 | 変更内容 |
+|------|---------|
+| `InboundCreate.vue` | 商品/SKU を `<a-select>` 連動式に変更・青枠アラート文言を変更 |
+| `InboundList.vue` | ヘッダーに「Excel一括入荷」ボタン追加 |
+| `InboundStockImport.vue` | 新規作成（旧 `SkuStockImport.vue` の移植先） |
+| `SkuList.vue` | 在庫タブから入荷登録フォームを削除・「Excel一括入荷」ボタン削除・入荷履歴と現在在庫は残す |
+| `SkuStockList.vue` | 「Excel一括入荷」ボタンの遷移先を `/inbound/import` に変更 |
+| `SkuStockImport.vue` | **削除** |
+| `router/index.js` | `/inbound/import` 追加・`/skus/stocks/import` 削除 |
+
+## 3-10. TDD テストケース
+
+- 表示変更と遷移先変更のみのため、本ステップでも Vue ユニットテストは追加せず手動 E2E で担保（フェーズ16冒頭の方針）
+- 既存の Laravel feature テスト（`POST /api/skus/stocks/import` 系）には影響なし
 
 ---
 

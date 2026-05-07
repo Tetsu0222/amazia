@@ -3,7 +3,7 @@
     <a-page-header title="SKU在庫管理" sub-title="Amazia Console" />
 
     <div style="margin-bottom: 16px; text-align: right">
-      <a-button @click="$router.push('/skus/stocks/import')">
+      <a-button @click="$router.push('/inbound/import')">
         Excel一括入荷
       </a-button>
     </div>

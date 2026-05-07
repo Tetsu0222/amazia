@@ -2,7 +2,10 @@
   <div style="padding: 24px; max-width: 1200px">
     <a-page-header title="入荷管理" sub-title="Amazia Console">
       <template #extra>
-        <a-button type="primary" @click="goCreate">入荷登録</a-button>
+        <a-space>
+          <a-button @click="goImport">Excel一括入荷</a-button>
+          <a-button type="primary" @click="goCreate">入荷登録</a-button>
+        </a-space>
       </template>
     </a-page-header>
 
@@ -83,6 +86,10 @@ function reset() {
 
 function goCreate() {
   router.push('/inbound/create');
+}
+
+function goImport() {
+  router.push('/inbound/import');
 }
 
 onMounted(reload);

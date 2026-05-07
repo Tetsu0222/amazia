@@ -7,28 +7,40 @@
     />
 
     <a-alert
-      message="倉庫はバックエンドが既定値（id=1 'default'）を自動セットします（並行運用期）。"
+      message="商品とSKUを選択し、入荷数量と入荷日を入力してください。倉庫は自動でデフォルトが設定されます。"
       type="info"
       show-icon
       style="margin-bottom: 12px"
     />
 
     <a-form layout="vertical" :model="form">
-      <a-form-item label="商品ID" required>
-        <a-input-number
+      <a-form-item label="商品" required>
+        <a-select
           v-model:value="form.productId"
-          :min="1"
-          style="width: 100%"
-          placeholder="商品IDを入力"
-        />
+          placeholder="商品を選択"
+          :loading="productsLoading"
+          @change="onProductChange"
+          allow-clear
+          show-search
+          :filter-option="filterProductOption"
+        >
+          <a-select-option v-for="p in products" :key="p.id" :value="p.id">
+            {{ p.name }}
+          </a-select-option>
+        </a-select>
       </a-form-item>
-      <a-form-item label="SKU ID" required>
-        <a-input-number
+      <a-form-item label="SKU" required>
+        <a-select
           v-model:value="form.skuId"
-          :min="1"
-          style="width: 100%"
-          placeholder="SKU IDを入力"
-        />
+          placeholder="SKUを選択"
+          :loading="skusLoading"
+          :disabled="!form.productId"
+          allow-clear
+        >
+          <a-select-option v-for="s in skus" :key="s.id" :value="s.id">
+            {{ s.skuCode }}（{{ s.color }} / {{ s.size }}）
+          </a-select-option>
+        </a-select>
       </a-form-item>
       <a-form-item label="入荷数量" required>
         <a-input-number
@@ -62,13 +74,21 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { registerInbound } from '../api/inboundApi.js';
+import { getAdminProducts } from '../../products/api/products.js';
+import { getProductSkus } from '../../skus/api/skus.js';
 
 const router = useRouter();
 const submitting = ref(false);
+
+const products = ref([]);
+const productsLoading = ref(false);
+const skus = ref([]);
+const skusLoading = ref(false);
+
 const form = reactive({
   productId: null,
   skuId: null,
@@ -76,6 +96,36 @@ const form = reactive({
   inboundedAt: null,
   supplierId: null,
 });
+
+onMounted(async () => {
+  productsLoading.value = true;
+  try {
+    products.value = await getAdminProducts();
+  } catch {
+    message.warning('商品一覧の取得に失敗しました');
+  } finally {
+    productsLoading.value = false;
+  }
+});
+
+async function onProductChange(productId) {
+  form.skuId = null;
+  skus.value = [];
+  if (!productId) return;
+  skusLoading.value = true;
+  try {
+    skus.value = await getProductSkus(productId);
+  } catch {
+    message.warning('SKU一覧の取得に失敗しました');
+  } finally {
+    skusLoading.value = false;
+  }
+}
+
+function filterProductOption(input, option) {
+  const label = String(option.children?.[0]?.children ?? '').toLowerCase();
+  return label.includes(String(input).toLowerCase());
+}
 
 async function onSubmit() {
   if (!form.productId || !form.skuId || !form.quantity || !form.inboundedAt) {
@@ -93,7 +143,6 @@ async function onSubmit() {
     if (form.supplierId) {
       payload.supplierId = form.supplierId;
     }
-    // RRRR-5：warehouseId は送らない（バックエンドが既定値を自動セット）
     await registerInbound(payload);
     message.success('入荷を登録しました');
     router.push('/inbound');

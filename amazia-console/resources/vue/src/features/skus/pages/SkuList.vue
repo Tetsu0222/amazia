@@ -1,12 +1,6 @@
 <template>
   <div style="padding: 24px; max-width: 960px">
-    <a-page-header title="SKU管理" sub-title="Amazia Console">
-      <template #extra>
-        <a-button @click="$router.push('/skus/stocks/import')">
-          Excel一括入荷
-        </a-button>
-      </template>
-    </a-page-header>
+    <a-page-header title="SKU管理" sub-title="Amazia Console" />
 
     <!-- 商品選択 -->
     <a-form layout="inline" style="margin-bottom: 24px">
@@ -113,28 +107,19 @@
             </a-form>
           </a-tab-pane>
 
-          <!-- 在庫管理タブ -->
+          <!-- 在庫管理タブ（参照のみ。入荷登録は「入荷管理」画面へ移譲） -->
           <a-tab-pane key="stock" tab="在庫管理">
+            <a-alert
+              message="入荷登録は「入荷管理」画面から行ってください。"
+              type="info"
+              show-icon
+              style="margin-bottom: 12px"
+            />
             <a-descriptions bordered size="small" :column="1" style="margin-bottom: 16px; max-width: 300px">
               <a-descriptions-item label="現在在庫">
                 {{ currentStock != null ? currentStock + ' 個' : '—' }}
               </a-descriptions-item>
             </a-descriptions>
-            <a-form
-              :model="stockForm"
-              :rules="stockRules"
-              ref="stockFormRef"
-              layout="inline"
-              style="margin-bottom: 16px"
-              @finish="handleStockReceive"
-            >
-              <a-form-item label="入荷数" name="quantity">
-                <a-input-number v-model:value="stockForm.quantity" :min="1" style="width: 120px" placeholder="例: 100" />
-              </a-form-item>
-              <a-form-item>
-                <a-button type="primary" html-type="submit" :loading="stockReceiving">入荷登録</a-button>
-              </a-form-item>
-            </a-form>
             <a-table
               :dataSource="stockHistory"
               :columns="stockHistoryColumns"
@@ -188,7 +173,7 @@ import { getAdminProducts } from '../../products/api/products';
 import {
   getProductSkus, createProductSku,
   getSkuPrices, createSkuPrice,
-  getSkuStock, receiveSkuStock, getSkuStockHistory,
+  getSkuStock, getSkuStockHistory,
   getSkuImages, uploadSkuImage,
 } from '../api/skus';
 
@@ -252,16 +237,10 @@ const priceColumns = [
     customRender: ({ text }) => text ?? '恒久' },
 ];
 
-// 在庫
+// 在庫（参照のみ）
 const currentStock = ref(null);
-const stockForm = ref({ quantity: null });
-const stockFormRef = ref();
-const stockReceiving = ref(false);
 const stockHistory = ref([]);
 const stockHistoryLoading = ref(false);
-const stockRules = {
-  quantity: [{ required: true, type: 'number', min: 1, message: '1以上の数を入力してください' }],
-};
 const stockHistoryColumns = [
   { title: '種別',   dataIndex: 'type',      key: 'type' },
   { title: '数量',   dataIndex: 'quantity',  key: 'quantity' },
@@ -411,21 +390,6 @@ const fetchStockHistory = async (skuId) => {
     message.warning('在庫履歴の取得に失敗しました');
   } finally {
     stockHistoryLoading.value = false;
-  }
-};
-
-const handleStockReceive = async () => {
-  stockReceiving.value = true;
-  try {
-    await receiveSkuStock(selectedSkuId.value, stockForm.value);
-    message.success('入荷を登録しました');
-    stockForm.value = { quantity: null };
-    stockFormRef.value.resetFields();
-    await Promise.all([fetchStock(selectedSkuId.value), fetchStockHistory(selectedSkuId.value)]);
-  } catch {
-    message.error('入荷登録に失敗しました');
-  } finally {
-    stockReceiving.value = false;
   }
 };
 

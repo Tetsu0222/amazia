@@ -10,7 +10,6 @@ import ProductImport              from '../features/products/pages/ProductImport
 import ProductMarketList          from '../features/products/pages/ProductMarketList.vue';
 import SkuList                    from '../features/skus/pages/SkuList.vue';
 import SkuStockList               from '../features/skus/pages/SkuStockList.vue';
-import SkuStockImport             from '../features/skus/pages/SkuStockImport.vue';
 import ListUserPage               from '../features/users/pages/ListUserPage.vue';
 import CreateUserPage             from '../features/users/pages/CreateUserPage.vue';
 import EditUserPage               from '../features/users/pages/EditUserPage.vue';
@@ -25,6 +24,7 @@ import DeliveryList               from '../features/delivery/pages/DeliveryList.
 import DeliveryDetail             from '../features/delivery/pages/DeliveryDetail.vue';
 import InboundList                from '../features/inbound/pages/InboundList.vue';
 import InboundCreate              from '../features/inbound/pages/InboundCreate.vue';
+import InboundStockImport         from '../features/inbound/pages/InboundStockImport.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -38,7 +38,6 @@ const routes = [
   { path: '/products/market-view',     component: ProductMarketList, meta: { requiresAuth: true } },
   { path: '/skus',                     component: SkuList,       meta: { requiresAuth: true } },
   { path: '/skus/stocks',              component: SkuStockList,  meta: { requiresAuth: true } },
-  { path: '/skus/stocks/import',       component: SkuStockImport, meta: { requiresAuth: true } },
 
   { path: '/users',                    component: ListUserPage,  meta: { requiresAuth: true, roles: ['admin', 'senior_admin', 'eternal_advisor'] } },
   { path: '/users/new',                component: CreateUserPage, meta: { requiresAuth: true, roles: ['admin', 'senior_admin', 'eternal_advisor'] } },
@@ -57,6 +56,7 @@ const routes = [
   // 静的ルート（/inbound/create）を動的ルート（/delivery/:id）より先に並べる（test_insights カテゴリ2）
   { path: '/inbound',                  component: InboundList,         meta: { requiresAuth: true } },
   { path: '/inbound/create',           component: InboundCreate,       meta: { requiresAuth: true } },
+  { path: '/inbound/import',           component: InboundStockImport,  meta: { requiresAuth: true } },
   { path: '/delivery',                 component: DeliveryList,        meta: { requiresAuth: true } },
   { path: '/delivery/:id',             component: DeliveryDetail,      meta: { requiresAuth: true } },
 ];

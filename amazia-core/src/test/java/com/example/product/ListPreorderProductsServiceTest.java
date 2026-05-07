@@ -127,7 +127,9 @@ class ListPreorderProductsServiceTest {
         assertEquals(1, items.size());
         PreorderProductItem item = items.get(0);
         assertEquals(pid, item.getProductId());
-        assertEquals("予約商品", item.getProductName());
+        // ヘルパーが name に nanoTime サフィックスを付けて UNIQUE 衝突を回避しているため、前方一致で確認する
+        assertTrue(item.getProductName().startsWith("予約商品"),
+                "actual=" + item.getProductName());
         assertNotNull(item.getReleaseDate());
         assertNotNull(item.getPreorderStartDate());
         assertTrue(item.isAcceptPreorder());

@@ -1,9 +1,9 @@
 <template>
   <div style="padding: 24px; max-width: 720px">
     <a-page-header
-      title="SKU在庫 一括入荷"
+      title="Excel一括入荷"
       sub-title="ExcelファイルをアップロードしてSKU単位で在庫を加算します"
-      @back="$router.push('/skus/stocks')"
+      @back="$router.push('/inbound')"
     />
 
     <a-card style="margin-top: 16px">
@@ -81,7 +81,7 @@
 import { ref } from 'vue';
 import { InboxOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
-import { importSkuStock } from '../api/skus';
+import { importSkuStock } from '../../skus/api/skus.js';
 
 const fileList = ref([]);
 const uploading = ref(false);
