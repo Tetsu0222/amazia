@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 実装完了・2026-05-07）
+🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 実装完了・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -455,6 +455,113 @@ Step 3 で入荷登録画面（`/inbound/create`）の UI を改善したが、`
 
 ## 3.1-6. 申し送り
 - 「入荷予定画面」（未来日入荷の管理 UI）は `次タスク.txt` の Step:X として継続バックログ
+
+---
+
+# Step 4：操作履歴画面の表示ラベル和名化（Console 操作履歴） ✅ 実装完了（2026-05-07）
+
+## 4-1. 背景・目的
+
+操作履歴画面（`/operation-logs`）の「操作」「対象」「画面名」「API名」列が、Core で記録された英字キー（`register_inbound` / `inbounds:3` / `console.inbound.register` / `POST /api/inbounds`）をそのまま表示しており、運用者にとって意味が直感的に把握しづらい。
+
+これらのキーは Core 側の固定文字列（各 Service の `private static final String ACTION` / `SCREEN_NAME` / `TARGET_TYPE` / `API_NAME` 定数）として記録されているため、Console UI 側でラベルマップを持って和名表示する。
+
+## 4-2. 設計方針
+
+### 4-2-1. ラベルマップの配置
+
+- **Vue 側の config モジュール**として持つ（PHP `config/app/` 経由ではない）
+- 配置先：`amazia-console/resources/vue/src/features/operationLog/config/labels.js`
+- 理由：
+  - 操作履歴の和名化は **表示専用ロジック**（Core 値はサーバ側で消費しないため Laravel config に置く意味がない）
+  - 規約 5（Vue）「コンポーネントに表示ロジック以外を書かない」「API は `src/api/` 配下に集約」と整合
+  - Core で新たな action / screen が追加された際、ラベル追加は Vue ファイル 1 箇所で完結する
+
+### 4-2-2. マップ対象の列
+
+| 列 | キー | マップ |
+|----|------|--------|
+| 操作 | `record.action` | `ACTION_LABELS` |
+| 対象 | `record.targetType` | `TARGET_TYPE_LABELS`（`{type}:{id}` の type 部分のみ和名化） |
+| 画面名 | `record.screenName` | `SCREEN_NAME_LABELS` |
+| API名 | `record.apiName` | `API_NAME_LABELS`（`POST /api/inbounds` 等の固定パターン） |
+
+### 4-2-3. フォールバック
+
+- マップに存在しないキーは **原文をそのまま表示** する（「不明」と置き換えない）
+- 理由：Core で新規 action が追加された場合、Vue 側のマップ更新が間に合わなくても画面で意味が読み取れる状態を保つ
+
+### 4-2-4. 検索フィルタ
+
+- 検索ボックス（画面名 / API名 / 操作）は **既存の英字キー入力** を維持する
+- Core 側の `OperationLogRepository` は英字キーで部分一致検索する仕様（変更しない）
+- プレースホルダ文言・ヒント表示も既存のまま
+
+## 4-3. ラベル定義（初期セット）
+
+Core 側の Service 定数を網羅して以下を定義する：
+
+### action（操作）
+| キー | 和名 |
+|------|------|
+| `register_inbound` | 入荷登録 |
+| `update_shipping_status` | 配送ステータス更新 |
+| `update_shipping_address` | 配送先住所更新 |
+| `update_scheduled_date` | 配送予定日更新 |
+| `register_tracking_code` | 追跡番号登録 |
+| `approve_sales_return` | 返品承認 |
+| `reject_sales_return` | 返品却下 |
+| `refund_sales_return` | 返金処理 |
+
+### target_type（対象）
+| キー | 和名 |
+|------|------|
+| `inbounds` | 入荷 |
+| `deliveries` | 配送 |
+| `sales_return` | 返品 |
+
+### screen_name（画面名）
+| キー | 和名 |
+|------|------|
+| `console.inbound.register` | 入荷登録画面 |
+| `console.delivery.update_status` | 配送ステータス更新 |
+| `console.delivery.update_address` | 配送先住所更新 |
+| `console.delivery.update_scheduled_date` | 配送予定日更新 |
+| `console.delivery.register_tracking` | 追跡番号登録 |
+| `console.sales_return.approve` | 返品承認画面 |
+| `core.batch.inbound_recalc` | 入荷再計算バッチ |
+
+### api_name（API名）
+| キー | 和名 |
+|------|------|
+| `POST /api/inbounds` | 入荷登録 API |
+| `PATCH /api/deliveries/:id/status` | 配送ステータス更新 API |
+| `PATCH /api/deliveries/:id/address` | 配送先住所更新 API |
+| `PATCH /api/deliveries/:id/scheduled-date` | 配送予定日更新 API |
+| `PATCH /api/deliveries/:id/tracking-code` | 追跡番号登録 API |
+| `POST /api/sales-returns/:id/approve` | 返品承認 API |
+| `POST /api/sales-returns/:id/reject` | 返品却下 API |
+| `POST /api/sales-returns/:id/refund` | 返金処理 API |
+
+## 4-4. UI 変更（Console）
+
+`features/operationLog/pages/OperationLogList.vue`：
+- `import { ACTION_LABELS, TARGET_TYPE_LABELS, SCREEN_NAME_LABELS, API_NAME_LABELS, labelOr } from '../config/labels.js'` を追加
+- `<template #bodyCell>` で各列のキーを `labelOr(map, key)` で和名化して表示
+- 「対象」列は `targetType` を和名化しつつ `:targetId` を末尾に維持（例：`入荷:3`）
+
+## 4-5. DB 変更
+**なし**
+
+## 4-6. API 変更
+**なし**（Core / Console とも値を返し続け、フロントが表示時に変換するだけ）
+
+## 4-7. TDD テストケース
+
+表示変更のみのため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保。
+- `register_inbound` 行が「入荷登録」と表示される
+- `inbounds:3` 行の対象列が「入荷:3」と表示される
+- マップに存在しない未知の action は原文のまま表示される（フォールバック動作）
 
 ---
 

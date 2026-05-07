@@ -50,11 +50,20 @@
         <template v-else-if="column.key === 'comment'">
           <span :title="record.comment">{{ record.comment || '—' }}</span>
         </template>
+        <template v-else-if="column.key === 'action'">
+          <span :title="record.action">{{ labelOr(ACTION_LABELS, record.action) || '—' }}</span>
+        </template>
         <template v-else-if="column.key === 'target'">
-          <span v-if="record.targetType">
-            {{ record.targetType }}<span v-if="record.targetId">:{{ record.targetId }}</span>
+          <span v-if="record.targetType" :title="`${record.targetType}${record.targetId ? ':' + record.targetId : ''}`">
+            {{ labelOr(TARGET_TYPE_LABELS, record.targetType) }}<span v-if="record.targetId">:{{ record.targetId }}</span>
           </span>
           <span v-else>—</span>
+        </template>
+        <template v-else-if="column.key === 'screenName'">
+          <span :title="record.screenName">{{ labelOr(SCREEN_NAME_LABELS, record.screenName) || '—' }}</span>
+        </template>
+        <template v-else-if="column.key === 'apiName'">
+          <span :title="record.apiName">{{ labelOr(API_NAME_LABELS, record.apiName) || '—' }}</span>
         </template>
       </template>
     </a-table>
@@ -65,6 +74,13 @@
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { listOperationLogs } from '../api/operationLogApi.js';
+import {
+  ACTION_LABELS,
+  TARGET_TYPE_LABELS,
+  SCREEN_NAME_LABELS,
+  API_NAME_LABELS,
+  labelOr,
+} from '../config/labels.js';
 
 const logs = ref([]);
 const loading = ref(false);
