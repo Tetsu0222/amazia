@@ -20,6 +20,8 @@ import WorkflowRequestForm        from '../features/workflows/pages/WorkflowRequ
 import SalesList                  from '../features/sales/pages/SalesList.vue';
 import SalesReturnList            from '../features/salesReturn/pages/SalesReturnList.vue';
 import OperationLogList           from '../features/operationLog/pages/OperationLogList.vue';
+import DeliveryList               from '../features/delivery/pages/DeliveryList.vue';
+import InboundList                from '../features/inbound/pages/InboundList.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -46,6 +48,10 @@ const routes = [
   { path: '/sales',                    component: SalesList,           meta: { requiresAuth: true } },
   { path: '/sales-returns',            component: SalesReturnList,     meta: { requiresAuth: true } },
   { path: '/operation-logs',           component: OperationLogList,    meta: { requiresAuth: true } },
+
+  // フェーズ15 配送管理 / 入荷管理（C-3-α は List のみ。Detail / Create は C-3-β で追加）
+  { path: '/delivery',                 component: DeliveryList,        meta: { requiresAuth: true } },
+  { path: '/inbound',                  component: InboundList,         meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({
