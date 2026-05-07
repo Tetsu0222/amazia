@@ -49,11 +49,20 @@ flowchart TB
     TRB -.昇華.-> AP
 ```
 
-- **トラブル記録 → 知見化 → AI 参照のループ**：[docs/troubles/](docs/troubles/) に蓄積された不具合は、CLAUDE.md のルールに従って [test_insights.md](docs/ai_context/test_insights.md) や [ai_collaboration_antipatterns.md](docs/ai_context/ai_collaboration_antipatterns.md) に昇華され、次のフェーズの計画段階で AI が自動的に参照する
+- **トラブル記録 → 知見化 → AI 参照のループ**：[docs/troubles/](docs/troubles/) に蓄積された不具合は、CLAUDE.md のルールに従って各知見ファイルに昇華され、次のフェーズの計画段階で AI が自動的に参照する
 - **AI 暴走を抑える設計**：DB/API を変更したフェーズ内で必ず設計書を更新する義務を CLAUDE.md に明文化し、コードと設計書の乖離をガードレールで防止
 - **他 AI への移植性**：本構成は Claude Code 固有ではなく、Cursor / Copilot / Codex など任意の AI コーディング環境に同じ思想で適用可能
 
-詳細：[CLAUDE.md](CLAUDE.md) / [docs/ai_context/](docs/ai_context/)
+#### AI 協働コンテキスト ファイル一覧
+
+| 層 | ファイル | 役割 |
+|---|---|---|
+| 第1層 | [CLAUDE.md](CLAUDE.md) | AI への運用ルール（不具合対応の手順、DB/API 設計書の同期義務、主要テーブル定数の同期 など） |
+| 第2層 | [test_insights.md](docs/ai_context/test_insights.md) | 過去トラブルから抽出したテスト観点。テストケース作成・フェーズ計画時に参照 |
+| 第2層 | [operational_insights.md](docs/ai_context/operational_insights.md) | Spring Boot ライフサイクル / コンテナ運用 / SSM 経由ジョブなど、テストでは検出しづらい設計パターン |
+| 第2層 | [ai_collaboration_antipatterns.md](docs/ai_context/ai_collaboration_antipatterns.md) | AI 協働で踏みやすい落とし穴（**AP-001〜008**）。各 AP は出典トラブル番号と紐付け |
+| 第2層 | [prompt_templates.md](docs/ai_context/prompt_templates.md) | 作業種別ごとの定型プロンプト（**TPL-001〜008**）。各 TPL は対応する AP-* と双方向リンク |
+| 第3層 | [docs/troubles/](docs/troubles/) | 一次記録（NNN_*.md）。26 件超の実トラブルを「症状 / 根本原因 / 再発防止 / AI 協働観点」で記録 |
 
 ---
 
@@ -66,7 +75,7 @@ flowchart TB
 | # | カテゴリ | 学び |
 |---|---|---|
 | 022 → 025 → 026 | SSM デプロイ系 | 「正常応答」と「正常動作」は別物。PingStatus を信じる検知から、実コマンド配信を直接観測する **カナリア方式** に到達した経緯 |
-| 018 / 019 / 020 | 認証・セッション | Docker コンテナの `running` 状態は中のアプリの ready を保証しない |
+| 019 / 020 / 032 | 認証・セッション | Cookie ドメインの取り違え、JWT 署名アルゴリズム（HS256/HS512）の Console-Core 間不一致 など、認証境界をまたぐと表面化する不具合の典型例 |
 | 044 / phaseX-6 | スキーマ整合 | `continue-on-error` で潰された DDL 失敗をデプロイ後 1 分以内に検知する仕組みを後付け実装 |
 
 すべての記録：[docs/troubles/README.md](docs/troubles/README.md)
