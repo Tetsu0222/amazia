@@ -4,6 +4,8 @@ import com.example.inbound.dto.RegisterInboundRequest;
 import com.example.inbound.entity.Inbound;
 import com.example.inbound.repository.InboundRepository;
 import com.example.inbound.service.RegisterInboundService;
+import com.example.inventory.entity.Inventories;
+import com.example.inventory.repository.InventoriesRepository;
 import com.example.operationlog.entity.OperationLog;
 import com.example.operationlog.repository.OperationLogRepository;
 import com.example.product.entity.Product;
@@ -45,6 +47,7 @@ class RegisterInboundServiceTest {
     @Autowired private ProductRepository productRepository;
     @Autowired private ProductSkuRepository skuRepository;
     @Autowired private ProductSkuStockRepository skuStockRepository;
+    @Autowired private InventoriesRepository inventoriesRepository;
     @Autowired private OperationLogRepository operationLogRepository;
 
     @Value("${amazia.delivery.default-warehouse-id}")
@@ -75,6 +78,13 @@ class RegisterInboundServiceTest {
         stock.setSkuId(skuId);
         stock.setQuantity(0);
         skuStockRepository.save(stock);
+
+        // 並行運用：inventories 行を事前投入（B-4 の recalculateForProduct が FOR UPDATE で取得するため必須）
+        Inventories inv = new Inventories();
+        inv.setProductId(productId);
+        inv.setWarehouseId(defaultWarehouseId);
+        inv.setQuantity(0);
+        inventoriesRepository.saveAndFlush(inv);
     }
 
     @Test

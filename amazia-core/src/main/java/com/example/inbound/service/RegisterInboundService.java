@@ -1,5 +1,6 @@
 package com.example.inbound.service;
 
+import com.example.delivery.service.DeliveryRescheduleService;
 import com.example.inbound.dto.RegisterInboundRequest;
 import com.example.inbound.entity.Inbound;
 import com.example.inbound.repository.InboundRepository;
@@ -44,6 +45,7 @@ public class RegisterInboundService {
     private final ProductRepository productRepository;
     private final ProductSkuRepository skuRepository;
     private final ReceiveProductSkuStockService receiveProductSkuStockService;
+    private final DeliveryRescheduleService deliveryRescheduleService;
     private final OperationLogRepository operationLogRepository;
 
     private final long defaultWarehouseId;
@@ -53,12 +55,14 @@ public class RegisterInboundService {
             ProductRepository productRepository,
             ProductSkuRepository skuRepository,
             ReceiveProductSkuStockService receiveProductSkuStockService,
+            DeliveryRescheduleService deliveryRescheduleService,
             OperationLogRepository operationLogRepository,
             @Value("${amazia.delivery.default-warehouse-id}") long defaultWarehouseId) {
         this.inboundRepository = inboundRepository;
         this.productRepository = productRepository;
         this.skuRepository = skuRepository;
         this.receiveProductSkuStockService = receiveProductSkuStockService;
+        this.deliveryRescheduleService = deliveryRescheduleService;
         this.operationLogRepository = operationLogRepository;
         this.defaultWarehouseId = defaultWarehouseId;
     }
@@ -96,7 +100,10 @@ public class RegisterInboundService {
         receiveProductSkuStockService.receive(request.getSkuId(), request.getQuantity());
 
         // 4. inventories 同期加算（Step B-5 で InventorySyncService.applyDelta を DI して呼び出し）
-        // 5. deliveries.scheduled_date FIFO 再計算（Step B-4 で DeliveryRescheduleService を DI）
+        // 5. deliveries.scheduled_date FIFO 再計算（B-4 で DI 済 / B-5 完成と同時に有効化）
+        //    inventories 行が無い商品では IllegalStateException で停止するため、B-5 で
+        //    applyDelta を経由した行作成または並行運用マイグレーション完了が前提となる。
+        deliveryRescheduleService.recalculateForProduct(request.getProductId(), actorUserId);
 
         // 6. operation_logs 記録
         recordLog(actorUserId, saved.getId(),
