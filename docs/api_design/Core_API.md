@@ -1086,3 +1086,204 @@ phase11 以前から実装されているがドキュメント未整備だった
 - フェーズ14.5 P2 (#041): 公開判定は **JST 0:00 基準**（`PreorderStatusService.isPublished()` 経由）。旧 `Product#isPublished()` の秒単位判定は廃止。`publish_start` / `publish_end` が NULL のときは「制限なし」扱い
 
 **レスポンス**: `Product` エンティティの配列（id / name / description / statusCode / publishStart / publishEnd / releaseDate / preorderStartDate / acceptPreorder / acceptBackorder / version / createdAt / updatedAt）。`price` / `stock` はフェーズ10 で SKU 側に移行済の旧カラムで、現在は常に NULL。
+
+---
+
+## 配送管理 API（フェーズ15追加）
+
+Console 管理画面向けの配送実体（`deliveries`）操作 API。注文確定と同時に `OrderConfirmationService` から `DeliveryCreationService.createForSales(...)` が呼ばれて PENDING で生成される。
+
+### 配送一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/deliveries` |
+| コントローラー | `ListDeliveryController` |
+
+**クエリパラメータ（任意）**
+
+| パラメータ | 型 | 説明 |
+|------------|-----|------|
+| shippingStatusId | long | 配送ステータス ID でフィルタ |
+
+**レスポンス**: `DeliveryResponse` の配列（id / salesId / shippingAddressId / shippingMethodId / shippingStatusId / trackingCode / scheduledDate / shippedDate / deliveredDate / createdAt / updatedAt）
+
+---
+
+### 配送詳細取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/deliveries/{id}` |
+| コントローラー | `GetDeliveryController` |
+
+**レスポンス**: `DeliveryResponse`（404 時は `{"message":"delivery not found"}`）
+
+---
+
+### 配送ステータス遷移
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/status` |
+| コントローラー | `UpdateShippingStatusController` |
+| サービス | `DeliveryStatusTransitionService.transition` |
+| 操作者 | `X-User-Id` ヘッダ（`users.id`） |
+
+**リクエストボディ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| shippingStatusId | long | ○ | 遷移先ステータス ID |
+| reason | string | × | 遷移理由（任意フリーテキスト） |
+
+**遷移可否ルール**（設計書 §配送ステータス遷移ルール）：
+
+| 現在 → 次 | 遷移可否 |
+|-----------|---------|
+| PENDING → SHIPPED | ✅ |
+| SHIPPED → DELIVERED | ✅ |
+| DELIVERED → RETURN_REQUESTED | ✅ |
+| RETURN_REQUESTED → RETURNED | ✅ |
+| その他（巻き戻し・飛び越し） | 400 |
+
+**SHIPPED 遷移時の在庫処理（P5-3 / P5-4）**：
+- `is_preorder=false`：在庫操作なし（注文確定時に減算済み）
+- `is_preorder=true`：`product_sku_stocks.quantity -= sales.quantity`（@Version 楽観ロック）+ `inventories.quantity` 同期減算（並行運用 / RRRR-2）+ `product_sku_stock_transactions` に `type='sale_preorder_shipment'` 記録
+- 在庫不足時は 409 で **PENDING のまま維持**。Controller が REQUIRES_NEW で `operation_logs.action='shipping_blocked_insufficient_stock'` を別 TX 記録
+
+**operation_logs**: 成功時 `action='update_shipping_status' / target_type='deliveries' / screen_name='console.delivery.update_status'` を記録
+
+---
+
+### 配送先住所変更
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/address` |
+| コントローラー | `UpdateShippingAddressController` |
+| 操作者 | `X-User-Id` ヘッダ |
+
+**リクエストボディ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| shippingAddressId | long | ○ | 新しい配送先住所 ID |
+| reason | string | × | 変更理由 |
+
+**RRR-7 オーナー検証**：`address.user_id == sales.user_id` のみ許容（不一致は 403）。`is_active=false` の住所は 400。
+
+**operation_logs**: `action='update_shipping_address' / screen_name='console.delivery.update_address'`
+
+---
+
+### 配送予定日変更
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/scheduled-date` |
+| コントローラー | `UpdateScheduledDateController` |
+| 操作者 | `X-User-Id` ヘッダ |
+
+**リクエストボディ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| scheduledDate | date | ○ | 新しい配送予定日（YYYY-MM-DD） |
+| reason | string | × | 変更理由 |
+
+**operation_logs**: `action='update_scheduled_date' / comment` 先頭に **`[manual]` プレフィックス自動付与**（RRR-5 / Service 層が固定）。バッチ起点の入荷再計算では `[inbound_recalc]` プレフィックスを付与（`screen_name='core.batch.inbound_recalc'`）。
+
+---
+
+### 追跡番号登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/tracking-code` |
+| コントローラー | `RegisterTrackingCodeController` |
+| 操作者 | `X-User-Id` ヘッダ |
+
+**リクエストボディ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| trackingCode | string | ○ | 配送業者の追跡番号（最大100文字） |
+
+**operation_logs**: `action='register_tracking_code' / screen_name='console.delivery.register_tracking'`
+
+---
+
+### 配送方法マスタ一覧
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/shipping-methods` |
+| コントローラー | `ListShippingMethodController` |
+
+**レスポンス**: `ShippingMethodResponse` の配列（id=1 home_delivery / id=2 konbini_pickup / id=3 dropoff）。schema.sql の INSERT IGNORE で固定投入。
+
+---
+
+## 入荷管理 API（フェーズ15追加）
+
+### 入荷一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/inbounds` |
+| コントローラー | `ListInboundController` |
+
+**クエリパラメータ（任意）**
+
+| パラメータ | 型 | 説明 |
+|------------|-----|------|
+| productId | long | 商品 ID でフィルタ |
+
+**レスポンス**: `InboundResponse` の配列（id / productId / warehouseId / supplierId / quantity / inboundedAt / createdAt / updatedAt）
+
+---
+
+### 入荷登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/inbounds` |
+| コントローラー | `RegisterInboundController` |
+| サービス | `RegisterInboundService.register` |
+| 操作者 | `X-User-Id` ヘッダ |
+
+**リクエストボディ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| productId | long | ○ | 商品 ID |
+| skuId | long | ○ | SKU ID（商品の子であること） |
+| quantity | integer | ○ | 入荷数量（≥1） |
+| inboundedAt | date | ○ | 入荷日 |
+| supplierId | long | × | 仕入先 ID（マスタ未整備のため任意） |
+
+**RRRR-5**: `warehouseId` はリクエストに含めない。バックエンドが `config('amazia.delivery.default-warehouse-id')` を自動セット。
+
+**処理フロー**:
+1. `inbounds` INSERT
+2. 既存 `ReceiveProductSkuStockService.receive(skuId, quantity)` を呼び出して `product_sku_stocks` 加算 + `product_sku_stock_transactions` 記録
+3. `InventorySyncService.applyDelta(productId, 1, +quantity)` で `inventories.quantity` 同期加算（RRRR-2）
+4. `DeliveryRescheduleService.recalculateForProduct(productId)` で在庫切れ `deliveries` の `scheduled_date` を FIFO 再計算（RRR-4 / RRRR-4）
+5. `operation_logs.action='register_inbound' / screen_name='console.inbound.register'` 記録
+
+**異常系**:
+- 404: `productId` 存在しない / `skuId` 存在しない
+- 400: `skuId` が指定 `productId` の子でない
+- 422: バリデーションエラー（必須欠落・数量 0 以下など）
+
+**レスポンス**: 201 で `InboundResponse`

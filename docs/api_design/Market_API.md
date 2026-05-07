@@ -242,6 +242,33 @@
 | 呼び出し先 | amazia-core `GET /api/customer/orders` |
 | 画面 | `/customer/orders` |
 
+**レスポンス**: `PurchaseHistoryItem` の配列。表示項目：
+
+| フィールド | 型 | 説明 |
+|------------|-----|------|
+| salesId | long | 売上 ID |
+| salesDate | date | 購入日 |
+| shippingDate | date \| null | 旧フィールド（フェーズ14互換）。フェーズ15以降は `delivery.shippedDate` を参照 |
+| skuId | long | 購入 SKU ID |
+| productName / color / size | string | 商品名 / 色 / サイズ |
+| quantity / amount | int | 数量 / 金額 |
+| shippingStatusCode | string | `PENDING / SHIPPED / DELIVERED / RETURN_REQUESTED / RETURNED` |
+| shippingMethodId | long | 配送方法 ID（1: 宅配 / 2: コンビニ受取 / 3: 置き配） |
+| paymentMethodId | long | 決済方法 ID |
+| preorder | boolean | 予約購入区分 |
+| **delivery** | object \| null | フェーズ15 r5 で追加。フェーズ15以前の旧 sales には null |
+
+`delivery` ネストの内訳（フェーズ15 r5 / Step D）:
+
+| フィールド | 型 | 説明 |
+|------------|-----|------|
+| scheduledDate | date \| null | 配送予定日。null のときは「入荷待ち」と表示（RR-4） |
+| shippedDate | date \| null | 発送日（SHIPPED 遷移時に Service 層が自動充填） |
+| deliveredDate | date \| null | 配達完了日（DELIVERED 遷移時に同上） |
+| trackingCode | string \| null | 配送業者発行の追跡番号 |
+| shippingStatusId | long | `deliveries.shipping_status_id`（`sales.shipping_status_id` と通常同期） |
+| shippingMethodId | long | `deliveries.shipping_method_id` |
+
 ---
 
 ## ルーティング対応表

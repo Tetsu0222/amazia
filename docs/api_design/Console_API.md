@@ -790,3 +790,131 @@
 | パス | `/api/workflows/{id}/steps/{stepNumber}/reject` |
 | 認証 | 要（当該ステップ承認権限） |
 | コントローラー | `App\Workflow\Controller\RejectWorkflowController` |
+
+---
+
+## 配送管理 API（フェーズ15追加）
+
+Core の `/api/deliveries` 系を中継する Console API。すべて `auth.jwt` ミドルウェア配下。
+PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_admin / eternal_advisor）のみ許容。
+中継時に Console は JWT の `sub` を `X-User-Id` ヘッダで Core に転送。
+
+### 配送一覧
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/deliveries[?shippingStatusId=N]` |
+| 認証 | 要（auth.jwt） |
+| コントローラー | `App\Delivery\Controller\ListDeliveryController` |
+| 中継先 | Core `GET /api/deliveries` |
+
+---
+
+### 配送詳細
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/deliveries/{id}` |
+| 認証 | 要 |
+| コントローラー | `App\Delivery\Controller\GetDeliveryController` |
+| 中継先 | Core `GET /api/deliveries/{id}` |
+
+---
+
+### 配送ステータス更新
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/status` |
+| 認証 | 要（approver_roles） |
+| コントローラー | `App\Delivery\Controller\UpdateShippingStatusController` |
+| 中継先 | Core `PATCH /api/deliveries/{id}/status` |
+
+リクエストボディ：`{ shippingStatusId: long, reason: string? }`。Core が在庫不足で 409 を返した場合は透過。
+
+---
+
+### 配送先住所変更
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/address` |
+| 認証 | 要（approver_roles） |
+| コントローラー | `App\Delivery\Controller\UpdateShippingAddressController` |
+| 中継先 | Core `PATCH /api/deliveries/{id}/address` |
+
+リクエストボディ：`{ shippingAddressId: long, reason: string? }`。Core がオーナー外住所で 403 を返した場合は透過。
+
+---
+
+### 配送予定日変更
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/scheduled-date` |
+| 認証 | 要（approver_roles） |
+| コントローラー | `App\Delivery\Controller\UpdateScheduledDateController` |
+| 中継先 | Core `PATCH /api/deliveries/{id}/scheduled-date` |
+
+リクエストボディ：`{ scheduledDate: YYYY-MM-DD, reason: string? }`。`[manual]` プレフィックスは Core 側 Service が自動付与。
+
+---
+
+### 追跡番号登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/deliveries/{id}/tracking-code` |
+| 認証 | 要（approver_roles） |
+| コントローラー | `App\Delivery\Controller\RegisterTrackingCodeController` |
+| 中継先 | Core `PATCH /api/deliveries/{id}/tracking-code` |
+
+リクエストボディ：`{ trackingCode: string }`（最大100文字、空文字は 422）。
+
+---
+
+### 配送方法マスタ一覧
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/shipping-methods` |
+| 認証 | 要 |
+| コントローラー | `App\Delivery\Controller\ListShippingMethodController` |
+| 中継先 | Core `GET /api/shipping-methods` |
+
+---
+
+## 入荷管理 API（フェーズ15追加）
+
+### 入荷一覧
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/inbounds[?productId=N]` |
+| 認証 | 要 |
+| コントローラー | `App\Inbound\Controller\ListInboundController` |
+| 中継先 | Core `GET /api/inbounds` |
+
+---
+
+### 入荷登録
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | POST |
+| パス | `/api/inbounds` |
+| 認証 | 要（approver_roles） |
+| コントローラー | `App\Inbound\Controller\RegisterInboundController` |
+| 中継先 | Core `POST /api/inbounds` |
+
+リクエストボディ：`{ productId, skuId, quantity, inboundedAt, supplierId? }`。
+
+**RRRR-5**: `warehouseId` がリクエストに含まれていても Console Service が **明示的に剥がす**（`unset($payload['warehouseId'], $payload['warehouse_id'])`）。Core 側でデフォルト倉庫（id=1）を自動セット。

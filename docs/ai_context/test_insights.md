@@ -499,3 +499,33 @@
 - [ ] **フロント側ユニットテストのモックデータは、実 API レスポンスと同じフィールド名**で書かれているか
 - [ ] **手動 E2E（ブラウザで URL バー確認・ネットワークタブで実 JSON 確認）** を新画面実装後に 1 周しているか
 - [ ] **将来課題**: バックエンド DTO のサンプル JSON を Core 側のテストで出力し、それをフロント側のテストデータの参照元にする「コントラクトテスト」の導入
+
+---
+
+## 並行運用フェーズの整合性テスト観点（フェーズ15 r5 / RRRR-7 起因）
+
+複数テーブルへの同期更新（`product_sku_stocks` と `inventories` の双方更新）が発生する並行運用フェーズでは、以下の観点でリグレッションを抑える。
+
+### 不変条件テスト
+
+- [ ] **任意時点で SUM(SKU stock by productId) == inventories.quantity (warehouse=1)** が成立することを各経路後に検証する
+  - 経路：販売（注文確定）/ 入荷登録 / 返品復元（REFUNDED 遷移）/ 予約購入の出荷時減算（PENDING→SHIPPED）
+  - **複数経路の組合せ**（販売→入荷→販売 など）でも維持されることを必ず確認する。1 経路だけ通っても、フックの呼び忘れや符号反転は組合せで初めて顕在化することがある
+
+### 例外時のロールバック
+
+- [ ] フック対象の Service（販売 / 返品 / 入荷）で **途中例外発生時に「先に書き込んだ inbounds・SKU stock 加算・inventories 加算」がすべてロールバック**することを検証
+  - `@Transactional(propagation=REQUIRED)` で外側 TX に参加するフックは、外側がロールバックすれば一緒に巻き戻される
+  - **テスト方法**：例外を投げる前後で `count` / `SUM` を取って一致を確認
+
+### auto-provision の落とし穴
+
+- [ ] **テスト環境で `inventories` 行が事前投入されていない場合の挙動**を意識する。本番は schema.sql の起動時マイグレーションで全商品に行が複製されるが、H2 テスト環境では `setUp` で明示投入が必要
+- [ ] auto-provision の初期値ソース（`products.stock` か `SUM(product_sku_stocks.quantity)`）が **phase10 移行後の実態と整合**しているか（phase10 で在庫は SKU 側に移行済みのため、`products.stock` ではなく SUM が真の値）
+- [ ] **呼出元が SKU 在庫を先に減算してから applyDelta を呼ぶ場合、SUM は減算後の値を返す**。auto-provision がこの値を初期値に採用すると、加算時に「SUM(減算後)+delta」となり期待値とずれる可能性がある。**事前投入で auto-provision 経路を回避する**のが整合性検証としては最も確実
+
+### 出荷時在庫不足の挙動（P5-4）
+
+- [ ] **予約購入の SHIPPED 遷移で在庫不足の場合、409 を返してステータスは PENDING のまま維持**されることを検証
+- [ ] その際、**`operation_logs.action='shipping_blocked_insufficient_stock'` が `REQUIRES_NEW` で別 TX 記録**されるため、外側のロールバックの影響を受けないことを確認
+- [ ] テストは **`@Transactional` を付けず実 DB に書く形**にして、ステータス維持と log 記録の両方を再 fetch で検証する

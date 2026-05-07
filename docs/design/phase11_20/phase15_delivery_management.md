@@ -1,7 +1,7 @@
 # フェーズ15：配送管理（改訂版 r5）
 
 ## ステータス
-🔲 未着手
+✅ 完了（2026-05-07）
 
 ## 改訂履歴
 | 版 | 日付 | 内容 |
@@ -12,6 +12,7 @@
 | r3 | 2026-05-06 | 再々レビューコメント RRR-1 〜 RRR-11 を反映。`inventories` を**並行運用**に格下げ（`products.stock` 廃止は phase14 r2 へ切り出し）、注文確定フローのガード条件明示、ダミー倉庫導入、入荷再計算 FIFO、reason_code プレフィックス、悲観ロックなど。 |
 | r4 | 2026-05-06 | 再々々レビューコメント RRRR-1 〜 RRRR-9 を反映。並行運用マイグレーション仕様の追記、販売側 `inventories` 減算フックの追加（整合性担保）、`shipping_method_id` 調達経路の確定、入荷再計算時の在庫読取元を `inventories` に固定、Console 入荷 UI の倉庫選択非表示方針、テストの config 経由化など。 |
 | r5 | 2026-05-07 | [phase14_5_preorder_status.md](phase14_5_preorder_status.md) §3-1 から要請された 6 項目を正式に取り込み（P5-1 〜 P5-6）。`shipping_methods` の INSERT IGNORE 投入仕様、`DeliveryCreationService.createForSales` の OrderConfirmationService からのフック呼び出し明示、**出荷時（PENDING→SHIPPED）の予約購入 SKU 在庫減算ロジック**、出荷時在庫不足の「例外+PENDING 維持」挙動、入荷登録 Service の命名整理（`RegisterInboundService` vs 既存 `ReceiveProductSkuStockService`）、配送ステータス CANCELED / DELIVERY_FAILED / RESCHEDULED のスコープ外確認。phase14_5 完了（C-1〜C-4 / 2026-05-07）に伴い本フェーズへ責務移譲が完了。 |
+| r5 実装完了 | 2026-05-07 | r5 で確定した全仕様を Step 0 → A → B（B-1〜B-6） → C（C-1〜C-3）→ D → E（E-α）の順で実装。Core 320 件 / Console 102 件 / Market 77 件すべてグリーン。並行運用整合性テスト 7 ケース緑（販売・入荷・返品復元・予約出荷・例外ロールバック）。住所一覧 API 未提供のため Console 配送先住所変更は address_id 直接入力で暫定運用（phase14 r2 / phase18 への申し送り）。都道府県別リードタイムは phaseX-5 として切り出し。 |
 
 ## 範囲
 - Amazia Console
