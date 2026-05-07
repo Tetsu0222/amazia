@@ -576,7 +576,7 @@ if (sales.is_preorder && stock.quantity < sales.quantity) {
 | 入力（入荷再計算時） | 上記のうち (c) を **`inventories.quantity` の最新値（`FOR UPDATE` 取得）+ Service 内ローカル変数で消費トラッキング**に切り替え（RRRR-4 対応） |
 | 計算ロジックの所在 | `DeliveryScheduleService.calculate(...)` に集約（規約 1-1） |
 | 在庫切れ時 | `scheduled_date = NULL`。Market は「入荷待ち」と表示。入荷時に再計算（注文日昇順 FIFO／RRR-4） |
-| 設定値（リードタイム） | 初期は `config/app/Delivery.php` / `application.yml` に定数定義（規約 3-1）。将来の頻繁な変更需要に応じて `shipping_lead_times` マスタ化（RR-8） |
+| 設定値（リードタイム） | 初期は `config/app/Delivery.php` / `application.yml` に定数定義（規約 3-1）。**都道府県別リードタイムのマスタ化は [phaseX-5](../phaseX/phaseX-5_prefecture_based_lead_time.md) に切り出し済**（RR-8） |
 | 変更履歴 | `scheduled_date` の変更はすべて `operation_logs.action = update_scheduled_date` で記録。`comment` は `[manual]` / `[inbound_recalc]` / `[shipping_delay]` プレフィックス付き（RR-2 / RRR-5） |
 
 ---
