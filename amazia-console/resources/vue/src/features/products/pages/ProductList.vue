@@ -31,6 +31,47 @@
       </a-space>
     </div>
 
+    <a-card size="small" style="margin-bottom: 16px" :body-style="{ padding: '12px 16px' }">
+      <a-form layout="inline" :model="searchForm">
+        <a-form-item label="商品名">
+          <a-input
+            v-model:value="searchForm.name"
+            placeholder="部分一致で検索"
+            allow-clear
+            style="width: 200px"
+          />
+        </a-form-item>
+        <a-form-item label="価格">
+          <a-input-number
+            v-model:value="searchForm.minPrice"
+            placeholder="最低"
+            :min="0"
+            :step="100"
+            style="width: 110px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-input-number
+            v-model:value="searchForm.maxPrice"
+            placeholder="最高"
+            :min="0"
+            :step="100"
+            style="width: 110px"
+          />
+          <span style="margin-left: 4px">円</span>
+        </a-form-item>
+        <a-form-item label="在庫">
+          <a-radio-group v-model:value="searchForm.stockFilter" button-style="solid">
+            <a-radio-button value="all">すべて</a-radio-button>
+            <a-radio-button value="inStock">在庫あり</a-radio-button>
+            <a-radio-button value="outOfStock">在庫なし</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item>
+          <a-button @click="resetSearch">クリア</a-button>
+        </a-form-item>
+      </a-form>
+    </a-card>
+
     <a-table
       :columns="columns"
       :data-source="filteredProducts"
@@ -143,10 +184,39 @@ const skuMap = ref({});
 const skuLoadingMap = ref({});
 const activeFilter = ref('all');
 
+const searchForm = ref({
+  name: '',
+  minPrice: null,
+  maxPrice: null,
+  stockFilter: 'all',
+});
+
+const resetSearch = () => {
+  searchForm.value = { name: '', minPrice: null, maxPrice: null, stockFilter: 'all' };
+};
+
 const filteredProducts = computed(() => {
-  if (activeFilter.value === 'active')   return products.value.filter(p => p.isActive);
-  if (activeFilter.value === 'inactive') return products.value.filter(p => !p.isActive);
-  return products.value;
+  const { name, minPrice, maxPrice, stockFilter } = searchForm.value;
+  const keyword = (name || '').trim().toLowerCase();
+
+  return products.value.filter(p => {
+    if (activeFilter.value === 'active'   && !p.isActive) return false;
+    if (activeFilter.value === 'inactive' &&  p.isActive) return false;
+
+    if (keyword && !(p.name || '').toLowerCase().includes(keyword)) return false;
+
+    if (minPrice != null) {
+      if (p.maxPrice == null || p.maxPrice < minPrice) return false;
+    }
+    if (maxPrice != null) {
+      if (p.minPrice == null || p.minPrice > maxPrice) return false;
+    }
+
+    if (stockFilter === 'inStock'    && !(p.totalStock > 0))  return false;
+    if (stockFilter === 'outOfStock' && !(p.totalStock <= 0)) return false;
+
+    return true;
+  });
 });
 
 const isPublished = (product) => {
