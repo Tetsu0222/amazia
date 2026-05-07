@@ -51,6 +51,7 @@
 | 039 | [Market Checkout が preorder モード未対応で予約フローでも在庫バリデーションが効く](039_market_checkout_preorder_mode_missing.md) | C-4 で追加した予約フロー導線で `&preorder=1` 付きで checkout に遷移しても、Checkout.jsx 側がクエリを読み取っていなかったため通常注文フォームと同じ動作（在庫超過警告で確定不可）になっていた。Checkout のテスト未整備で画面間契約が漏れた | ✅ 解決済 | - | - |
 | 040 | [SKU 価格未登録の商品が Market に出て注文時に 400](040_market_lists_products_without_sku_price.md) | C-4 で在庫 0 商品も Market に表示するようにした副作用で、SKU 価格未登録の商品まで露出。注文画面まで進めても Core が `sku price not registered` で 400 を返す。EC 業界標準は「価格未登録は出品不可」。Service 層に「販売可否」概念が無かった構造的な問題 | ✅ 解決済 | - | - |
 | 041 | [公開期間判定の二重基準（秒単位 vs JST 0:00）で予約商品の注文確定が 400](041_publish_judgement_dual_basis_secs_vs_jst_zero.md) | `Product#isPublished()`（秒単位 LocalDateTime）と C-2 で追加した `PreorderStatusService`（JST 0:00 基準 LocalDate）の判定基準が食い違い、同日 17 時公開予定の商品が Market では PRE_ORDER として表示されるが Checkout では「非公開」で 400。公開判定を PreorderStatusService に統一して解消 | ✅ 解決済 | - | - |
+| 042 | [EC2ディスクフル起因のゾンビOnline・カナリア配信失敗](042_disk_full_zombie_online_docker_image_pile.md) | 旧 Docker イメージが `/var/lib/docker` に蓄積（33個・3.08GB）してルートボリューム 8GB を枯渇。systemd-journald がジャーナルを書けず無限エラー、SSM Agent も `echo canary-ok` を実行できず CD の `canary_check` が `Failed` で停止。EBSを16GBに拡張＋`docker system prune -af`で復旧、deploy.ymlに `docker image prune -af` 自動化と canary_check 失敗時の3点セットログ出力を追加 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

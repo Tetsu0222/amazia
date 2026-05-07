@@ -15,8 +15,8 @@
 |---|----------|--------|-----|------|------|------------|------|
 | 1 | id | 履歴ID | BIGINT | - | NOT NULL | AUTO_INCREMENT | PK |
 | 2 | sku_id | SKU ID | BIGINT | - | NOT NULL | - | FK: product_skus.id |
-| 3 | type | 取引種別 | VARCHAR | 20 | NOT NULL | - | receive / adjust 等 |
-| 4 | quantity | 増減数 | INT | - | NOT NULL | - | 入荷は正値、調整は正負どちらもあり得る |
+| 3 | type | 取引種別 | VARCHAR | 20 | NOT NULL | - | `receive` / `adjust` / `sale` / `return` / `cancel`（phase14 r4）/ `sale_preorder_shipment`（phase15 r5：予約購入の PENDING→SHIPPED 遷移時の減算） |
+| 4 | quantity | 増減数 | INT | - | NOT NULL | - | 入荷・返品は正値、販売・出荷時減算は負値、調整は正負どちらもあり得る |
 | 5 | reference_type | 参照対象種別 | VARCHAR | 50 | NULL | NULL | フェーズ11追加。sales / workflow 等の参照元テーブル種別 |
 | 6 | reference_id | 参照対象ID | BIGINT | - | NULL | NULL | フェーズ11追加。reference_type に対応する PK |
 | 7 | created_by_user_id | 操作者ID | BIGINT | - | NULL | NULL | フェーズ11追加。users.id（誰が在庫操作したか） |
@@ -52,6 +52,8 @@
 | フェーズ | 内容 |
 |---------|------|
 | フェーズ11 | `reference_type` / `reference_id` / `created_by_user_id` / `comment` の4カラムと、対応する3つのインデックスを追加。在庫変動の出所追跡（売上・ワークフロー等）と監査性を強化 |
+| フェーズ14 r4 | `type` 値に `sale` / `return` / `cancel` を追加（注文確定時の販売減算・返品復元・キャンセル復元の記録用） |
+| フェーズ15 r5 | `type` 値に `sale_preorder_shipment` を追加（予約購入の PENDING→SHIPPED 遷移時の在庫減算記録用 / P5-3） |
 
 ## 設計上の注意
 
