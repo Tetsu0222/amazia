@@ -1,208 +1,234 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1060" width="900" height="1060" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1240" width="960" height="1240" font-family="sans-serif" font-size="13">
 
   <!-- ===== 背景 ===== -->
-  <rect width="900" height="1060" fill="#f9f9f9"/>
+  <rect width="960" height="1240" fill="#f9f9f9"/>
 
   <!-- ===== タイトル ===== -->
-  <text x="450" y="36" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">CI/CD パイプライン アーキテクチャ</text>
-  <text x="450" y="56" text-anchor="middle" font-size="12" fill="#888">GitHub Actions → ECR / S3 → EC2 (SSM)</text>
+  <text x="480" y="36" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">CI/CD パイプライン アーキテクチャ</text>
+  <text x="480" y="56" text-anchor="middle" font-size="12" fill="#888">GitHub Actions → ECR / S3 → EC2 (SSM) → CloudFront (HTTPS)</text>
+  <text x="480" y="72" text-anchor="middle" font-size="11" fill="#aaa">phaseX-3（HTTPS化）/ phaseX-4（t3.micro + Swap）反映済み</text>
 
   <!-- ========================================
        1. 開発者 → GitHub
   ======================================== -->
-  <!-- 開発者 -->
-  <circle cx="110" cy="110" r="22" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
-  <text x="110" y="115" text-anchor="middle" font-size="12" fill="#333">開発者</text>
-  <!-- GitHub -->
-  <rect x="220" y="88" width="100" height="44" rx="8" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
-  <text x="270" y="107" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">GitHub</text>
-  <text x="270" y="123" text-anchor="middle" font-size="11" fill="#555">main branch</text>
-  <!-- 矢印 -->
-  <line x1="132" y1="110" x2="218" y2="110" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="175" y="104" text-anchor="middle" font-size="11" fill="#555">git push</text>
+  <circle cx="120" cy="118" r="22" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+  <text x="120" y="123" text-anchor="middle" font-size="12" fill="#333">開発者</text>
+
+  <rect x="230" y="96" width="110" height="44" rx="8" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="285" y="115" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">GitHub</text>
+  <text x="285" y="131" text-anchor="middle" font-size="11" fill="#555">main branch</text>
+
+  <line x1="142" y1="118" x2="228" y2="118" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="185" y="112" text-anchor="middle" font-size="11" fill="#555">git push</text>
 
   <!-- ========================================
        2. GitHub Actions 全体枠
   ======================================== -->
-  <rect x="30" y="160" width="840" height="450" rx="12" fill="#eaf4fb" stroke="#6c8ebf" stroke-width="2"/>
-  <text x="450" y="185" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a6fa0">GitHub Actions（deploy.yml）</text>
+  <rect x="30" y="170" width="900" height="460" rx="12" fill="#eaf4fb" stroke="#6c8ebf" stroke-width="2"/>
+  <text x="480" y="195" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a6fa0">GitHub Actions（deploy.yml）</text>
 
-  <!-- trigger 矢印 GitHub → Actions -->
-  <line x1="270" y1="132" x2="270" y2="158" stroke="#6c8ebf" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
-  <text x="290" y="150" font-size="11" fill="#1a6fa0">trigger</text>
+  <line x1="285" y1="140" x2="285" y2="168" stroke="#6c8ebf" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <text x="305" y="160" font-size="11" fill="#1a6fa0">trigger</text>
 
   <!-- ---- 並列テストジョブ ---- -->
-  <!-- test-core -->
-  <rect x="60" y="200" width="160" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
-  <text x="140" y="225" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-core</text>
-  <text x="140" y="242" text-anchor="middle" font-size="11" fill="#555">mvn clean test</text>
-  <text x="140" y="258" text-anchor="middle" font-size="11" fill="#555">(JUnit)</text>
+  <rect x="65" y="210" width="170" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
+  <text x="150" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-core</text>
+  <text x="150" y="252" text-anchor="middle" font-size="11" fill="#555">mvn clean test</text>
+  <text x="150" y="268" text-anchor="middle" font-size="11" fill="#555">(JUnit)</text>
 
-  <!-- test-console -->
-  <rect x="370" y="200" width="160" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
-  <text x="450" y="225" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-console</text>
-  <text x="450" y="242" text-anchor="middle" font-size="11" fill="#555">php artisan test</text>
-  <text x="450" y="258" text-anchor="middle" font-size="11" fill="#555">(PHPUnit)</text>
+  <rect x="395" y="210" width="170" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
+  <text x="480" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-console</text>
+  <text x="480" y="252" text-anchor="middle" font-size="11" fill="#555">php artisan test</text>
+  <text x="480" y="268" text-anchor="middle" font-size="11" fill="#555">(PHPUnit)</text>
 
-  <!-- test-market -->
-  <rect x="680" y="200" width="160" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
-  <text x="760" y="225" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-market</text>
-  <text x="760" y="242" text-anchor="middle" font-size="11" fill="#555">npm run build</text>
-  <text x="760" y="258" text-anchor="middle" font-size="11" fill="#555">(ビルド確認)</text>
+  <rect x="725" y="210" width="170" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
+  <text x="810" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-market</text>
+  <text x="810" y="252" text-anchor="middle" font-size="11" fill="#555">npm test</text>
+  <text x="810" y="268" text-anchor="middle" font-size="11" fill="#555">(ビルド確認)</text>
 
-  <!-- 3本の矢印 → deploy -->
-  <line x1="140" y1="270" x2="390" y2="320" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
-  <line x1="450" y1="270" x2="450" y2="318" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
-  <line x1="760" y1="270" x2="510" y2="320" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
-  <text x="450" y="308" text-anchor="middle" font-size="11" fill="#82b366">全グリーン後</text>
+  <line x1="150" y1="280" x2="420" y2="330" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
+  <line x1="480" y1="280" x2="480" y2="328" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
+  <line x1="810" y1="280" x2="540" y2="330" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
+  <text x="480" y="318" text-anchor="middle" font-size="11" fill="#82b366">全グリーン後</text>
 
   <!-- ---- deploy ジョブ枠 ---- -->
-  <rect x="55" y="325" width="780" height="265" rx="10" fill="#fff8e1" stroke="#d6b656" stroke-width="1.5"/>
-  <text x="445" y="346" text-anchor="middle" font-size="14" font-weight="bold" fill="#8a6a00">deploy ジョブ</text>
+  <rect x="55" y="335" width="850" height="280" rx="10" fill="#fff8e1" stroke="#d6b656" stroke-width="1.5"/>
+  <text x="480" y="356" text-anchor="middle" font-size="14" font-weight="bold" fill="#8a6a00">deploy ジョブ（HTTPS_ENABLED で本番構成切替）</text>
+
+  <!-- Step 0: SSM 健全性 -->
+  <rect x="75" y="368" width="195" height="68" rx="7" fill="#fce4d6" stroke="#c44000" stroke-width="1.5"/>
+  <text x="172" y="388" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">⓪ SSM 健全性確認</text>
+  <text x="172" y="405" text-anchor="middle" font-size="11" fill="#555">canary echo + 詰まり検知</text>
+  <text x="172" y="420" text-anchor="middle" font-size="11" fill="#555">ゾンビOnline → EC2 stop/start</text>
+  <text x="172" y="433" text-anchor="middle" font-size="10" fill="#888">phaseX-2 / トラブル026</text>
 
   <!-- Step 1: ECR build & push -->
-  <rect x="75" y="358" width="210" height="68" rx="7" fill="#ffe0b2" stroke="#e6851f" stroke-width="1.5"/>
-  <text x="180" y="378" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a3d00">① ECR build &amp; push</text>
-  <text x="180" y="395" text-anchor="middle" font-size="11" fill="#555">docker build amazia-core</text>
-  <text x="180" y="410" text-anchor="middle" font-size="11" fill="#555">docker build amazia-console</text>
-  <text x="180" y="425" text-anchor="middle" font-size="11" fill="#888">→ ECR push</text>
+  <rect x="290" y="368" width="190" height="68" rx="7" fill="#ffe0b2" stroke="#e6851f" stroke-width="1.5"/>
+  <text x="385" y="388" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a3d00">① ECR build &amp; push</text>
+  <text x="385" y="405" text-anchor="middle" font-size="11" fill="#555">docker build amazia-core</text>
+  <text x="385" y="420" text-anchor="middle" font-size="11" fill="#555">docker build amazia-console</text>
+  <text x="385" y="433" text-anchor="middle" font-size="11" fill="#888">→ ECR push</text>
 
-  <!-- Step 2: npm build -->
-  <rect x="315" y="358" width="210" height="68" rx="7" fill="#ffe0b2" stroke="#e6851f" stroke-width="1.5"/>
-  <text x="420" y="378" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a3d00">② フロントビルド</text>
-  <text x="420" y="395" text-anchor="middle" font-size="11" fill="#555">amazia-market npm build</text>
-  <text x="420" y="410" text-anchor="middle" font-size="11" fill="#555">console Vue npm build</text>
-  <text x="420" y="425" text-anchor="middle" font-size="11" fill="#888">→ dist 生成</text>
+  <!-- Step 2: フロントビルド -->
+  <rect x="500" y="368" width="195" height="68" rx="7" fill="#ffe0b2" stroke="#e6851f" stroke-width="1.5"/>
+  <text x="597" y="388" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a3d00">② フロントビルド</text>
+  <text x="597" y="405" text-anchor="middle" font-size="11" fill="#555">market: npm build</text>
+  <text x="597" y="420" text-anchor="middle" font-size="11" fill="#555">console Vue: VITE_BASE_PATH=/console/</text>
+  <text x="597" y="433" text-anchor="middle" font-size="10" fill="#888">HTTPS_ENABLED=true で base 切替</text>
 
   <!-- Step 3: S3 upload -->
-  <rect x="555" y="358" width="210" height="68" rx="7" fill="#ffe0b2" stroke="#e6851f" stroke-width="1.5"/>
-  <text x="660" y="378" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a3d00">③ S3 upload</text>
-  <text x="660" y="395" text-anchor="middle" font-size="11" fill="#555">zip -r amazia.zip .</text>
-  <text x="660" y="410" text-anchor="middle" font-size="11" fill="#555">(vendor/node_modules除外)</text>
-  <text x="660" y="425" text-anchor="middle" font-size="11" fill="#888">→ s3://fullstack-renaissance-demo/</text>
+  <rect x="715" y="368" width="170" height="68" rx="7" fill="#ffe0b2" stroke="#e6851f" stroke-width="1.5"/>
+  <text x="800" y="388" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a3d00">③ S3 upload</text>
+  <text x="800" y="405" text-anchor="middle" font-size="11" fill="#555">zip -r amazia.zip .</text>
+  <text x="800" y="420" text-anchor="middle" font-size="11" fill="#555">(vendor/node_modules除外)</text>
+  <text x="800" y="433" text-anchor="middle" font-size="10" fill="#888">→ s3://fullstack-renaissance-demo/</text>
 
-  <!-- 矢印 ①②③ → SSM ① -->
-  <line x1="180" y1="426" x2="180" y2="450" stroke="#d6b656" stroke-width="1.5" marker-end="url(#arrow-gold)"/>
-  <line x1="420" y1="426" x2="420" y2="450" stroke="#d6b656" stroke-width="1.5" marker-end="url(#arrow-gold)"/>
-  <line x1="660" y1="426" x2="660" y2="450" stroke="#d6b656" stroke-width="1.5" marker-end="url(#arrow-gold)"/>
-  <!-- 横線でまとめる -->
-  <line x1="180" y1="450" x2="660" y2="450" stroke="#d6b656" stroke-width="1.5"/>
-  <line x1="420" y1="450" x2="420" y2="460" stroke="#d6b656" stroke-width="1.5" marker-end="url(#arrow-gold)"/>
+  <!-- 矢印 ①②③ → SSM -->
+  <line x1="385" y1="436" x2="385" y2="458" stroke="#d6b656" stroke-width="1.5"/>
+  <line x1="597" y1="436" x2="597" y2="458" stroke="#d6b656" stroke-width="1.5"/>
+  <line x1="800" y1="436" x2="800" y2="458" stroke="#d6b656" stroke-width="1.5"/>
+  <line x1="385" y1="458" x2="800" y2="458" stroke="#d6b656" stroke-width="1.5"/>
+  <line x1="480" y1="458" x2="480" y2="468" stroke="#d6b656" stroke-width="1.5" marker-end="url(#arrow-gold)"/>
 
   <!-- SSM ① -->
-  <rect x="220" y="462" width="460" height="58" rx="7" fill="#fce4d6" stroke="#c44000" stroke-width="1.5"/>
-  <text x="450" y="481" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">④ SSM send-command ①（ポーリング待機）</text>
-  <text x="450" y="497" text-anchor="middle" font-size="11" fill="#555">ECR login → docker pull → S3 unzip → docker-compose down → docker-compose up -d</text>
-  <text x="450" y="512" text-anchor="middle" font-size="11" fill="#888">完了まで最大6分 (15sec × 24回) ポーリング</text>
+  <rect x="200" y="470" width="560" height="62" rx="7" fill="#fce4d6" stroke="#c44000" stroke-width="1.5"/>
+  <text x="480" y="490" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">④ SSM send-command ①（ポーリング待機）</text>
+  <text x="480" y="506" text-anchor="middle" font-size="11" fill="#555">ECR login → docker pull → S3 unzip → docker-compose down → up -d</text>
+  <text x="480" y="521" text-anchor="middle" font-size="11" fill="#888">HTTPS_ENABLED=true で CORS / Cookie Secure / SESSION_DOMAIN を切替</text>
 
-  <!-- SSM ① → SSM ② -->
-  <line x1="450" y1="520" x2="450" y2="534" stroke="#c44000" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <line x1="480" y1="532" x2="480" y2="546" stroke="#c44000" stroke-width="1.5" marker-end="url(#arrow-red)"/>
 
   <!-- SSM ② -->
-  <rect x="220" y="536" width="460" height="46" rx="7" fill="#fce4d6" stroke="#c44000" stroke-width="1.5"/>
-  <text x="450" y="554" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">⑤ SSM send-command ②（ポーリング待機）</text>
-  <text x="450" y="570" text-anchor="middle" font-size="11" fill="#555">nginx.conf コピー → dist コピー → nginx -t → systemctl reload nginx</text>
+  <rect x="200" y="548" width="560" height="46" rx="7" fill="#fce4d6" stroke="#c44000" stroke-width="1.5"/>
+  <text x="480" y="566" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">⑤ SSM send-command ②（ポーリング待機）</text>
+  <text x="480" y="582" text-anchor="middle" font-size="11" fill="#555">amazia.cloudfront.conf or amazia.conf 配置 → dist 配置 → nginx -t → reload</text>
+
+  <!-- ⑥ ヘルスチェック -->
+  <line x1="480" y1="594" x2="480" y2="606" stroke="#c44000" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <rect x="200" y="608" width="560" height="0" />
+  <text x="480" y="606" text-anchor="middle" font-size="0" />
 
   <!-- ========================================
        3. AWS インフラ層
   ======================================== -->
 
   <!-- ECR -->
-  <rect x="30" y="650" width="200" height="80" rx="10" fill="#fff3e0" stroke="#FF9900" stroke-width="2"/>
-  <text x="130" y="675" text-anchor="middle" font-size="13" font-weight="bold" fill="#7a4500">Amazon ECR</text>
-  <text x="130" y="693" text-anchor="middle" font-size="11" fill="#555">amazia-core:latest</text>
-  <text x="130" y="709" text-anchor="middle" font-size="11" fill="#555">amazia-console:latest</text>
+  <rect x="30" y="670" width="200" height="80" rx="10" fill="#fff3e0" stroke="#FF9900" stroke-width="2"/>
+  <text x="130" y="695" text-anchor="middle" font-size="13" font-weight="bold" fill="#7a4500">Amazon ECR</text>
+  <text x="130" y="713" text-anchor="middle" font-size="11" fill="#555">amazia-core:latest</text>
+  <text x="130" y="729" text-anchor="middle" font-size="11" fill="#555">amazia-console:latest</text>
 
   <!-- S3 -->
-  <rect x="265" y="650" width="200" height="80" rx="10" fill="#fff3e0" stroke="#FF9900" stroke-width="2"/>
-  <text x="365" y="675" text-anchor="middle" font-size="13" font-weight="bold" fill="#7a4500">Amazon S3</text>
-  <text x="365" y="693" text-anchor="middle" font-size="11" fill="#555">fullstack-renaissance-demo</text>
-  <text x="365" y="709" text-anchor="middle" font-size="11" fill="#555">amazia.zip</text>
+  <rect x="265" y="670" width="200" height="80" rx="10" fill="#fff3e0" stroke="#FF9900" stroke-width="2"/>
+  <text x="365" y="695" text-anchor="middle" font-size="13" font-weight="bold" fill="#7a4500">Amazon S3</text>
+  <text x="365" y="713" text-anchor="middle" font-size="11" fill="#555">fullstack-renaissance-demo</text>
+  <text x="365" y="729" text-anchor="middle" font-size="11" fill="#555">amazia.zip</text>
 
   <!-- EC2 外枠 -->
-  <rect x="500" y="635" width="370" height="290" rx="12" fill="#fffde7" stroke="#d6b656" stroke-width="2"/>
-  <text x="685" y="658" text-anchor="middle" font-size="13" font-weight="bold" fill="#8a6a00">AWS EC2  13.54.203.95（Elastic IP）</text>
-  <text x="685" y="673" text-anchor="middle" font-size="11" fill="#888">ap-southeast-2 / SSM管理（SSH不要）</text>
+  <rect x="500" y="650" width="430" height="320" rx="12" fill="#fffde7" stroke="#d6b656" stroke-width="2"/>
+  <text x="715" y="673" text-anchor="middle" font-size="13" font-weight="bold" fill="#8a6a00">AWS EC2  t3.micro（無料枠）</text>
+  <text x="715" y="688" text-anchor="middle" font-size="11" fill="#888">ap-southeast-2 / EIP 13.54.203.95 / SSM 管理（SSH不要）</text>
+  <text x="715" y="703" text-anchor="middle" font-size="11" fill="#7a4500">Spring -Xmx384m / Swap 2GB（phaseX-4）</text>
 
   <!-- Nginx -->
-  <rect x="515" y="680" width="340" height="44" rx="7" fill="#e8f5e9" stroke="#388e3c" stroke-width="1.5"/>
-  <text x="685" y="699" text-anchor="middle" font-size="12" font-weight="bold" fill="#1b5e20">Nginx（リバースプロキシ）</text>
-  <text x="685" y="715" text-anchor="middle" font-size="11" fill="#555">:80 → /var/www/amazia-market　　:8001 → /var/www/amazia-console</text>
+  <rect x="515" y="712" width="400" height="56" rx="7" fill="#e8f5e9" stroke="#388e3c" stroke-width="1.5"/>
+  <text x="715" y="730" text-anchor="middle" font-size="12" font-weight="bold" fill="#1b5e20">Nginx（リバースプロキシ・パス分離）</text>
+  <text x="715" y="746" text-anchor="middle" font-size="11" fill="#555">/ → Market 静的　 /console/ → Console SPA</text>
+  <text x="715" y="761" text-anchor="middle" font-size="11" fill="#555">/console/api/ → :8000　 /api/ → :8080</text>
 
   <!-- Docker Compose 枠 -->
-  <rect x="515" y="735" width="340" height="170" rx="7" fill="#fce4d6" stroke="#b85450" stroke-width="1.5"/>
-  <text x="685" y="754" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">Docker Compose</text>
+  <rect x="515" y="780" width="400" height="180" rx="7" fill="#fce4d6" stroke="#b85450" stroke-width="1.5"/>
+  <text x="715" y="799" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a1f00">Docker Compose</text>
 
   <!-- amazia-core -->
-  <rect x="525" y="762" width="150" height="60" rx="6" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
-  <text x="600" y="781" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a3a6a">amazia-core</text>
-  <text x="600" y="797" text-anchor="middle" font-size="11" fill="#555">Java / Spring Boot</text>
-  <text x="600" y="812" text-anchor="middle" font-size="11" fill="#555">:8080</text>
+  <rect x="525" y="808" width="180" height="60" rx="6" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+  <text x="615" y="827" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a3a6a">amazia-core</text>
+  <text x="615" y="843" text-anchor="middle" font-size="11" fill="#555">Java / Spring Boot</text>
+  <text x="615" y="858" text-anchor="middle" font-size="11" fill="#555">:8080</text>
 
   <!-- amazia-console -->
-  <rect x="695" y="762" width="150" height="60" rx="6" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
-  <text x="770" y="781" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a3a6a">amazia-console</text>
-  <text x="770" y="797" text-anchor="middle" font-size="11" fill="#555">PHP / Laravel</text>
-  <text x="770" y="812" text-anchor="middle" font-size="11" fill="#555">:8000</text>
+  <rect x="725" y="808" width="180" height="60" rx="6" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+  <text x="815" y="827" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a3a6a">amazia-console</text>
+  <text x="815" y="843" text-anchor="middle" font-size="11" fill="#555">PHP / Laravel</text>
+  <text x="815" y="858" text-anchor="middle" font-size="11" fill="#555">:8000</text>
 
   <!-- MySQL -->
-  <rect x="610" y="838" width="150" height="50" rx="6" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
-  <text x="685" y="858" text-anchor="middle" font-size="12" font-weight="bold" fill="#1b5e20">MySQL</text>
-  <text x="685" y="876" text-anchor="middle" font-size="11" fill="#555">:3306 (volume永続化)</text>
+  <rect x="640" y="884" width="150" height="50" rx="6" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
+  <text x="715" y="904" text-anchor="middle" font-size="12" font-weight="bold" fill="#1b5e20">MySQL</text>
+  <text x="715" y="922" text-anchor="middle" font-size="11" fill="#555">:3306 (volume永続化)</text>
 
-  <!-- console → core -->
-  <line x1="695" y1="792" x2="675" y2="792" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
-
-  <!-- core → mysql -->
-  <line x1="600" y1="822" x2="660" y2="836" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
-  <!-- console → mysql -->
-  <line x1="770" y1="822" x2="730" y2="836" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="725" y1="838" x2="705" y2="838" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="615" y1="868" x2="685" y2="882" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="815" y1="868" x2="745" y2="882" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
 
   <!-- ========================================
        4. 接続矢印（Actions → ECR / S3 / EC2）
   ======================================== -->
+  <path d="M 130 615 L 130 668" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="80" y="645" font-size="11" fill="#FF9900">docker push</text>
 
-  <!-- deploy → ECR (①) -->
-  <path d="M 130 610 L 130 648" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)"/>
-  <text x="80" y="635" font-size="11" fill="#FF9900">docker push</text>
+  <path d="M 365 615 L 365 668" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="290" y="645" font-size="11" fill="#FF9900">aws s3 cp</text>
 
-  <!-- deploy → S3 (③) -->
-  <path d="M 365 610 L 365 648" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)"/>
-  <text x="290" y="635" font-size="11" fill="#FF9900">aws s3 cp</text>
+  <path d="M 650 615 L 700 648" fill="none" stroke="#c44000" stroke-width="2" marker-end="url(#arrow-red)"/>
+  <text x="630" y="640" font-size="11" fill="#c44000">SSM</text>
 
-  <!-- deploy → EC2 SSM -->
-  <path d="M 620 610 L 655 633" fill="none" stroke="#c44000" stroke-width="2" marker-end="url(#arrow-red)"/>
-  <text x="600" y="627" font-size="11" fill="#c44000">SSM</text>
+  <path d="M 230 700 L 520 808" fill="none" stroke="#6c8ebf" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="335" y="755" font-size="11" fill="#6c8ebf">docker pull</text>
 
-  <!-- ECR → Docker Compose (docker pull) -->
-  <path d="M 230 690 L 520 762" fill="none" stroke="#6c8ebf" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
-  <text x="330" y="730" font-size="11" fill="#6c8ebf">docker pull</text>
-
-  <!-- S3 → EC2 (unzip) -->
-  <path d="M 465 690 L 535 735" fill="none" stroke="#6c8ebf" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
-  <text x="452" y="720" font-size="11" fill="#6c8ebf">unzip</text>
+  <path d="M 465 700 L 530 778" fill="none" stroke="#6c8ebf" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="455" y="745" font-size="11" fill="#6c8ebf">unzip</text>
 
   <!-- ========================================
-       5. ブラウザアクセス
+       5. CloudFront / DNS 層（HTTPS 終端）
   ======================================== -->
-  <rect x="30" y="960" width="840" height="82" rx="10" fill="#f3e5f5" stroke="#9673a6" stroke-width="1.5"/>
-  <text x="450" y="982" text-anchor="middle" font-size="13" font-weight="bold" fill="#4a148c">ブラウザアクセス（デプロイ完了後）</text>
+  <rect x="30" y="998" width="900" height="118" rx="10" fill="#e3f2fd" stroke="#1976d2" stroke-width="1.5"/>
+  <text x="480" y="1020" text-anchor="middle" font-size="13" font-weight="bold" fill="#0d47a1">HTTPS 終端層（phaseX-3 / 恒久 $0）</text>
 
-  <text x="140" y="1006" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">http://13.54.203.95</text>
-  <text x="140" y="1022" text-anchor="middle" font-size="11" fill="#555">Amazia Market（会員向け）</text>
-  <text x="140" y="1036" text-anchor="middle" font-size="11" fill="#888">React / MUI → Nginx :80</text>
+  <rect x="55" y="1032" width="240" height="70" rx="8" fill="#fff" stroke="#1976d2" stroke-width="1.5"/>
+  <text x="175" y="1052" text-anchor="middle" font-size="12" font-weight="bold" fill="#0d47a1">CloudFront ディストリビューション</text>
+  <text x="175" y="1068" text-anchor="middle" font-size="11" fill="#555">d30j0e0y4f4ybd.cloudfront.net</text>
+  <text x="175" y="1083" text-anchor="middle" font-size="11" fill="#555">ACM 証明書（us-east-1）</text>
+  <text x="175" y="1097" text-anchor="middle" font-size="10" fill="#888">パス分離 4 Behaviors / 1 ドメイン</text>
 
-  <text x="400" y="1006" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">http://13.54.203.95:8001</text>
-  <text x="400" y="1022" text-anchor="middle" font-size="11" fill="#555">Amazia Console UI（管理者向け）</text>
-  <text x="400" y="1036" text-anchor="middle" font-size="11" fill="#888">Vue / Ant Design → Nginx :8001</text>
+  <rect x="335" y="1032" width="240" height="70" rx="8" fill="#fff" stroke="#1976d2" stroke-width="1.5"/>
+  <text x="455" y="1052" text-anchor="middle" font-size="12" font-weight="bold" fill="#0d47a1">desec.io DDNS</text>
+  <text x="455" y="1068" text-anchor="middle" font-size="11" fill="#555">www.amazia-portfolio.dedyn.io</text>
+  <text x="455" y="1083" text-anchor="middle" font-size="11" fill="#555">→ CloudFront (CNAME)</text>
+  <text x="455" y="1097" text-anchor="middle" font-size="10" fill="#888">origin → 13.54.203.95 (A)</text>
 
-  <text x="690" y="1006" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">http://13.54.203.95:8080</text>
-  <text x="690" y="1022" text-anchor="middle" font-size="11" fill="#555">Amazia Core API</text>
-  <text x="690" y="1036" text-anchor="middle" font-size="11" fill="#888">Spring Boot（直接公開）</text>
+  <rect x="615" y="1032" width="290" height="70" rx="8" fill="#fff" stroke="#1976d2" stroke-width="1.5"/>
+  <text x="760" y="1052" text-anchor="middle" font-size="12" font-weight="bold" fill="#0d47a1">直 IP アクセスは遮断</text>
+  <text x="760" y="1068" text-anchor="middle" font-size="11" fill="#555">nginx default_server で 444 切断</text>
+  <text x="760" y="1083" text-anchor="middle" font-size="11" fill="#555">CloudFront → EC2 は HTTP（学習用途）</text>
+  <text x="760" y="1097" text-anchor="middle" font-size="10" fill="#888">server_name で Host 検証</text>
 
-  <!-- EC2 → ブラウザ矢印 -->
-  <line x1="685" y1="925" x2="685" y2="958" stroke="#9673a6" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <!-- CloudFront → EC2（オリジン） -->
+  <path d="M 295 1067 Q 480 1010 715 970" fill="none" stroke="#1976d2" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-darkblue)"/>
+  <text x="500" y="990" text-anchor="middle" font-size="11" fill="#1976d2">origin: HTTP → EC2</text>
+
+  <!-- ========================================
+       6. ブラウザアクセス
+  ======================================== -->
+  <rect x="30" y="1136" width="900" height="92" rx="10" fill="#f3e5f5" stroke="#9673a6" stroke-width="1.5"/>
+  <text x="480" y="1158" text-anchor="middle" font-size="13" font-weight="bold" fill="#4a148c">ブラウザアクセス（HTTPS 統一・1 ドメイン）</text>
+
+  <text x="170" y="1184" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">https://www.amazia-portfolio.dedyn.io/</text>
+  <text x="170" y="1200" text-anchor="middle" font-size="11" fill="#555">Amazia Market（会員向け）</text>
+  <text x="170" y="1216" text-anchor="middle" font-size="11" fill="#888">React / MUI</text>
+
+  <text x="480" y="1184" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">…/console/</text>
+  <text x="480" y="1200" text-anchor="middle" font-size="11" fill="#555">Amazia Console UI（管理者向け）</text>
+  <text x="480" y="1216" text-anchor="middle" font-size="11" fill="#888">Vue / Ant Design  base=/console/</text>
+
+  <text x="780" y="1184" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">…/api/* ・ …/console/api/*</text>
+  <text x="780" y="1200" text-anchor="middle" font-size="11" fill="#555">Core API / Console API</text>
+  <text x="780" y="1216" text-anchor="middle" font-size="11" fill="#888">Spring Boot / Laravel</text>
+
+  <!-- ブラウザ → CloudFront -->
+  <line x1="170" y1="1136" x2="170" y2="1104" stroke="#9673a6" stroke-width="1.5" marker-end="url(#arrow-purple-up)"/>
+  <text x="100" y="1125" font-size="11" fill="#9673a6">HTTPS</text>
 
   <!-- ========================================
        矢印マーカー定義
@@ -213,6 +239,9 @@
     </marker>
     <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L0,6 L8,3 z" fill="#6c8ebf"/>
+    </marker>
+    <marker id="arrow-darkblue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#1976d2"/>
     </marker>
     <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L0,6 L8,3 z" fill="#82b366"/>
@@ -227,6 +256,9 @@
       <path d="M0,0 L0,6 L8,3 z" fill="#FF9900"/>
     </marker>
     <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#9673a6"/>
+    </marker>
+    <marker id="arrow-purple-up" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L0,6 L8,3 z" fill="#9673a6"/>
     </marker>
   </defs>
