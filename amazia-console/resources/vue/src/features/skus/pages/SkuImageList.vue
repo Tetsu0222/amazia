@@ -80,7 +80,8 @@
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
-import { getProducts } from '../../products/api/products';
+// 管理画面では公開期間外の商品（予約開始前など）も対象にするため admin 一覧を使う
+import { getAdminProducts } from '../../products/api/products';
 import { getProductSkus, getSkuImages, uploadSkuImage } from '../api/skus';
 
 const products = ref([]);
@@ -95,7 +96,7 @@ const uploading = ref(false);
 onMounted(async () => {
   productsLoading.value = true;
   try {
-    products.value = await getProducts();
+    products.value = await getAdminProducts();
   } catch {
     message.warning('商品一覧の取得に失敗しました');
   } finally {
