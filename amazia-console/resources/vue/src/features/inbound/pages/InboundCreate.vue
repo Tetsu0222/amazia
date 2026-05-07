@@ -68,12 +68,13 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { registerInbound } from '../api/inboundApi.js';
 import { getAdminProducts } from '../../products/api/products.js';
 import { getProductSkus } from '../../skus/api/skus.js';
 
+const route = useRoute();
 const router = useRouter();
 const submitting = ref(false);
 
@@ -98,7 +99,47 @@ onMounted(async () => {
   } finally {
     productsLoading.value = false;
   }
+
+  await applyInitialSelection();
 });
+
+async function applyInitialSelection() {
+  const querySkuId = route.query.skuId ? Number(route.query.skuId) : null;
+  const queryProductId = route.query.productId ? Number(route.query.productId) : null;
+  if (!querySkuId) return;
+
+  let productId = queryProductId;
+  if (!productId) {
+    for (const p of products.value) {
+      try {
+        const list = await getProductSkus(p.id);
+        if (list.some(s => s.id === querySkuId)) {
+          productId = p.id;
+          skus.value = list;
+          break;
+        }
+      } catch {
+        // 個別商品の SKU 取得失敗は無視して次へ
+      }
+    }
+  }
+  if (!productId) return;
+
+  form.productId = productId;
+  if (skus.value.length === 0) {
+    skusLoading.value = true;
+    try {
+      skus.value = await getProductSkus(productId);
+    } catch {
+      message.warning('SKU一覧の取得に失敗しました');
+    } finally {
+      skusLoading.value = false;
+    }
+  }
+  if (skus.value.some(s => s.id === querySkuId)) {
+    form.skuId = querySkuId;
+  }
+}
 
 async function onProductChange(productId) {
   form.skuId = null;

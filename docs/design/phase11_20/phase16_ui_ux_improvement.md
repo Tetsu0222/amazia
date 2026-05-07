@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 / Step 5 / Step 6-1 / Step 6-2 / Step 6-3 / Step 6-4 / Step 6-5 / Step 6-6 実装完了・2026-05-07）
+🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 / Step 5 / Step 6-1 / Step 6-2 / Step 6-3 / Step 6-4 / Step 6-5 / Step 6-6 / Step 8 / Step 9 実装完了・2026-05-07／Step 7 / Step 10 / Step 11 設計策定・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -1196,71 +1196,1067 @@ Excel ヘッダーの追加列：
 
 ---
 
-# 機能詳細
+## Step 7：商品マスタ画面の UI 視認性・操作性改善 🟡 設計策定（2026-05-07）
+
+### 7-1. 背景・目的
+
+商品マスタ画面（`/products`、`ProductList.vue`）は Step 1 / 1.5 / 6-1 で機能を積み増してきた結果、画面要素が増え、以下の **視認性・操作性のひずみ** がスクリーンショット観察で確認できた。本ステップでは DB / API には手を入れず、`ProductList.vue` 単体の見た目と挙動の整理に閉じる。
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | `<a-page-header>` の `sub-title="Amazia Console"` がサイドバーのアプリ名と重複している | タイトル横にノイズが出て、画面名（"商品マスタ"）の視認性が落ちる |
+| B | 「一括削除（0件）」が常に表示され、未選択時もグレーボタンとして主要操作列を圧迫する | 主要 CTA（新規登録）への視線誘導を阻害 |
+| C | 上段の「すべて／有効のみ／無効のみ」（`activeFilter`）と検索カード内の「在庫 すべて／在庫あり／在庫なし」（`stockFilter`）が **同じ pill ラジオ表現** で並走している | 「フィルタ群が二か所に分かれている」状態で、運用者がどちらでどの軸を絞るか毎回探すコストが発生 |
+| D | テーブル列「公開状態」と「有効/無効」が並んでいるが、Step 1 で導入した直交軸の関係が UI 上で読み取りづらい | `is_active = FALSE` かつ `公開期間内` のとき「●公開中＋無効」という一見矛盾した表示になり、初見の運用者が混乱する |
+| E | ヘッダーラベル「有効/無効」が列幅 90px で **"効" だけ折り返している** | 文字単位で改行され、見出しとして体裁が崩れる |
+| F | 「価格帯」「合計在庫」が左寄せ表示で、桁の比較がしづらい | 数値列の右寄せ原則から外れている |
+| G | 「+」（行展開）アイコンと行チェックボックスが左端に並び、どちらをクリックすると何が起きるかが直感的でない | 現状は `expand-row-by-click` で行クリックでも展開するが、視覚的手がかりが弱い |
+| H | 「操作」列の "編集 / SKU管理 / 削除" が等価ボタンで横並び | SKU管理は遷移先が明確でも、視覚的には編集・削除と同列の重みに見え、誤操作リスクは中庸 |
+| I | テーブル下のページネーションに **総件数表示がなく**、現在何件中の何ページを見ているか判別できない | 件数が増えたとき「あと何ページあるか」「フィルタ後の件数はいくつか」が分からない |
+| J | 検索カード内で「商品名」「価格」「在庫」が `inline` で横一列にあり、ウィンドウ幅が狭いと折り返し時に **`〜` セパレータと "円" 単位が分断される** | 中間幅の表示で価格レンジが読みにくい |
+
+### 7-2. スコープ
+
+| 観点 | 方針 |
+|------|------|
+| 対象画面 | `features/products/pages/ProductList.vue` 単体 |
+| 対象外 | `ProductForm.vue`（編集画面）／`SkuList.vue`／その他画面（次タスクで個別判断） |
+| DB 変更 | **なし** |
+| API 変更 | **なし** |
+| バックエンド変更 | **なし**（既存 `GET /admin/products` のレスポンスをそのまま使う） |
+
+### 7-3. 改善方針
+
+#### 7-3-1. ヘッダー整理（課題 A・B）
+
+- `<a-page-header>` の `sub-title` を削除（`title="商品マスタ"` のみに）
+- 既存ヘッダー右側の総件数表示として、フィルタ後件数 / 全体件数のサブテキストを `<a-page-header>` 配下の `description` slot に表示
+  - 例：`全 3 件中 3 件を表示` / フィルタ適用時は `全 3 件中 1 件を表示（フィルタ適用中）`
+- 「一括削除」ボタンは **`v-if="selectedRowKeys.length > 0"`** に変更し、選択がないときは DOM ごと出さない
+  - これにより未選択時のヘッダー左側はラジオフィルタのみとなり、主要 CTA「+ 新規登録」への視線誘導が回復する
+
+#### 7-3-2. フィルタの一本化（課題 C）
+
+「有効/無効」ラジオを **検索カード内に集約** し、ヘッダー行から取り除く。
+
+- 検索カードのレイアウトを `<a-card>` 内 2 段構成に変更：
+  - 1 段目（基本検索）：商品名／価格（最低〜最高）／在庫
+  - 2 段目（状態フィルタ）：有効/無効（すべて／有効のみ／無効のみ）／公開状態（すべて／公開中のみ／非公開のみ）／クリア
+- 「公開状態」フィルタは新設：既存 `isPublished()` ロジックを `filteredProducts` に取り込み、`publishStatus = 'all' | 'published' | 'unpublished'` で AND 結合する
+  - これは課題 D の解決にも寄与する（運用者が "公開中で無効" を意図的に絞り込めるようになる）
+- 「クリア」ボタンの動作は **全 5 条件をリセット**（現行は 3 条件のみリセットだが、フィルタ統合に合わせて全部戻す挙動に変更）
+  - Step 6-1-7 の「クリアで有効/無効は維持」仕様は本ステップで上書きする旨、Step 6-1 の備考に追記する
+
+#### 7-3-3. テーブル列の見直し（課題 D・E・F）
+
+| 列 | 変更点 |
+|----|-------|
+| ID | 変更なし |
+| 商品名 | 変更なし |
+| SKU数 | 変更なし |
+| 価格帯 | `align: 'right'` を付与し右寄せ |
+| 合計在庫 | `align: 'right'` を付与し右寄せ。値が 0 のときは赤系の小バッジ（`<a-tag color="red">在庫なし</a-tag>`）で表示 |
+| 状態 | **「公開状態」「有効/無効」を 1 列に統合**。タイトル「状態」、内容は `<a-space>` で「●公開中／●非公開」バッジ＋「有効／無効」タグの 2 行縦並び。列幅 110px |
+| 操作 | 課題 H の対応として、`<a-button-group>` で「編集」を primary、「SKU管理」を default、「削除」を danger アウトラインに揃え、間隔と密度を整える |
+
+「状態」列の縦 2 行表示は、Step 1 で導入した直交 2 軸（公開期間 / `is_active`）を **見た目でも 2 軸として表現する** ためのもの。1 列に統合することで列数も減り、ヘッダー折り返し問題（課題 E）も解消する。
+
+#### 7-3-4. 行展開アイコンと選択チェックボックス（課題 G）
+
+- `expand-row-by-click` を **削除**（行クリックでの展開は副作用が大きい）
+- `<a-table>` の `expandIcon` カスタムレンダリングで、`+` / `−` のボタンを `<a-button type="text" size="small">` に統一して視認性を上げる
+- 行選択チェックボックスとの間に 4px のスペーサを置き、誤クリックを防ぐ
+
+#### 7-3-5. ページネーション（課題 I）
+
+- `<a-table>` の `:pagination` を明示的に設定：
+  ```js
+  pagination: {
+    pageSize: 20,
+    showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+    showSizeChanger: true,
+    pageSizeOptions: ['20', '50', '100'],
+  }
+  ```
+- 件数表示は `filteredProducts.length` に対して効くため、フィルタ適用中の件数推移も追える
+
+#### 7-3-6. 検索カードのレスポンシブ（課題 J）
+
+- 価格の「最低〜最高〜円」は単一の `<a-form-item label="価格">` 内に内包されているが、ウィンドウ幅で `<a-input-number>` × 2 が折り返しても **セパレータ `〜` と単位 `円` が同じ行内に残る** ように `<a-input-group compact>` でラップする
+- 検索カード全体を `<a-form layout="inline">` から `<a-form layout="vertical" class="search-form-grid">` に変更し、`display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));` で列を自動折り返し
+
+### 7-4. UI 変更まとめ（Console）
+
+`features/products/pages/ProductList.vue`：
+
+- `<a-page-header>` の `sub-title` 削除、`description` slot に件数表示
+- ヘッダー行から「すべて／有効のみ／無効のみ」ラジオを削除
+- 「一括削除」ボタンを `v-if="selectedRowKeys.length > 0"` 化
+- 検索カードを 2 段構成に変更（基本検索 + 状態フィルタ）
+- 「公開状態」フィルタを新設し `filteredProducts` に AND 結合
+- `columns` 配列：
+  - 「価格帯」「合計在庫」に `align: 'right'`
+  - 「公開状態」「有効/無効」を「状態」1 列に統合
+- `expand-row-by-click` 削除、`expandIcon` カスタム
+- `pagination` に `showTotal` / `showSizeChanger` 追加
+- 価格入力を `<a-input-group compact>` でラップ
+
+### 7-5. DB 変更
+**なし**
+
+### 7-6. API 変更
+**なし**
+
+### 7-7. TDD テストケース
+
+表示変更のため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- ヘッダーから "Amazia Console" のサブタイトルが消えている
+- 商品を 1 件もチェックしていない状態で「一括削除」ボタンが画面に存在しない
+- 1 件以上チェックすると「一括削除（N件）」が現れる
+- 「有効/無効」ラジオが検索カード内にあり、ヘッダー行には存在しない
+- 「公開状態」フィルタを「公開中のみ」にすると `publishEnd` が過去の商品が消える
+- 「公開状態」フィルタを「非公開のみ」にすると公開期間内の商品が消える
+- クリアボタン押下で 5 条件すべてが既定値に戻る
+- 「価格帯」「合計在庫」列の数値が右寄せで表示される
+- 「状態」列に「●公開中／●非公開」と「有効／無効」が縦 2 行で表示される
+- 行クリックでは展開せず、左端の `+` ボタンクリック時のみ展開する
+- ページネーションに「N-M / 全 K 件」が表示される
+- ページサイズを 50 / 100 に切り替えできる
+- ウィンドウ幅 768px 程度でも価格の `〜` と `円` が分断されない
+
+### 7-8. 申し送り
+
+- 同様の UI 観点（ヘッダー重複・フィルタ二重化・状態列の統合・数値右寄せ・件数表示・展開アイコン）は他の一覧画面（`SkuList.vue` / `ProductMarketList.vue` / `InboundList.vue` / `DeliveryList.vue` 等）にも横展開余地がある。本ステップでは商品マスタに閉じ、横展開要否は次タスクで判断する。
+- Step 6-1-7 の「クリアで有効/無効は維持」仕様は Step 7-3-2 で上書きされる。Step 6-1 の説明節にその旨の追記を入れる（実装時併せて対応）。
 
 ---
 
-## 🖥 Amazia Console（管理画面）
+## Step 8：SKU管理画面の UI 視認性・操作性改善 ✅ 実装完了（2026-05-07）
 
-### UI改善方針
-- 現行の雰囲気は維持しつつ、以下の観点で洗練させる  
-  - 情報の階層化（見出し・カード・タブの活用）  
-  - 一覧画面の視認性向上（行間・色・アイコン）  
-  - 操作ボタンの統一（配置・色・サイズ）  
-  - フォーム入力のガイド強化（プレースホルダー・バリデーション表示）  
-  - レスポンシブ対応の最適化  
+### 8-1. 背景・目的
 
-### 対象画面例
-- 売上管理  
-- 商品管理  
-- ワークフロー管理  
-- 配送管理  
-- 操作履歴  
+SKU管理画面（`/skus`、`SkuList.vue`）は Step 1.5 / Step 3 で SKU 一覧構造と発売前後表示を整えたが、商品マスタ画面（Step 7 対象）と並べて見たときに以下の **視認性・操作性のひずみ** がスクリーンショット観察と実装読解で確認できた。本ステップでは Step 7 と同様、DB / API には手を入れず `SkuList.vue` 単体に閉じる。
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | `<a-page-header>` の `sub-title="Amazia Console"` がサイドバーのアプリ名と重複（Step 7 課題 A と同根） | タイトル横にノイズが出て、画面名（"SKU管理"）の視認性が落ちる |
+| B | 画面上部に **検索フォームが一切ない** | 商品数が増えると目的の親商品を探すのにスクロールするしかない（商品マスタ画面とのギャップが大きい） |
+| C | 親テーブルのヘッダー行と本文行の **間に過大な余白** が見えるレイアウトで、初見では「商品が読み込めていないのか」と誤認しやすい | スクリーンショット上でヘッダー（ID / 商品名…）と最初の行（2 / テスト）の間に空白帯が大きく出ている |
+| D | 親テーブルに「発売 / 公開状態 / 有効/無効」の 3 列が右側に並ぶが、Step 7 課題 D と同根の「公開状態」「有効/無効」の意味重複がここでも発生 | 直交軸であることが UI から読み取れない |
+| E | 「有効/無効」列幅 90px で **"効" だけ折り返し**（Step 7 課題 E と同根） | 列見出しの体裁が崩れる |
+| F | `expand-row-by-click="true"` のため **行のどこをクリックしても展開**する | 行内のテキストを選択しようとしただけで展開し、誤操作の温床（Step 7 課題 G と同根） |
+| G | 展開行内で「SKU 一覧テーブル」と「SKU 追加フォーム（色 / サイズ / SKUを追加）」が **境界線なく縦に並ぶ** | どこまでが既存 SKU の表示で、どこからが追加 UI かが視覚的に分かれていない |
+| H | SKU 行右端の **青塗りボタンのラベルが「選択」** | 押すと SKU 詳細モーダル（価格 / 在庫 / 画像）が開くが、「選択」では何が起きるか予測できない |
+| I | SKU 追加フォームが **色・サイズ必須** のバリデーションを `handleSkuSubmit` に直書き（`if (!form.color || !form.size) return`） | 色やサイズの概念がない商品（食品・書籍など）でも入力を強制される。実 DB スキーマ上は NULL 可だが UI が阻んでいる |
+| J | 親テーブルに「SKU数」列があるが、SKU 数 **0 の行を展開すると「SKUが登録されていません」だけが大きく出て、追加フォームへの導線が空白を挟んだ下にある** | SKU 0 件のときに最初にやるべき操作（追加）が画面下部に埋もれる |
+| K | SKU詳細モーダルが `width="780px"` 固定 | 1024px クラスのウィンドウ幅で右端が窮屈／タブ内のテーブル + フォームが横スクロールする |
+| L | モーダル「在庫管理」タブの `<a-alert message="入荷登録は「入荷管理」画面から行ってください。">` が **テキスト案内のみで遷移ボタンがない** | 運用者が一旦モーダルを閉じてサイドバーから「入荷管理」に飛ぶ必要があり動線が長い |
+| M | 親テーブルにページネーション・件数表示・ページサイズ切替がない（既定 10 件ページング） | 全 N 件中いま何件目を見ているか不明（Step 7 課題 I と同根） |
+
+### 8-2. スコープ
+
+| 観点 | 方針 |
+|------|------|
+| 対象画面 | `features/skus/pages/SkuList.vue` 単体 |
+| 対象外 | SKU詳細モーダル内の機能仕様（価格履歴の複数行化など）／在庫管理タブのバックエンド拡張／画像アップロードのサーバ側仕様 |
+| DB 変更 | **なし** |
+| API 変更 | **なし** |
+| バックエンド変更 | **なし** |
+
+### 8-3. 改善方針
+
+#### 8-3-1. ヘッダー整理（課題 A）
+
+- `<a-page-header>` の `sub-title` を削除
+- `<a-page-header>` 配下の `description` slot に件数表示（`全 N 件中 M 件を表示`）を出す
+- ヘッダー右側に **「全展開／全折りたたみ」ボタン** を追加（既存 SKU を一括確認したいときの操作性向上）
+
+#### 8-3-2. 検索カードの新設（課題 B）
+
+商品マスタ画面（Step 6-1）と同じ判断軸で、`SkuList.vue` にもクライアント側 `computed` ベースの検索カードを新設する。
+
+- `<a-card>` 内 `<a-form layout="inline">` で以下 3 条件 + クリアボタン：
+  - **商品名**（部分一致）
+  - **発売状態**（すべて／発売中のみ／発売前のみ）：親商品の `releaseDate` 基準（`isReleased()` 流用）
+  - **有効/無効**（すべて／有効のみ／無効のみ）
+- API / DB 変更なし。`getAdminProducts()` の戻り値を `filteredProducts` computed で絞り込む
+
+商品マスタ画面と同じ並び順・同じ UI コンポーネントで揃え、運用者が画面間を移動しても操作感が変わらないようにする。
+
+#### 8-3-3. 親テーブルの列見直し（課題 C・D・E）
+
+| 列 | 変更点 |
+|----|-------|
+| ID | 変更なし |
+| 商品名 | 変更なし |
+| SKU数 | 変更なし（バッジ表示はそのまま） |
+| 発売 | 変更なし（発売中／発売前タグ） |
+| 状態 | **「公開状態」「有効/無効」を 1 列に統合**（Step 7-3-3 と同方針）。バッジ＋タグの縦 2 行表示。列幅 110px |
+
+「公開状態」「有効/無効」の統合により列数が減り、ヘッダー折り返し（課題 E）が解消する。スクリーンショットで観察された「ヘッダーと最初の行の余白の大きさ」（課題 C）は、`<a-table>` の `:body-style="{ padding: '0' }"` ではなく親 `<div>` の余白が原因の可能性が高いため、`a-page-header` 直下のラッパー余白を `margin-top: 16px` 程度に整える。
+
+#### 8-3-4. 行クリック展開の廃止（課題 F）
+
+- `expand-row-by-click` を **削除**
+- `expandIcon` カスタムレンダリングで `+` / `−` を `<a-button type="text" size="small">` に統一（Step 7-3-4 と同方針）
+
+これにより「行内テキストを選択しようとしただけで展開」の事故が無くなる。
+
+#### 8-3-5. 展開行内レイアウトの整理（課題 G・J）
+
+展開行内を以下の 2 ブロックに **明示的に分割**：
+
+```
+┌─────────────────────────────────────────────┐
+│ 既存 SKU 一覧（a-table size=small）         │
+│ - 0 件のときは <a-empty> をコンパクト表示   │
+└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ ＋ SKU を追加                                │
+│ 色 [____] サイズ [____] [SKUを追加]         │
+└─────────────────────────────────────────────┘
+```
+
+- 2 ブロック目は `<a-card>` `size="small"` で囲み、タイトルに「＋ SKU を追加」を入れる
+- SKU 0 件の場合は `<a-empty>` の高さを抑え（`:image-style="{ height: '32px' }"`）、追加カードの目立ち方を上げる
+- ブロック間の縦余白を `margin: 12px 0` で統一
+
+#### 8-3-6. SKU 行アクションのラベル変更（課題 H）
+
+- 「選択」ボタンを **「詳細・編集」** に変更（中身：価格・在庫・画像の管理）
+- アイコンに `<EditOutlined />` を併記して操作意味を補強
+- ボタンの type は `default` に下げ（モーダルを開くだけの導線なので primary は過剰）、アクセントを `<a-typography-link>` 風に整える
+
+#### 8-3-7. SKU 追加フォームのバリデーション緩和（課題 I）
+
+- `handleSkuSubmit` の必須チェックを **「色 OR サイズの少なくとも 1 つ、または商品が "色サイズなし" 設定なら両方空でも可」** に緩和
+- 簡易判定として：「色・サイズ両方空のときに `<a-popconfirm>` で『色・サイズなしの SKU を作成しますか？』と確認」を挟む
+- 既存商品の運用が「色・サイズ必須」前提のため、空のまま登録できるようにするだけにし、エラー文言は警告 → 確認に格下げ
+
+DB 側（`skus.color` / `skus.size`）は元々 NULL 可。Core API もバリデーションしていない（実装読解により確認）ため、UI のガードを緩めるだけで成立する。
+
+#### 8-3-8. SKU詳細モーダルの幅調整（課題 K）
+
+- `width="780px"` を `:width="modalWidth"` に変更し、`computed` で `Math.min(900, window.innerWidth - 80)` を返す
+- またはより簡潔に `width="80%"` + `style="max-width: 900px"` でも可
+- モーダル内のテーブルが横スクロールしないよう、価格管理タブのテーブルに `:scroll="{ x: 'max-content' }"` を付与
+
+#### 8-3-9. 在庫管理タブから入荷管理画面へのジャンプ動線（課題 L）
+
+`<a-alert>` を以下に拡張：
+
+```vue
+<a-alert
+  message="入荷登録は「入荷管理」画面から行ってください。"
+  type="info"
+  show-icon
+  style="margin-bottom: 12px"
+>
+  <template #action>
+    <a-button size="small" @click="$router.push(`/inbound/create?skuId=${selectedSkuId}&productId=${selectedProductId}`)">
+      入荷登録へ
+    </a-button>
+  </template>
+</a-alert>
+```
+
+クエリパラメータ `skuId` で遷移先（`InboundCreate.vue`）の SKU を初期選択できるよう、Step 8 の合わせ技として `InboundCreate.vue` の `onMounted` で `route.query.skuId` を読む実装も同フェーズで行う（軽微な追加実装で、UI 改善の枠内）。
+
+#### 8-3-10. 親テーブルのページネーション（課題 M）
+
+`<a-table>` の `:pagination` を Step 7-3-5 と同じ仕様で明示：
+
+```js
+pagination: {
+  pageSize: 20,
+  showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+  showSizeChanger: true,
+  pageSizeOptions: ['20', '50', '100'],
+}
+```
+
+### 8-4. UI 変更まとめ（Console）
+
+`features/skus/pages/SkuList.vue`：
+
+- `<a-page-header>` の `sub-title` 削除、`description` slot に件数表示、右側に「全展開／全折りたたみ」ボタン
+- 検索カード新設（商品名 / 発売状態 / 有効/無効 / クリア）
+- `productColumns`：「公開状態」「有効/無効」を「状態」1 列に統合
+- `expand-row-by-click` 削除、`expandIcon` カスタム
+- 展開行内を「既存 SKU 一覧」「＋ SKU を追加」の 2 ブロックに分割
+- SKU 行の「選択」を「詳細・編集」に改名、`<EditOutlined />` 付与
+- SKU 追加の必須バリデーションを緩和（両方空は popconfirm 経由で許容）
+- SKU詳細モーダルの幅をレスポンシブ化
+- 在庫管理タブの `<a-alert>` に「入荷登録へ」遷移ボタンを追加
+- 親テーブルに `showTotal` / `showSizeChanger` 付き pagination を追加
+
+`features/inbound/pages/InboundCreate.vue`（合わせ技）：
+
+- `onMounted` で `route.query.skuId` を読み、初期選択 SKU を設定（追加実装は数行で済む）
+
+### 8-5. DB 変更
+**なし**
+
+### 8-6. API 変更
+**なし**
+
+### 8-7. TDD テストケース
+
+表示変更のため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- ヘッダーから "Amazia Console" のサブタイトルが消えている
+- 「全展開」を押すと全商品行が同時に展開される／「全折りたたみ」で閉じる
+- 検索カードの「商品名」部分一致で親一覧が絞られる
+- 検索カードの「発売前のみ」で `releaseDate` 未来の親商品だけ残る
+- 検索カードの「有効のみ」で `is_active = TRUE` の親商品だけ残る
+- 「クリア」ボタンで検索 3 条件すべてが既定値に戻る
+- 親テーブルの「状態」列に「●公開中／●非公開」と「有効／無効」が縦 2 行で表示される
+- 行クリックでは展開せず、左端の `+` ボタンクリック時のみ展開する
+- 展開行内に「既存 SKU 一覧」「＋ SKU を追加」の 2 ブロックが明示的なカード境界で表示される
+- SKU 0 件のときも「＋ SKU を追加」カードがすぐ下に視認できる位置で出る
+- SKU 行右端のボタンラベルが「詳細・編集」になっている
+- SKU 追加フォームで色・サイズ両方空欄で「SKUを追加」を押すと、popconfirm が出て確認後に登録できる
+- SKU詳細モーダルが幅 1280px のウィンドウで右端まで張り付かず適切な幅で開く
+- モーダル「在庫管理」タブの「入荷登録へ」ボタンを押すと `/inbound/create?skuId=...&productId=...` に遷移し、`InboundCreate.vue` が当該商品 / SKU を初期選択する
+- 親テーブルのページネーションに「N-M / 全 K 件」が表示され、ページサイズを 50 / 100 に切り替えできる
+
+### 8-8. 申し送り
+
+- 「親テーブルの状態列を 1 列に統合」「pagination の `showTotal` 設定」「`expand-row-by-click` 廃止」「`<a-page-header>` の sub-title 廃止」は Step 7 と完全に同方針。**実装時は両画面で利用する `<StatusCell>` `<TableExpandIcon>` 等の小さな共通コンポーネントに切り出す** ことで、横展開対象（`ProductMarketList.vue` / `InboundList.vue` / `DeliveryList.vue` 等）への展開コストを下げる
+- SKU 詳細モーダルの「価格管理」タブは現状 `getSkuPrices()` が単一価格しか扱えない構造（`prices.value = data ? [data] : []`）。価格履歴の複数行化はバックエンド改修を伴うため、本ステップのスコープ外（次フェーズ以降で要検討）
+- `InboundCreate.vue` の `route.query.skuId` 受け取り実装は Step 8 の動線改善に必要なため同フェーズで実施するが、軽微（数行追加）のため別ステップ化はしない
 
 ---
 
-## 🛒 Amazia Market（ECサイト）
+## Step 9：商品一覧（SKU集約版）画面の UI 視認性・操作性改善 ✅ 実装完了（2026-05-07）
 
-### UI改善方針
-- **Amazon の UI に寄せる**  
-  - ヘッダー構成（検索バー・カテゴリ・アカウント・カート）  
-  - 商品一覧のカードデザイン  
-  - 商品詳細ページのレイアウト（画像・価格・説明・購入ボタン）  
-  - レビュー表示のスタイル  
-  - カート画面・購入画面の導線  
-  - 配送情報の選択 UI（Amazon の「お届け先を選択」風）  
+### 9-1. 背景・目的
 
-### 改善対象
-- TOPページ  
-- 商品一覧  
-- 商品詳細  
-- カート  
-- 決済画面  
-- 購入履歴  
-- 予約商品表示  
+商品一覧（SKU集約版）画面（`/products/market-view`、`ProductMarketList.vue`）は Step 6-2 で 5 軸（実体 7 入力）のクライアント側検索条件を導入したが、結果として **検索カードの密度が画面内で最も高い画面** になり、列レイアウトと検索 UI の両面で以下の課題が露呈した。Step 7 / 8 と同様、DB / API には手を入れず `ProductMarketList.vue` 単体に閉じる。
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | 検索カードに `<a-form-item>` が 6 件横並び（商品名 / 価格帯 / 発売日帯 / 予約開始日帯 / 在庫 / クリア）で、`inline` レイアウトのため **2 段折り返し**になっている | 1 軸ずつの位置がウィンドウ幅で動的に変わり、運用者が探しづらい |
+| B | 価格帯 `〜 円` / 発売日帯 `〜` / 予約開始日帯 `〜` のセパレータ + 単位 が 3 箇所にあり、**折り返し時に左右が分断** されることがある（Step 7 課題 J と同根） | レンジ条件の意味が読み取りづらい |
+| C | テーブル「メイン画像」列がヘッダー幅 100px に対し見出し文字数が 5 文字あり、**「メイン画」「像」で 2 行に折り返し**ている | 見出しの体裁が崩れる |
+| D | テーブル「最低価格」「合計在庫」が左寄せ（Step 7 課題 F と同根） | 数値の桁比較ができない |
+| E | 検索適用中でもテーブル直前・直後に **件数表示やフィルタ適用バッジがない** | 「全 N 件中 M 件にフィルタ済」が画面から読み取れない |
+| F | `expand-row-by-click="true"` で行クリックにより誤展開（Step 7 課題 G / Step 8 課題 F と同根） | 行内テキスト選択ができない |
+| G | テーブル行高がメイン画像 64px + 余白で大きく、**1 画面に 3〜4 行しか入らない** | 一覧性が下がり、スクロール量が増える |
+| H | ページネーションに件数表示・サイズ切替がない（Step 7 課題 I / Step 8 課題 M と同根） | 全 N 件中の現在地が不明 |
+| I | `<a-page-header>` の `sub-title="Marketに公開されているSKU集約データの確認用"` は **本画面では削除しない**（Step 7・8 と異なり意味のある説明文） | サブタイトルの取り扱い方針を Step ごとに明確化する必要がある |
+| J | テーブル「ステータス」「予約開始日」「発売日」が画面右側にまとまっているが、**メイン画像と並ぶ「最低価格」「合計在庫」は数値で、その右に並ぶ「ステータス／予約開始日／発売日」は商品状態軸** で、列のグループ意味が混在 | グルーピングのヒント（罫線・背景色など）がなく、列の役割が読み解きづらい |
+| K | 「メイン画像」列で `mainImage` が null のとき「画像なし」とグレー文字を出すだけ | プレースホルダー画像にすれば行高が揃い、視覚ノイズが減る |
+
+### 9-2. スコープ
+
+| 観点 | 方針 |
+|------|------|
+| 対象画面 | `features/products/pages/ProductMarketList.vue` 単体 |
+| 対象外 | Market 側公開エンドポイント（`GET /api/products/market`）の DTO 変更／画像ホスティング仕様 |
+| DB 変更 | **なし** |
+| API 変更 | **なし** |
+| バックエンド変更 | **なし** |
+
+### 9-3. 改善方針
+
+#### 9-3-1. ヘッダー整理（課題 E・I）
+
+- `<a-page-header>` の `sub-title` は **維持**（本画面は確認用の補助説明として意味がある）
+- `<a-page-header>` 配下の `description` slot に件数表示を追加：
+  - 例：`全 3 件中 3 件を表示` / フィルタ適用時は `全 3 件中 1 件を表示（フィルタ適用中）`
+- ヘッダー右側に **「全展開／全折りたたみ」ボタン** を追加（Step 8-3-1 と同方針。SKU 確認用画面なので展開操作の頻度が高い）
+
+#### 9-3-2. 検索カードのレイアウト見直し（課題 A・B）
+
+`<a-form layout="inline">` から **`<a-form layout="vertical">` + CSS Grid** に変更（Step 7-3-6 と同方針）：
+
+```vue
+<a-form layout="vertical" class="search-form-grid" :model="searchForm">
+  <a-form-item label="商品名">...</a-form-item>
+  <a-form-item label="価格">
+    <a-input-group compact>
+      <a-input-number ... /><span>〜</span><a-input-number ... /><span>円</span>
+    </a-input-group>
+  </a-form-item>
+  <a-form-item label="発売日">
+    <a-input-group compact>
+      <a-date-picker ... /><span>〜</span><a-date-picker ... />
+    </a-input-group>
+  </a-form-item>
+  <a-form-item label="予約開始日">...</a-form-item>
+  <a-form-item label="在庫">...</a-form-item>
+  <a-form-item>
+    <a-button @click="resetSearch">クリア</a-button>
+  </a-form-item>
+</a-form>
+
+<style>
+.search-form-grid :deep(.ant-form) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  column-gap: 16px;
+  row-gap: 8px;
+}
+</style>
+```
+
+- グリッドにより **ウィンドウ幅に応じて自動的に列数が変わる**（4 列 / 3 列 / 2 列 / 1 列）
+- `<a-input-group compact>` で帯域条件のセパレータと単位を 1 セットでまとめ、折り返し分断を防ぐ（課題 B）
+
+#### 9-3-3. テーブル列の見直し（課題 C・D・G・J・K）
+
+| 列 | 変更点 |
+|----|-------|
+| ID | `width: 80` → `width: 70`（商品マスタと揃える） |
+| 商品名 | 変更なし |
+| メイン画像 | **列見出しを「画像」に短縮**（課題 C 解消）。`width: 80` に縮小し、画像サイズも 64px → 48px に縮小（課題 G 解消）。`mainImage` が null のときはグレー枠の `<a-skeleton-image>` 風プレースホルダーで行高を揃える（課題 K） |
+| 最低価格 | `align: 'right'` 付与（課題 D） |
+| 合計在庫 | `align: 'right'` 付与。値 0 のときは `<a-tag color="red">在庫なし</a-tag>` を併記（課題 D） |
+| ステータス | 変更なし（発売中／発売前タグ） |
+| 予約開始日 | 変更なし |
+| 発売日 | 変更なし |
+
+行高は画像縮小により実質的に縮まり、1 画面の行数が 3〜4 行 → 6〜7 行になる（課題 G）。
+
+「ステータス／予約開始日／発売日」の **3 列を視覚的にひとまとまり** として認識できるよう、テーブルの `customRow` で右側 3 列の背景に薄い灰色（`#fafafa`）を付ける案もあるが、Ant Design Vue 標準では列単位の背景色設定が複雑になるため、本ステップでは **見出し行の境界線で区切る** 程度に留め、必要なら次フェーズで対応（課題 J）。
+
+#### 9-3-4. 行クリック展開の廃止（課題 F）
+
+- `expand-row-by-click` を **削除**
+- `expandIcon` カスタムレンダリングで `+` / `−` を `<a-button type="text" size="small">` に統一（Step 7-3-4 / Step 8-3-4 と同方針）
+
+#### 9-3-5. ページネーション（課題 H）
+
+`<a-table>` の `:pagination` を Step 7-3-5 / Step 8-3-10 と同じ仕様で明示：
+
+```js
+pagination: {
+  pageSize: 20,
+  showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+  showSizeChanger: true,
+  pageSizeOptions: ['20', '50', '100'],
+}
+```
+
+### 9-4. UI 変更まとめ（Console）
+
+`features/products/pages/ProductMarketList.vue`：
+
+- `<a-page-header>` の `description` slot に件数表示、右側に「全展開／全折りたたみ」ボタン
+- 検索カードを `<a-form layout="vertical">` + CSS Grid に変更
+- 帯域条件（価格 / 発売日 / 予約開始日）を `<a-input-group compact>` でラップ
+- `columns`：
+  - 「メイン画像」を「画像」に改名、列幅 80px、画像 48px、null プレースホルダー対応
+  - 「最低価格」「合計在庫」に `align: 'right'`
+  - 「合計在庫」0 件は「在庫なし」タグ併記
+- `expand-row-by-click` 削除、`expandIcon` カスタム
+- `pagination` に `showTotal` / `showSizeChanger` 追加
+
+### 9-5. DB 変更
+**なし**
+
+### 9-6. API 変更
+**なし**
+
+### 9-7. TDD テストケース
+
+表示変更のため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- `<a-page-header>` のサブタイトル「Marketに公開されているSKU集約データの確認用」は維持されている
+- `<a-page-header>` の説明欄に「全 N 件中 M 件を表示」が出る／フィルタ適用中は「（フィルタ適用中）」が併記される
+- 「全展開」「全折りたたみ」ボタンが機能する
+- 検索カードがウィンドウ幅 1920px → 4 列、1280px → 3 列、768px → 2 列で自動的に折り返す
+- 価格帯入力で「最低 〜 最高 円」が同一グループ内に保持され、折り返し時も分断されない
+- テーブル「画像」列の見出しが 1 行で表示される
+- テーブル「最低価格」「合計在庫」の数値が右寄せで表示される
+- 「合計在庫」が 0 の行に「在庫なし」赤タグが併記される
+- メイン画像が null の行でも行高が他行と揃う
+- 行クリックでは展開せず、左端の `+` ボタンクリック時のみ展開する
+- ページネーションに「N-M / 全 K 件」が表示され、ページサイズを 50 / 100 に切り替えできる
+
+### 9-8. 申し送り
+
+- Step 7・8 で見送った「`<StatusCell>` `<TableExpandIcon>` 等の小さな共通コンポーネント切り出し」を Step 9 でも見送るが、本ステップを実装する時点で **3 画面分の同パターンが揃う** ため、Step 10 着手前に共通コンポーネント化の要否を再判断する
+- 「ステータス／予約開始日／発売日」の列グルーピングの視覚化は、Ant Design Vue の `columns` の `colSpan` トリックや `customRow` で対応可能だが複雑になるため次フェーズ送り
+
+### 9-9. レイアウト追加調整（2026-05-07）
+
+#### 9-9-1. 背景・目的
+
+Step 9 実装完了後、商品マスタ画面と並べて見ると、商品一覧（SKU集約版）画面の検索カードだけが **軸の並びがウィンドウ幅次第で揺れて見える** ことが確認された。
+
+原因は実装方針の差にある：
+
+| 観点 | 商品マスタ（`ProductList.vue`） | SKU集約版（`ProductMarketList.vue`、Step 9 実装版） |
+|------|------|------|
+| 構造 | **2段の `<div>` に分割**（`search-row--basic` / `search-row--status`） | **1段の `<div class="search-grid">`** に全 6 軸を放り込み |
+| 上段Grid | `2fr 1fr`（商品名広め＋価格コンパクト） | — |
+| 下段Grid | `auto auto auto 1fr`（軸幅は中身ぴったり、末尾余白でクリアを右寄せ） | — |
+| 単段Grid | — | `repeat(auto-fit, minmax(220px, 1fr))` の自動配置 |
+
+商品一覧（SKU集約版）は軸が 6 つ（商品名 / 価格帯 / 発売日帯 / 予約開始日帯 / 在庫 / クリア）と多いため、`auto-fit` の自動配置だとウィンドウ幅次第で 3 列／4 列／5 列に揺れ、帯域条件（価格・発売日・予約開始日）と単軸条件（在庫）が混在して整列が破綻する。
+
+ユーザー要望（2026-05-07）：「商品マスタみたいに綺麗に並べたい」。本節では `<SearchCard>` のような共通コンポーネント化は行わず（Step 11-9 の方針を継承し、画面ごとに軸の並びは独立で持つ）、**SKU集約版に対して 3 段構造の Grid を当てる** ことで視覚的な整列を取り戻す。
+
+#### 9-9-2. スコープ
+
+| 観点 | 方針 |
+|------|------|
+| 対象 | `amazia-console/resources/vue/src/features/products/pages/ProductMarketList.vue` の検索カード `<style>` 部 + テンプレートの `<div>` 構造 |
+| 共通コンポーネント化 | **行わない**（軸が今後の改修で増減しやすい想定のため） |
+| 商品マスタ画面 | **手を入れない**（既に 2 段構造で整列しており現状維持） |
+| DB 変更 | **なし** |
+| API 変更 | **なし** |
+
+#### 9-9-3. 3 段構造の設計
+
+軸の性質で 3 段に分ける：
+
+| 段 | 含む軸 | Grid 仕様 |
+|------|------|------|
+| 上段 | 商品名（テキスト幅広）／価格（数値帯域） | `grid-template-columns: 2fr 1fr`（商品マスタ上段と完全同形） |
+| 中段 | 発売日（日付帯域）／予約開始日（日付帯域） | `grid-template-columns: 1fr 1fr`（帯域 2 つを等幅で並べる） |
+| 下段 | 在庫（ラジオ）／クリアボタン | `grid-template-columns: auto 1fr`（在庫は中身ぴったり、末尾 `1fr` の余白でクリアを右寄せ） |
+
+レイアウトイメージ：
+
+```
+┌─ 検索カード ──────────────────────────────────────────────┐
+│  商品名                            価格                       │
+│  [部分一致で検索________________]  [最低]〜[最高]円         │
+│                                                              │
+│  発売日                       予約開始日                     │
+│  [____]〜[____]              [____]〜[____]                  │
+│                                                              │
+│  在庫                                                  [クリア]│
+│  [すべて][在庫あり][在庫なし]                                │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### 9-9-4. 実装方針
+
+- テンプレート：単段の `<div class="search-grid">` を **3 段の `<div>` に分割**（上段／中段／下段）。`<a-form layout="vertical">` と `<a-form-item>` のラベル位置はそのまま維持
+- CSS：`search-grid` クラスを撤去し、`search-row` ベースクラス + `search-row--basic` / `search-row--dates` / `search-row--status` の 3 行修飾子に置き換える
+- 768px 以下の狭い画面では 3 行とも 1 列に潰す（`grid-template-columns: 1fr`）
+- 帯域条件の `<a-input-group compact>` ラップ・`range-sep` / `range-unit` の小スタイルは現状維持
+- クリアボタンの右寄せ（`justify-self: end`）は下段にだけ適用
+
+#### 9-9-5. UI 変更まとめ（Console）
+
+`features/products/pages/ProductMarketList.vue`：
+- `<div class="search-grid">` を `<div class="search-row search-row--basic">` / `<div class="search-row search-row--dates">` / `<div class="search-row search-row--status">` の 3 段に分割
+- `<a-form-item label="商品名">` と `label="価格"` を上段に配置
+- `<a-form-item label="発売日">` と `label="予約開始日"` を中段に配置
+- `<a-form-item label="在庫">` と `label=" "（クリアボタン）` を下段に配置
+- `<style>` の `.search-grid` 規則を削除し、`.search-row` / `.search-row--basic` / `.search-row--dates` / `.search-row--status` を追加
+
+#### 9-9-6. DB 変更
+**なし**
+
+#### 9-9-7. API 変更
+**なし**
+
+#### 9-9-8. TDD テストケース
+
+レイアウト調整のため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- ウィンドウ幅 1920px / 1440px / 1200px のいずれでも、検索カード上段に「商品名」「価格」、中段に「発売日」「予約開始日」、下段に「在庫」「クリア」が表示される
+- 上段「商品名」入力欄が「価格」入力欄より約 2 倍の幅で表示される
+- 中段の「発売日」「予約開始日」が同じ幅で左右に並ぶ
+- 下段「クリア」ボタンが右端に表示される
+- ウィンドウ幅 768px 以下で 3 段とも各軸が縦 1 列に並ぶ
+- 帯域条件（価格・発売日・予約開始日）が `<a-input-group compact>` 内で `〜` セパレータと単位が分断されない
 
 ---
 
-# 技術検討事項
-- UIフレームワークの選定（Bootstrap / Tailwind / Vuetify / Chakra UI など）  
-- ダークモード対応の要否  
-- コンポーネント化による保守性向上  
-- Market の Amazon 風 UI をどこまで再現するか（完全模倣は避ける）  
-- スマホ最適化（特に Market はモバイル比率が高い想定）  
-- アクセシビリティ（色覚対応・キーボード操作対応）
+## Step 10：売上管理画面の UI 視認性・操作性改善 🟡 設計策定（2026-05-07）
+
+### 10-1. 背景・目的
+
+売上管理画面（`/sales`、`SalesList.vue`）は「一覧」「集計」の 2 タブ構成で Step 2 / Step 6-3 を経て検索条件と集計粒度切替が入ったが、商品マスタ・SKU管理・商品一覧（SKU集約版）画面と並べて見たとき、以下の **視認性・操作性のひずみ** がスクリーンショット観察と実装読解で確認できた。本ステップでは Step 7〜9 と同様、DB / API には手を入れず `SalesList.vue` 単体に閉じる。
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | `<a-page-header>` の `sub-title="Amazia Console"` がサイドバーのアプリ名と重複（Step 7・8 課題 A と同根） | タイトル横にノイズが出る |
+| B | 一覧タブの検索条件が **「予約を除外」チェック + 売上日帯 + クリア** だけで、商品名 / ユーザ名 / 配送ステータス / 決済方法 / 区分 などの絞り込みがない | 売上が積み上がると目的の行を探しづらい |
+| C | 検索行が `<a-card>` でラップされず、`<div>` に直書きで `flex` 配置されている | Step 6-1 以降の他画面（`<a-card>` ラップ）と表現が不統一で、検索エリアの視覚的境界が弱い |
+| D | テーブル数値列「数量」「金額（円）」が **左寄せ**（Step 7 課題 F / Step 9 課題 D と同根） | 桁比較しづらい |
+| E | ユーザ名列が「W A D A T E T S U Y A」のように **半角空白で分割表示** になっている | データ起因か CSS 起因か実装読解では切り分けできないが、視認性が悪い（見た目では空白挿入されているが `customerName` の元値次第） |
+| F | 「配送日」列が全行「—」（NULL）でも常に列幅を取り続ける | NULL 率の高い列が画面横幅を消費する |
+| G | 「決済方法」が `credit_card` の **生コード表示**（`SHIPPING_METHOD_LABELS` / `SHIPPING_STATUS_LABELS` のような日本語マップが決済方法には用意されていない） | 運用者向け画面なのに英語識別子のまま |
+| H | ページネーションが `pageSize: 50` 固定で、件数表示・サイズ切替なし（Step 7・8・9 課題と同根） | 全 N 件中の現在地が不明 |
+| I | 「区分」列が「通常／予約」のプレーンテキスト | `<a-tag>` 化されていないため視覚的識別が弱い |
+| J | ヘッダーから件数が分からない（フィルタ適用中の影響範囲が不明） | Step 7・8・9 と同様、件数表示が必要 |
+| K | 一覧タブの検索フォーム内「クリア」ボタンが `size="small"` で右端配置 | 他画面（Step 6-1 以降）の通常サイズ「クリア」と統一感がない |
+| L | 集計タブの「見込み表示中（予約含む）」トグルが **default ↔ primary でテキストも切り替わる** ボタン | 状態遷移が分かりにくく、初見で「いま含まれているのか除外されているのか」が読み取れない |
+| M | 集計タブの 4 カード（粒度別 / SKU別 / 決済方法別 / 区分別）の **数値列がすべて左寄せ** | 集計画面なのに桁比較できない |
+| N | テーブル全体が `max-width: 1200px` の親 `<div>` で縛られ、ウィンドウを広げても **横方向に余白が広がるだけで列幅は伸びない** | ワイドモニタで情報密度が下がる |
+
+### 10-2. スコープ
+
+| 観点 | 方針 |
+|------|------|
+| 対象画面 | `features/sales/pages/SalesList.vue` 単体 |
+| 対象外 | `salesApi.js` のレスポンス DTO 変更／集計ロジックのバックエンド移管 |
+| DB 変更 | **なし** |
+| API 変更 | **なし** |
+| バックエンド変更 | **なし**（決済方法ラベルマップは Console フロント内に持つ） |
+
+### 10-3. 改善方針
+
+#### 10-3-1. ヘッダー整理（課題 A・J・N）
+
+- `<a-page-header>` の `sub-title` を削除（Step 7-3-1 / Step 8-3-1 と同方針）
+- `<a-page-header>` 配下の `description` slot に件数表示（一覧タブ時のみ。集計タブ時は表示しない）
+- 親 `<div>` の `max-width: 1200px` を **削除**（課題 N）。テーブル幅をウィンドウ幅に追従させる
+  - 集計タブのカード 4 つは `<a-row :gutter="16">` の中で 2x2 配置されているので、ウィンドウが広がっても破綻しない
+
+#### 10-3-2. 一覧タブの検索カード新設（課題 B・C・K）
+
+`<div>` 直書きから **`<a-card>` ラップ** に変更し、検索条件を以下に拡張：
+
+| 条件 | 入力 UI | 比較ロジック |
+|------|--------|-------------|
+| 予約を除外 | `<a-checkbox>`（既存） | `s.preorder` を除外 |
+| 売上日（最早〜最遅） | `<a-date-picker>` × 2（既存） | 既存ロジック |
+| 商品名 | `<a-input allow-clear>`（**新設**） | `s.productName` 部分一致 |
+| ユーザ名 | `<a-input allow-clear>`（**新設**） | `s.customerName` 部分一致 |
+| 配送ステータス | `<a-select>`（**新設**、`SHIPPING_STATUS_LABELS` から選択肢生成） | `s.shippingStatusCode` 完全一致 |
+| 決済方法 | `<a-select>`（**新設**、`PAYMENT_METHOD_LABELS` から選択肢生成）※10-3-3 で定義 | `s.paymentMethodName` 完全一致 |
+| 区分 | `<a-radio-group>`（**新設**：すべて／通常のみ／予約のみ） | `s.preorder` 真偽 |
+| クリア | `<a-button>`（既存サイズ統一） | 全条件リセット |
+
+レイアウトは Step 9-3-2 と同じ `<a-form layout="vertical">` + CSS Grid（`minmax(200px, 1fr)`）で 4 列 / 3 列 / 2 列 / 1 列の自動折り返し。
+
+`filteredSalesForList` computed に上記 5 条件の AND 結合を追加する。
+
+#### 10-3-3. 決済方法の日本語マップ追加（課題 G）
+
+実装ファイル冒頭に追加：
+
+```js
+const PAYMENT_METHOD_LABELS = {
+  credit_card: 'クレジットカード',
+  convenience: 'コンビニ決済',
+  bank_transfer: '銀行振込',
+  // 既知の決済方法コードを列挙。未知のコードは生値を出す（fallback）
+};
+```
+
+`listColumns` の `paymentMethodName` の `customRender` で `PAYMENT_METHOD_LABELS[text] ?? text` で表示。
+
+決済方法のコード体系がバックエンド側で確定していない場合、未マップ値はそのまま生表示にフォールバックする（運用上の既存コードを壊さない）。
+
+#### 10-3-4. テーブル列の見直し（課題 D・F・I）
+
+| 列 | 変更点 |
+|----|-------|
+| 売上日 | 変更なし |
+| 配送日 | **NULL 率が高いため列幅 80px に縮小**（課題 F）。値ありのときのみ太字 |
+| ユーザ名 | 表示時に `s.customerName?.replace(/\s+/g, '')` でホワイトスペースを除去（課題 E のデータ起因対策。ただし正当なミドルネーム空白がある場合に備えて、空白除去前後で長さが半分以下になる場合のみ除去する保守的な実装にする） |
+| 商品名 | 変更なし |
+| 色 | 変更なし |
+| サイズ | 変更なし |
+| 数量 | `align: 'right'` 付与（課題 D） |
+| 金額（円） | `align: 'right'` 付与（課題 D） |
+| 配送方法 | 変更なし（既存ラベルマップ） |
+| 決済方法 | 日本語ラベル化（10-3-3） |
+| 配送ステータス | 変更なし（既存ラベルマップ） |
+| 区分 | **`<a-tag>` 化**：通常 → `<a-tag>通常</a-tag>`（無色）／予約 → `<a-tag color="orange">予約</a-tag>`（課題 I） |
+
+#### 10-3-5. ページネーション（課題 H）
+
+一覧タブのテーブル `:pagination` を Step 7-3-5 / Step 8-3-10 / Step 9-3-5 と同じ仕様に変更：
+
+```js
+pagination: {
+  pageSize: 50,
+  showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+  showSizeChanger: true,
+  pageSizeOptions: ['50', '100', '200'],
+}
+```
+
+売上は件数が多い画面なので、既定 50 / 上限 200 にしておく（他画面より粒度を粗く）。
+
+#### 10-3-6. 集計タブの「見込み表示」トグルの改善（課題 L）
+
+`<a-button>` の状態切替から **`<a-switch>` + ラベル** に変更：
+
+```vue
+<a-space align="center">
+  <a-switch v-model:checked="includePreorderInSummary" />
+  <span>予約購入を含む見込み値で表示</span>
+  <a-tooltip title="ON にすると予約購入分を集計に含めます。発売前商品の見込み売上を確認したいときに使用します。">
+    <InfoCircleOutlined style="color: #999" />
+  </a-tooltip>
+</a-space>
+```
+
+スイッチの ON / OFF で意味が直感的に分かり、ツールチップで運用上の使い所を説明する。
+
+#### 10-3-7. 集計タブの数値列右寄せ（課題 M）
+
+`summaryGranularityColumns` / `summarySkuColumns` / `summaryPaymentColumns` / `summaryPreorderColumns` のすべての数値列（件数 / 数量 / 売上）に `align: 'right'` を付与する。
+
+### 10-4. UI 変更まとめ（Console）
+
+`features/sales/pages/SalesList.vue`：
+
+- 親 `<div>` の `max-width: 1200px` を削除
+- `<a-page-header>` の `sub-title` 削除、`description` slot に件数表示（一覧タブ時のみ）
+- 一覧タブ：
+  - 検索行を `<a-card>` でラップし、`<a-form layout="vertical">` + CSS Grid 化
+  - 商品名 / ユーザ名 / 配送ステータス / 決済方法 / 区分 の 5 条件を新設
+  - `filteredSalesForList` に 5 条件の AND を追加
+  - 「クリア」ボタンサイズを通常に統一、全条件リセットに変更
+  - `listColumns`：数量・金額に `align: 'right'`、決済方法に日本語ラベル、区分を `<a-tag>` 化、ユーザ名のホワイトスペース保守的除去、配送日の列幅縮小
+  - `pagination` に `showTotal` / `showSizeChanger` 付与（既定 50、選択肢 50/100/200）
+- 集計タブ：
+  - 「見込み表示」トグルを `<a-switch>` + ラベル + ツールチップに変更
+  - 4 カードのテーブルすべての数値列に `align: 'right'`
+- スクリプト先頭に `PAYMENT_METHOD_LABELS` を追加
+
+### 10-5. DB 変更
+**なし**
+
+### 10-6. API 変更
+**なし**（決済方法ラベルは Console フロント内のマップで対応）
+
+### 10-7. TDD テストケース
+
+表示変更のため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- ヘッダーから "Amazia Console" のサブタイトルが消えている
+- 一覧タブで `<a-page-header>` の説明欄に「全 N 件中 M 件を表示」が出る
+- 集計タブに切り替えると件数表示は出ない
+- 一覧タブ：検索条件「商品名」「ユーザ名」「配送ステータス」「決済方法」「区分」「予約除外」「売上日帯」のすべてが AND で機能する
+- 一覧タブ：「クリア」ボタンで全条件が既定値にリセットされる
+- 一覧タブ：数量・金額の数値が右寄せで表示される
+- 一覧タブ：決済方法が `credit_card` ではなく「クレジットカード」と日本語表示される（未マップ値は生表示にフォールバック）
+- 一覧タブ：区分が「予約」のとき橙色のタグで表示される
+- 一覧タブ：ページネーションに「N-M / 全 K 件」が表示され、ページサイズ 50 / 100 / 200 を切り替えできる
+- 集計タブ：「予約購入を含む見込み値で表示」スイッチが ON のときだけ予約データが集計に含まれる
+- 集計タブ：4 カードすべての数値列が右寄せで表示される
+- ウィンドウ幅 1920px でテーブルが 1200px に縛られず横いっぱいに広がる
+
+### 10-8. 申し送り
+
+- 売上管理画面の検索条件追加（商品名 / ユーザ名 / 配送ステータス / 決済方法 / 区分）は Step 6-3 で見送られた軸の補完にあたる。Step 6-3 の検索条件が「売上日帯」のみだった経緯（クライアント側 computed の負荷／既定 pageSize 50 でカバー可能）を踏まえ、本ステップではあくまで **クライアント側 computed の範囲** に閉じる
+- `PAYMENT_METHOD_LABELS` のマップは Console フロント内の暫定対応。決済方法コード体系が Phase 17 以降で正式化される場合、Core API 側で日本語ラベルを返す方が望ましい（次フェーズ申し送り）
+- ユーザ名のホワイトスペース除去（課題 E 対策）は **画面表示時のみの保守的処理** で、データ自体は変更しない。根本原因（Backend / DB のいずれで空白が混入したか）の調査は本ステップのスコープ外とし、別途トラブルドキュメント化するか判断する
+- Step 7・8・9・10 で 4 画面分の同パターン（`<a-page-header>` description 件数 / `<a-form layout="vertical">` + Grid 検索 / `expand-row-by-click` 廃止 / `showTotal` ページネーション / 数値右寄せ）が揃ったため、**実装着手前に共通コンポーネント or composable 化の要否を最終判断する**（Step 8-8 / Step 9-8 の継続申し送り）
 
 ---
 
-# TDDテストケース  
-※UI改善フェーズのため、主に E2E / 表示確認系
+## Step 11：予約管理 / 配送管理 / 入荷管理画面の検索カード共通化と UI 改善 🟡 設計策定（2026-05-07）
 
-## Amazia Console / PHPUnit（または Dusk）
-- 一覧画面のレイアウトが崩れず表示される  
-- ボタン配置が統一されている  
-- フォームのバリデーション表示が正しく動作する  
+### 11-1. 背景・目的
 
-## Amazia Market / PHPUnit（または Dusk）
-- 商品一覧が正しいレイアウトで表示される  
-- カートアイコン・検索バーが正常に動作する  
-- 商品詳細ページのレイアウトが崩れない  
-- モバイル表示で UI が最適化されている  
+予約管理（`/preorders`、`PreorderList.vue`）／配送管理（`/delivery`、`DeliveryList.vue`）／入荷管理（`/inbound`、`InboundList.vue`）の 3 画面は、Step 6-4 / 6-5 / 6-6 で検索条件を導入した結果、**いずれも `<a-card>` + `<a-form layout="inline">` で多軸の `<a-form-item>` を横並びにする同型レイアウト** になった。3 画面を並べて見ると以下が明らかになった：
+
+1. **構造が完全に同型**：「カード枠／上段に幅広 1 軸（追跡番号 or 商品名）／下段に多軸 inline／末尾にクリアボタン」というレイアウトが 3 画面で繰り返されている（Preorder は上段なし、Delivery / Inbound は上段に追跡番号）
+2. **横並び `inline` の折り返しがウィンドウ幅で不安定**：軸数が多い（Preorder 4 軸 / Delivery 6 軸 / Inbound 5 軸）ため、1280px 程度のウィンドウで `<a-form-item>` の途中で折り返しが起き、ラベルとフィールドの対応が読み取りづらい
+3. **帯域条件（`〜` セパレータ）の分断**：Step 7 課題 J / Step 9 課題 B と同じ問題が 3 画面とも発生
+4. **同じ「クリア」「リセット」「`searchForm` ref」「`computed filtered*`」のボイラープレートが 3 画面に重複**
+
+ユーザー要望：「検索条件のレイアウトが特に直したい。3 画面で似ているので共通化できないか」を踏まえ、本ステップでは **検索カードの "枠" を共通化する `<SearchCard>` コンポーネントを新設** し、3 画面に同時適用する。中身（`<a-form-item>` の並び）は各画面が slot で書く方針（フィールド定義配列で完全自動化はしない）。
+
+加えて、Step 7・8・9・10 で蓄積した個別画面の改善観点（sub-title 削除、件数表示、数値右寄せ、`showTotal` ページネーション、`max-width` 撤去）を 3 画面にも横展開する。
+
+### 11-2. スコープ
+
+| 観点 | 方針 |
+|------|------|
+| 対象画面 | `PreorderList.vue` / `DeliveryList.vue` / `InboundList.vue` の 3 画面 |
+| 新設コンポーネント | `<SearchCard>`（カード枠 + Grid + クリアボタンのスロットコンテナ） |
+| 共通化の深さ | **「枠」だけ共通化**。中身の `<a-form-item>` は各画面が slot で書く（select / radio / 帯域などの自由度を保つため） |
+| `searchForm` / `filtered*` / `resetSearch` | **共通化しない**（軸の組み合わせとフィルタ判定が画面ごとに異なるため。`useSearchForm` composable 化も Step 11 では見送り） |
+| DB 変更 | **なし** |
+| API 変更 | **なし** |
+| バックエンド変更 | **なし** |
+
+### 11-3. `<SearchCard>` コンポーネント設計
+
+#### 11-3-1. 配置
+
+`amazia-console/resources/vue/src/components/SearchCard.vue` に新設（`features/` 配下のいずれか 1 つに偏らせない）。
+
+#### 11-3-2. インターフェース
+
+```vue
+<!-- props -->
+- :wide-field-label?: string   // 幅広 1 軸の見出し（例: "追跡番号"）
+- :wide-field-placeholder?: string
+
+<!-- emits -->
+- @clear         // クリアボタン押下
+- @update:wide-field-value  // 幅広 1 軸が指定されているときの v-model
+
+<!-- slots -->
+- default        // メインの <a-form-item> 群（Grid で並ぶ）
+- wide-field     // 幅広 1 軸を <a-input> 以外で表現したいとき用（任意）
+- extra          // クリアボタン以外の追加ボタン（任意）
+```
+
+#### 11-3-3. テンプレート骨子
+
+```vue
+<template>
+  <a-card size="small" class="search-card" :body-style="{ padding: '12px 16px' }">
+    <!-- 上段：幅広 1 軸（任意） -->
+    <div v-if="wideFieldLabel || $slots['wide-field']" class="search-card__wide-row">
+      <span class="search-card__wide-label">{{ wideFieldLabel }}</span>
+      <slot name="wide-field">
+        <a-input
+          :value="wideFieldValue"
+          :placeholder="wideFieldPlaceholder ?? '部分一致で検索'"
+          allow-clear
+          @update:value="$emit('update:wideFieldValue', $event)"
+        />
+      </slot>
+    </div>
+
+    <!-- 下段：メイン Grid -->
+    <div class="search-card__grid">
+      <slot />
+      <div class="search-card__actions">
+        <slot name="extra" />
+        <a-button @click="$emit('clear')">クリア</a-button>
+      </div>
+    </div>
+  </a-card>
+</template>
+
+<style scoped>
+.search-card { margin-bottom: 16px; }
+.search-card__wide-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.search-card__wide-label {
+  font-weight: 500;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.search-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  column-gap: 16px;
+  row-gap: 8px;
+  align-items: end;
+}
+.search-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  justify-self: end;
+}
+:deep(.ant-form-item) {
+  margin-bottom: 0;
+}
+</style>
+```
+
+#### 11-3-4. Grid の自動列数
+
+| ウィンドウ幅 | 列数（目安） |
+|------|------|
+| ~480px | 1 列 |
+| ~720px | 2 列 |
+| ~960px | 3 列 |
+| ~1200px | 4 列 |
+| ~1440px | 5 列 |
+| 1920px+ | 6 列〜 |
+
+`minmax(220px, 1fr)` により列数は CSS Grid 側が自動計算。各画面は軸数に関わらずレイアウトが破綻しない。
+
+#### 11-3-5. 帯域条件の書き方ガイド
+
+各画面の `<a-form-item>` 内で帯域条件を表現するときは、**`<a-input-group compact>` でラップして `〜` セパレータと単位を 1 セットに保つ**（Step 7-3-6 / Step 9-3-2 と同方針）：
+
+```vue
+<a-form-item label="価格">
+  <a-input-group compact>
+    <a-input-number ... placeholder="最低" />
+    <span class="range-sep">〜</span>
+    <a-input-number ... placeholder="最高" />
+    <span class="range-unit">円</span>
+  </a-input-group>
+</a-form-item>
+```
+
+`.range-sep` / `.range-unit` の小スタイルは `<SearchCard>` コンポーネントで `:deep()` で当てて統一する。
+
+### 11-4. 各画面の改善方針
+
+#### 11-4-1. 予約管理画面（`PreorderList.vue`）
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | `sub-title="Amazia Console"` 重複（Step 7・8・10 課題 A と同根） | タイトル横にノイズ |
+| B | `<a-form layout="inline">` で 4 軸が密集、特に帯域条件 3 つ（価格 / 発売日 / 予約開始日）の `〜` 分断（Step 9 課題 B と同根） | 折り返し時にレンジが読み取りづらい |
+| C | 親 `<div>` の `max-width: 1200px` でワイドモニタで余白が広がるだけ（Step 10 課題 N と同根） | 情報密度が下がる |
+| D | テーブル「予約数」「予約金額（円）」が左寄せ（Step 7 課題 F / Step 10 課題 D と同根） | 桁比較しづらい |
+| E | ページネーション `pageSize: 50` 固定で件数表示・サイズ切替なし | 件数規模の把握ができない |
+| F | 件数表示なし（フィルタ適用中の影響範囲が不明） | 他画面と同根 |
+| G | 「予約受付」「Market 公開」が `<a-tag>` で表現されているが、意味が直交（受付状態 / 公開状態）するのに視覚的グルーピングがない | 列の役割が読み解きづらい（Step 9 課題 J と同根） |
+
+改善内容：
+
+- `<a-page-header>` の `sub-title` 削除、`description` slot に件数表示
+- 親 `<div>` の `max-width: 1200px` 削除
+- 検索カードを **`<SearchCard>` に置換**（幅広 1 軸は使わず、4 軸すべてを default slot 内に並べる）
+- 価格 / 発売日 / 予約開始日 の帯域条件を `<a-input-group compact>` でラップ
+- `columns`：「予約数」「予約金額（円）」に `align: 'right'`
+- `pagination` を `showTotal` / `showSizeChanger` 付きに変更（既定 50、選択肢 50/100/200）
+
+#### 11-4-2. 配送管理画面（`DeliveryList.vue`）
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | `sub-title="Amazia Console"` 重複 | タイトル横にノイズ |
+| B | 検索カードの上段「追跡番号」幅広 1 軸 + 下段 inline 6 軸の構造が ad-hoc（手書き flex + 手書き inline） | レイアウトが手で作り込まれていて統一感がない |
+| C | 帯域条件 3 つ（配送予定日 / 発送日 / 配達完了日）の `〜` 分断 | 折り返し時にレンジが読み取りづらい |
+| D | 親 `<div>` の `max-width: 1400px` でワイドモニタで余白が広がるだけ | 情報密度が下がる |
+| E | データ 0 件のとき `No data` が英語表示（`<a-table>` の `:locale`未設定） | 日本語 UI なのに空状態だけ英語 |
+| F | テーブル「ID」「売上ID」が左寄せ数値 | 桁比較しづらい |
+| G | ページネーション固定（既定 50、サイズ切替なし） | 件数規模の把握ができない |
+| H | 件数表示なし | 他画面と同根 |
+
+改善内容：
+
+- `<a-page-header>` の `sub-title` 削除、`description` slot に件数表示
+- 親 `<div>` の `max-width: 1400px` 削除
+- 検索カードを **`<SearchCard wide-field-label="追跡番号" v-model:wide-field-value="searchForm.trackingCode">` に置換**。下段の 6 軸は default slot 内に並べる
+- 配送予定日 / 発送日 / 配達完了日 の帯域条件を `<a-input-group compact>` でラップ
+- `<a-table>` に `:locale="{ emptyText: '該当データがありません' }"` を付与
+- `columns`：「ID」「売上ID」に `align: 'right'`
+- `pagination` を `showTotal` / `showSizeChanger` 付きに変更
+
+#### 11-4-3. 入荷管理画面（`InboundList.vue`）
+
+観察された主な課題：
+
+| # | 課題 | 影響 |
+|---|------|------|
+| A | `sub-title="Amazia Console"` 重複 | タイトル横にノイズ |
+| B | 検索カードの上段「追跡番号」幅広 1 軸 + 下段 inline 5 軸の構造が ad-hoc（Delivery と同じ手書き構造） | レイアウトが手で作り込まれていて統一感がない |
+| C | 帯域条件 2 つ（入荷数量 / 入荷日）の `〜` 分断 | 折り返し時にレンジが読み取りづらい |
+| D | 親 `<div>` の `max-width: 1300px` でワイドモニタで余白が広がるだけ | 情報密度が下がる |
+| E | データ 0 件のとき `No data` 英語表示 | 日本語 UI なのに空状態だけ英語 |
+| F | テーブル「ID」「商品ID」「倉庫ID」「入荷数量」が左寄せ | 桁比較しづらい |
+| G | ページネーション固定 | 件数規模の把握ができない |
+| H | 件数表示なし | 他画面と同根 |
+| I | ヘッダー右の「Excel一括入荷」「入荷登録」ボタンは現状維持で良い（主要 CTA として機能している） | — |
+
+改善内容：
+
+- `<a-page-header>` の `sub-title` 削除、`description` slot に件数表示（`#extra` のボタン群はそのまま維持）
+- 親 `<div>` の `max-width: 1300px` 削除
+- 検索カードを **`<SearchCard wide-field-label="追跡番号" v-model:wide-field-value="searchForm.trackingCode">` に置換**
+- 入荷数量 / 入荷日 の帯域条件を `<a-input-group compact>` でラップ
+- `<a-table>` に `:locale="{ emptyText: '該当データがありません' }"` を付与
+- `columns`：「ID」「商品ID」「倉庫ID」「入荷数量」に `align: 'right'`
+- `pagination` を `showTotal` / `showSizeChanger` 付きに変更
+
+### 11-5. UI 変更まとめ（Console）
+
+新規ファイル：
+
+- `amazia-console/resources/vue/src/components/SearchCard.vue` を新設
+
+`features/preorder/pages/PreorderList.vue`：
+- `<a-page-header>` の `sub-title` 削除、`description` に件数
+- 親 `<div>` の `max-width` 削除
+- 検索カードを `<SearchCard>` に置換
+- 帯域条件を `<a-input-group compact>` ラップ
+- 「予約数」「予約金額（円）」を `align: 'right'`
+- ページネーションに `showTotal` / `showSizeChanger`
+
+`features/delivery/pages/DeliveryList.vue`：
+- `<a-page-header>` の `sub-title` 削除、`description` に件数
+- 親 `<div>` の `max-width` 削除
+- 検索カードを `<SearchCard wide-field-label="追跡番号">` に置換
+- 帯域条件 3 つを `<a-input-group compact>` ラップ
+- `<a-table>` に `:locale` で空状態日本語化
+- 数値列を `align: 'right'`
+- ページネーションに `showTotal` / `showSizeChanger`
+
+`features/inbound/pages/InboundList.vue`：
+- `<a-page-header>` の `sub-title` 削除、`description` に件数（`#extra` ボタンは維持）
+- 親 `<div>` の `max-width` 削除
+- 検索カードを `<SearchCard wide-field-label="追跡番号">` に置換
+- 帯域条件 2 つを `<a-input-group compact>` ラップ
+- `<a-table>` に `:locale` で空状態日本語化
+- 数値列を `align: 'right'`
+- ページネーションに `showTotal` / `showSizeChanger`
+
+### 11-6. DB 変更
+**なし**
+
+### 11-7. API 変更
+**なし**
+
+### 11-8. TDD テストケース
+
+表示変更のため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+#### 共通
+
+- `<SearchCard>` のグリッドがウィンドウ幅 1920px → 6 列前後、1280px → 4〜5 列、768px → 2 列で自動的に折り返す
+- 「クリア」ボタン押下で `@clear` が emit され、各画面の `resetSearch()` が走り全条件が既定値に戻る
+- 帯域条件（価格 / 入荷数量 / 各種日付）が `<a-input-group compact>` 内に保たれ、折り返し時も `〜` と単位が分断されない
+
+#### 予約管理（PreorderList）
+
+- ヘッダーから "Amazia Console" のサブタイトルが消えている
+- ヘッダーに「全 N 件中 M 件を表示」が出る／フィルタ適用中は「（フィルタ適用中）」が併記される
+- 「予約数」「予約金額（円）」の数値が右寄せで表示される
+- ページネーションに「N-M / 全 K 件」が表示され、ページサイズを 50 / 100 / 200 に切り替えできる
+- ウィンドウ幅 1920px でテーブルが 1200px に縛られず横いっぱいに広がる
+
+#### 配送管理（DeliveryList）
+
+- ヘッダーから "Amazia Console" のサブタイトルが消えている
+- ヘッダーに件数表示が出る
+- 検索カード上段に「追跡番号」幅広入力が表示される
+- データ 0 件のとき「該当データがありません」と日本語表示される
+- 「ID」「売上ID」の数値が右寄せで表示される
+- ページネーションに「N-M / 全 K 件」が表示され、ページサイズ切替できる
+- ウィンドウ幅 1920px でテーブルが 1400px に縛られず横いっぱいに広がる
+
+#### 入荷管理（InboundList）
+
+- ヘッダーから "Amazia Console" のサブタイトルが消えている
+- ヘッダー右側に「Excel一括入荷」「入荷登録」ボタンが維持されている
+- ヘッダーに件数表示が出る
+- 検索カード上段に「追跡番号」幅広入力が表示される
+- データ 0 件のとき「該当データがありません」と日本語表示される
+- 「ID」「商品ID」「倉庫ID」「入荷数量」の数値が右寄せで表示される
+- ページネーションに「N-M / 全 K 件」が表示され、ページサイズ切替できる
+
+### 11-9. 申し送り
+
+- **共通化の深さは「枠だけ」に留めた**。`searchForm` ref / `computed filtered*` / `resetSearch()` のボイラープレートは画面ごとに残るが、軸の組み合わせとフィルタ判定が画面ごとに異なるため、フィールド定義配列で完全自動化する設計（`<SearchForm :fields="...">`）は本ステップでは採用しない
+- `useSearchForm` composable（フィールド定義から `searchForm` ref / `resetSearch` / `filteredFn` を組み立てる）への発展余地はあるが、現時点で 3 画面すべてに型安全に当てはめるには軸タイプが多く（テキスト / 数値完全一致 / 数値帯域 / 日付帯域 / select / radio）、composable 化のメリットがコード削減量に見合わない
+- 将来 4 画面目以降が同型レイアウトを必要としたタイミング（次フェーズ以降）で、composable 化を再判断する
+- 商品マスタ画面（Step 7）／商品一覧 SKU 集約版画面（Step 9 + 9-9）／売上管理画面（Step 10）も検索カードを持つが、本ステップでは **既に Step 7 / 9 で `<a-form layout="vertical">` + 個別 Grid CSS の方針を採った** ため、`<SearchCard>` への置換は行わない（既存方針を上書きせず、3 画面の整合性を優先）。なお、SKU 集約版画面は Step 9-9 で 2 段構造（商品マスタと同形）から 3 段構造へ整列を取り直しているが、これも個別 Grid CSS の範囲内の調整であり、本ステップの方針と矛盾しない。次フェーズで全画面横展開のタイミングで一括置換する余地は残す
+- `<a-table>` の `:locale="{ emptyText: '該当データがありません' }"` は Delivery / Inbound 以外の画面（一覧系全般）にも適用余地あり。本ステップでは 3 画面に閉じ、横展開は次フェーズ以降で判断する
+

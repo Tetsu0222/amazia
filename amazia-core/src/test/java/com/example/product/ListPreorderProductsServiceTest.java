@@ -185,10 +185,13 @@ class ListPreorderProductsServiceTest {
     }
 
     private Long createSku(Long productId) {
+        // ProductSku は (product_id, color, size) UNIQUE 制約を持つため、
+        // 同一 product に複数 SKU を作るテスト（min/max 価格集計など）で衝突しないよう color を一意化する。
+        String suffix = String.valueOf(System.nanoTime());
         ProductSku sku = new ProductSku();
         sku.setProductId(productId);
-        sku.setSkuCode("SKU-" + System.nanoTime());
-        sku.setColor("赤");
+        sku.setSkuCode("SKU-" + suffix);
+        sku.setColor("赤-" + suffix);
         sku.setSize("M");
         sku.setStatus("ACTIVE");
         return skuRepository.save(sku).getId();

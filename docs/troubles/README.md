@@ -60,6 +60,7 @@
 | 047 | [Console 商品マスタの削除確認ポップアップのレイアウト崩れ](047_console_product_delete_popconfirm_layout_broken.md) | 商品一覧の行「削除」押下時、`a-popconfirm` の中身が縦積み・タイトル左はみ出しで崩れる。画面右端列で `placement` 未指定（デフォルト `top`）が画面外押し出され、加えて `@click.stop` を Popconfirm 自体に付けていてイベント伝播停止が効いていなかった。`placement="topRight"` 指定とボタン側への `@click.stop` 移動で解消 | ✅ 解決済 | - | - |
 | 048 | [CD ヘルスチェックの SQL シングルクォートが `sh -c '<INNER>'` を閉じて `Unknown column 'amazia'` で失敗](048_cd_healthcheck_sql_quote_break_inside_sh_c.md) | 046 修正で `sh -c '<INNER>'` 方式に切り替えたが、INNER に埋め込んだ SQL 本文中の `'amazia'` `IN ('users','products',...)` のシングルクォートが外側を閉じてしまい、ホスト bash で `WHERE table_schema=amazia` に劣化して MySQL が `Unknown column 'amazia'` を返す。SQL 中の `'` を `'\''` にエスケープしてから INNER に埋め込む方式（bash パラメータ展開）に修正。**046 が「`$VAR` だけ守った点の対症療法」になっており、`sh -c '<INNER>'` クラス全体の不変条件を整理しなかったための同型再発**。同ドキュメントに派生節として `tr -d '[:space:]'` が `\n` まで削って `EXPECTED_COUNT=1` 誤検知になっていた件も併記（メタ評価対象） | ✅ 解決済 | - | - |
 | 049 | [password_histories テーブルが schema.sql 未記載のまま本番に存在せず（044・045 同型・phaseX-6 で事前検知）](049_password_histories_table_missing_in_schema_sql.md) | 046・048 が解消されて phaseX-6 ヘルスチェックが本来の役割で初動した瞬間、`password_histories` テーブルが本番 MySQL に存在しないことを検知。DDL は Flyway 名残ファイル `V1__create_auth_tables.sql` にしか無く、schema.sql には未記載のまま運用に入っていた（設計書では「要検討事項」と既知扱い）。schema.sql に CREATE TABLE IF NOT EXISTS を追加（FK 列を BIGINT UNSIGNED に揃え）。**044・045 と同じ schema.sql ドリフト系統だが、本件は phaseX-6 ヘルスチェックの初の「事前検知」事例**（メタ評価対象） | ✅ 解決済 | - | - |
+| 050 | [テストヘルパーのハードコードで `@UniqueConstraint(product_id, color, size)` に衝突し CI 全滅（H2 ドリフト系統の "逆向き" 顕在化）](050_h2_unique_constraint_test_helper_collision.md) | `ListPreorderProductsServiceTest` の `createSku` が `color="赤"` `size="M"` をハードコードしたまま同一 product に対して 3 回呼ばれる新規テストを追加。`skuCode` のみ `nanoTime` で一意化していたが UNIQUE 制約は `(product_id, color, size)` にかかっており 2 件目で H2 が UNIQUE 違反を返して CI 全滅。`color` を `nanoTime` で一意化して解消。**027/037/038/044/045/049 と同じ H2/本番 MySQL 乖離系統だが本件は方向が逆（H2 が Entity の `@UniqueConstraint` を忠実に DDL 化するから落ちる）**。二次リスクとして `product_skus` の `CREATE TABLE` が schema.sql に未記載（049 同型）の課題を次フェーズに送り（メタ評価対象） | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 
@@ -74,6 +75,8 @@
 | 中 | クロスサービス回帰テスト（Console 状態遷移 → Market 読み出しの往復）の観点を `test_insights.md` に追記 | 043 | ⬜ 未対応 |
 | 中 | Spring 発行 JWT を Console PHPUnit でフィクスチャ検証する E2E 寄りテスト導入。`JWT_SECRET` 64バイト以上を `setup.md` に明記 | 032 | ⬜ 未対応 |
 | 中 | フロントの Vitest モックデータを Core DTO の実 JSON 形式に揃える運用（getter 名から外挿しない） | 035・039・040 | ⬜ 未対応 |
+| 中 | `product_skus` の `CREATE TABLE` を schema.sql に追記（049 同型の二次リスク。phaseX-6 の本番 mysqldump スナップショットと突合して移植） | 050 | ⬜ 未対応（次フェーズ送り） |
+| 中 | `@UniqueConstraint` を持つ Entity のテストヘルパーは制約カラムを毎回ユニーク化／引数化する規律を `test_insights.md` カテゴリ7-2 に追記済（横展開時にレビュー観点として参照） | 050 | ✅ 050 修正時に対応（`test_insights.md` カテゴリ7-2「`@UniqueConstraint` を持つ Entity のテストヘルパー設計」） |
 | 中 | URL クエリ・ナビゲーション state 経由の画面遷移は遷移先画面でも単体テストで「クエリ解釈」を検証する観点を `test_insights.md` の「画面間契約テスト」項目に追加 | 039 | ⬜ 未対応 |
 | 中 | UI ライブラリのメジャーバージョンアップ手順（Migration Guide 確認 → 旧構文 grep → ブラウザ Console 警告目視）を `docs/ai_context/` に整備 | 036 | ⬜ 未対応 |
 | 中 | 設計書「前提」セクションに **裏付け参照ファイル** を必須項目として明記する規約を CLAUDE.md に追加検討 | 037 | ⬜ 未対応 |
