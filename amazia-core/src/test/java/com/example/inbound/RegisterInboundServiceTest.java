@@ -118,6 +118,21 @@ class RegisterInboundServiceTest {
     }
 
     @Test
+    void inboundedAt未指定なら本日付が自動セットされる() {
+        // phase16 Step3.1：未来日入荷防止のため、リクエストに inboundedAt を含めない場合は
+        // Service 側で LocalDate.now() を強制セットする。
+        RegisterInboundRequest req = new RegisterInboundRequest();
+        req.setProductId(productId);
+        req.setSkuId(skuId);
+        req.setQuantity(3);
+        // inboundedAt をあえてセットしない
+
+        Inbound saved = service.register(req, actorUserId);
+
+        assertEquals(LocalDate.now(), saved.getInboundedAt());
+    }
+
+    @Test
     void warehouse_idはリクエストに含まれず_default_warehouse_id_が自動セットされる() {
         // RegisterInboundRequest は warehouseId フィールドを持たない設計（RRRR-5）。
         // 登録結果が config('amazia.delivery.default-warehouse-id') に一致することを確認。

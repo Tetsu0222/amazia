@@ -7,7 +7,7 @@
     />
 
     <a-alert
-      message="商品とSKUを選択し、入荷数量と入荷日を入力してください。倉庫は自動でデフォルトが設定されます。"
+      message="商品とSKUを選択し、入荷数量を入力してください。入荷日は登録時の本日付で記録されます。倉庫は自動でデフォルトが設定されます。"
       type="info"
       show-icon
       style="margin-bottom: 12px"
@@ -49,13 +49,6 @@
           style="width: 100%"
         />
       </a-form-item>
-      <a-form-item label="入荷日" required>
-        <a-date-picker
-          v-model:value="form.inboundedAt"
-          value-format="YYYY-MM-DD"
-          style="width: 100%"
-        />
-      </a-form-item>
       <a-form-item label="仕入先ID（任意）">
         <a-input-number
           v-model:value="form.supplierId"
@@ -93,7 +86,6 @@ const form = reactive({
   productId: null,
   skuId: null,
   quantity: 1,
-  inboundedAt: null,
   supplierId: null,
 });
 
@@ -128,7 +120,7 @@ function filterProductOption(input, option) {
 }
 
 async function onSubmit() {
-  if (!form.productId || !form.skuId || !form.quantity || !form.inboundedAt) {
+  if (!form.productId || !form.skuId || !form.quantity) {
     message.warning('必須項目を入力してください');
     return;
   }
@@ -138,7 +130,6 @@ async function onSubmit() {
       productId: form.productId,
       skuId: form.skuId,
       quantity: form.quantity,
-      inboundedAt: form.inboundedAt,
     };
     if (form.supplierId) {
       payload.supplierId = form.supplierId;

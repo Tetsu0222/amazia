@@ -937,6 +937,6 @@ PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_a
 | コントローラー | `App\Inbound\Controller\RegisterInboundController` |
 | 中継先 | Core `POST /api/inbounds` |
 
-リクエストボディ：`{ productId, skuId, quantity, inboundedAt, supplierId? }`。
+リクエストボディ：`{ productId, skuId, quantity, inboundedAt?, supplierId? }`。phase16 Step3.1 以降は `inboundedAt` を任意項目化（未指定時は Core 側で本日付を強制セット）。
 
 **RRRR-5**: `warehouseId` がリクエストに含まれていても Console Service が **明示的に剥がす**（`unset($payload['warehouseId'], $payload['warehouse_id'])`）。Core 側でデフォルト倉庫（id=1）を自動セット。

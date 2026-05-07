@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+
 /**
  * 入荷登録 Service（フェーズ15 r5 / P5-5 / R-3）。
  *
@@ -92,12 +94,16 @@ public class RegisterInboundService {
         }
 
         // 2. inbounds INSERT（warehouse_id は config 値を自動セット / RRRR-5）
+        // phase16 Step3.1：inboundedAt 未指定なら本日付を強制。未来日入荷（入荷予定）は別画面（Step:X）で扱う。
+        LocalDate inboundedAt = request.getInboundedAt() != null
+                ? request.getInboundedAt()
+                : LocalDate.now();
         Inbound inbound = new Inbound();
         inbound.setProductId(request.getProductId());
         inbound.setWarehouseId(defaultWarehouseId);
         inbound.setSupplierId(request.getSupplierId());
         inbound.setQuantity(request.getQuantity());
-        inbound.setInboundedAt(request.getInboundedAt());
+        inbound.setInboundedAt(inboundedAt);
         Inbound saved = inboundRepository.saveAndFlush(inbound);
 
         // 3. SKU 在庫加算（既存 Service を再利用）

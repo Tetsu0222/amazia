@@ -105,6 +105,29 @@ class InboundProxyTest extends TestCase
         });
     }
 
+    public function test_inboundedAtを省略してもCoreに転送される(): void
+    {
+        // phase16 Step3.1：入荷登録画面から日付欄を撤去したため、inboundedAt 未指定でも 422 を返さない。
+        Http::fake([
+            "{$this->baseUrl}/inbounds" => Http::response([
+                'id' => 1, 'productId' => 100, 'quantity' => 5, 'warehouseId' => 1,
+            ], 201),
+        ]);
+
+        $this->withHeaders($this->authHeaders('admin'))
+             ->postJson('/api/inbounds', [
+                 'productId' => 100,
+                 'skuId'     => 200,
+                 'quantity'  => 5,
+             ])
+             ->assertStatus(201);
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+            return !array_key_exists('inboundedAt', $body);
+        });
+    }
+
     public function test_quantityが0以下で422が返る(): void
     {
         $this->withHeaders($this->authHeaders('admin'))

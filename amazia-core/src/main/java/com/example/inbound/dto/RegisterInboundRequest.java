@@ -30,7 +30,10 @@ public class RegisterInboundRequest {
     /** 仕入先 ID。マスタ未整備のため任意（将来 phaseX で活用） */
     private Long supplierId;
 
-    @NotNull
+    /**
+     * 入荷日。phase16 Step3.1 以降は任意項目。null の場合は Service 側で本日付を自動セットする。
+     * 未来日入荷（入荷予定）は別画面（Step:X）で扱うため、本登録 API は当日入荷のみを想定する。
+     */
     private LocalDate inboundedAt;
 
     public Long getProductId() { return productId; }

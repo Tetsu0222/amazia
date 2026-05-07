@@ -103,6 +103,24 @@ class RegisterInboundControllerTest {
     }
 
     @Test
+    void inboundedAtを省略しても201を返し本日付で登録される() throws Exception {
+        // phase16 Step3.1：inboundedAt は任意。未指定時は Service が本日付を強制セット。
+        Map<String, Object> body = new HashMap<>();
+        body.put("productId", productId);
+        body.put("skuId", skuId);
+        body.put("quantity", 2);
+        // inboundedAt を含めない
+
+        mockMvc.perform(post("/api/inbounds")
+                        .header("X-User-Id", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.inboundedAt").value(LocalDate.now().toString()));
+    }
+
+    @Test
     void quantityが0以下で422を返す() throws Exception {
         Map<String, Object> body = new HashMap<>();
         body.put("productId", productId);

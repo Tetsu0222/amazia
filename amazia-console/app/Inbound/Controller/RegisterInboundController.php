@@ -29,11 +29,12 @@ class RegisterInboundController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        // phase16 Step3.1：inboundedAt は任意化。未指定時は Core 側で本日付を強制セットする。
         $validated = $request->validate([
             'productId'   => 'required|integer|min:1',
             'skuId'       => 'required|integer|min:1',
             'quantity'    => 'required|integer|min:1',
-            'inboundedAt' => 'required|date',
+            'inboundedAt' => 'nullable|date',
             'supplierId'  => 'nullable|integer|min:1',
         ]);
 
