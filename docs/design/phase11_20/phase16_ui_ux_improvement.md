@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 / Step 5 / Step 6-1 実装完了・2026-05-07）
+🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 / Step 5 / Step 6-1 / Step 6-2 / Step 6-3 実装完了・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -779,6 +779,162 @@ SKU 行の「選択」ボタンで開く。
 - 在庫「在庫なし」で `totalStock <= 0` の商品だけ残る
 - 「有効のみ」+ 検索条件の組み合わせで AND になる
 - 「クリア」ボタンで検索 3 条件がリセットされ、有効/無効フィルタは維持される
+
+---
+
+## Step 6-2：商品一覧（SKU 集約版）画面の検索条件 ✅ 実装完了（2026-05-07）
+
+### 6-2-1. 背景・目的
+
+商品一覧（SKU 集約版）画面（`/products/market-view`、`ProductMarketList.vue`）は Market 公開データの確認用画面で、現状は検索条件を一切持たず、商品数が増えるとスクロールでしか目的の商品に辿り着けない。
+
+Step 1.5 でこの画面に「ステータス（発売前 / 発売中）」「予約開始日」「発売日」列が追加され、Step 6-1 で商品マスタ画面に検索条件を導入した流れを踏まえ、Market 公開データ確認用途で頻用する以下の検索軸を追加する：
+
+- 商品名（部分一致）
+- 価格（最低〜最高の帯域検索）
+- 発売日（最早〜最遅の帯域検索）
+- 予約開始日（最早〜最遅の帯域検索）
+- 在庫有無（在庫あり／在庫なし）
+
+### 6-2-2. 設計方針
+
+| 観点 | 方針 |
+|------|------|
+| フィルタ実装位置 | **クライアント側（`ProductMarketList.vue` の `computed`）で完結**（Step 6-1 と同じ判断軸） |
+| API / DB 変更 | **なし**（既存 `GET /api/products/market` の `ProductMarketSummary` DTO に `productName` / `minPrice` / `maxPrice` / `totalStock` / `releaseDate` / `preorderStartDate` が揃っているため、サーバ側変更は不要） |
+| 検索 UI 配置 | `<a-page-header>` 直下に `<a-card>` で 1 行のフォーム枠を新設し、その中に inline フォームで 5 条件 + クリアボタンを配置 |
+| 「クリア」操作 | `resetSearch()` で 5 条件全てをリセット |
+| 日付帯域の比較基準 | `releaseDate` / `preorderStartDate` は `YYYY-MM-DD` 文字列のため、`<a-date-picker value-format="YYYY-MM-DD">` の出力と文字列比較で帯域判定する（時刻成分なし） |
+
+理由：
+- 規約 5（Vue）に従い表示専用ロジックはコンポーネント内に閉じる
+- Step 6-1 と同じ判断軸（件数規模ではクライアント側で十分）
+- 日付の文字列比較は `YYYY-MM-DD` 形式が辞書順 = 時系列順となる性質を利用（`Date` 変換不要）
+
+### 6-2-3. 検索仕様
+
+| 条件 | 入力 UI | 比較ロジック |
+|------|--------|-------------|
+| 商品名 | `<a-input allow-clear>` | `record.productName` を小文字化して `includes()` 部分一致 |
+| 価格（最低） | `<a-input-number min=0 step=100>` | `record.maxPrice >= minPrice`（`maxPrice` が null の商品は除外） |
+| 価格（最高） | `<a-input-number min=0 step=100>` | `record.minPrice <= maxPrice`（`minPrice` が null の商品は除外） |
+| 発売日（最早） | `<a-date-picker value-format="YYYY-MM-DD">` | `record.releaseDate >= releaseDateFrom`（`releaseDate` が null の商品は除外） |
+| 発売日（最遅） | 同上 | `record.releaseDate <= releaseDateTo`（同上） |
+| 予約開始日（最早） | 同上 | `record.preorderStartDate >= preorderStartDateFrom`（`preorderStartDate` が null の商品は除外） |
+| 予約開始日（最遅） | 同上 | `record.preorderStartDate <= preorderStartDateTo`（同上） |
+| 在庫 `すべて` | `<a-radio-button>` | フィルタなし |
+| 在庫 `在庫あり` | 同上 | `record.totalStock > 0` |
+| 在庫 `在庫なし` | 同上 | `record.totalStock <= 0`（Step 6-1 と同じく「ゼロ含む在庫切れ」として扱う） |
+
+価格・発売日・予約開始日の帯域は **「商品の値幅と検索範囲が重なるか／値が範囲内に入るか」** で判定する。
+- 価格は SKU 価格幅（`minPrice` 〜 `maxPrice`）と検索範囲のオーバーラップ判定（Step 6-1 と同じ）
+- 発売日 / 予約開始日は商品単位の単一値のため、範囲内に入るかの単純判定
+- 値未設定（null）の商品は、該当条件を 1 つでも入れた時点で除外される
+
+### 6-2-4. UI 変更（Console）
+
+`features/products/pages/ProductMarketList.vue`：
+- `<a-page-header>` 直下に `<a-card>` を追加し、`<a-form layout="inline">` で「商品名 / 価格（最低〜最高）/ 発売日（最早〜最遅）/ 予約開始日（最早〜最遅）/ 在庫（ラジオ）/ クリア」を配置
+- `searchForm = { name, minPrice, maxPrice, releaseDateFrom, releaseDateTo, preorderStartDateFrom, preorderStartDateTo, stockFilter }` を ref で保持
+- `filteredProducts` computed を新設し、`<a-table :data-source>` を `products` から `filteredProducts` に切り替える
+
+### 6-2-5. DB 変更
+**なし**
+
+### 6-2-6. API 変更
+**なし**（`GET /api/products/market` をそのまま流用）
+
+### 6-2-7. TDD テストケース
+
+表示変更のみのため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- 商品名に部分一致するキーワードを入れると一覧が絞られる
+- 価格 最低・最高で帯域がオーバーラップする商品だけ残る
+- 発売日 最早・最遅で `releaseDate` が範囲内の商品だけ残る
+- 予約開始日 最早・最遅で `preorderStartDate` が範囲内の商品だけ残る
+- 在庫「在庫あり」で `totalStock > 0` の商品だけ残る
+- 在庫「在庫なし」で `totalStock <= 0` の商品だけ残る
+- 複数条件を組み合わせた場合 AND になる
+- 「クリア」ボタンで全検索条件がリセットされる
+
+---
+
+## Step 6-3：売上管理画面の日付帯域検索と集計粒度切替 ✅ 実装完了（2026-05-07）
+
+### 6-3-1. 背景・目的
+
+売上管理画面（`/sales`、`SalesList.vue`）は phase14〜16 Step 2 を経て「予約除外フィルタ」「見込み表示トグル」が揃ったが、**期間で絞る／集計粒度を切り替える** 機能がない：
+
+- 一覧タブは全期間が時系列で並ぶだけで、「先月分だけ見たい」が一覧では難しい
+- 集計タブの「月別売上」カードは粒度が月固定で、「日別の動きを見たい」「年別で大局を掴みたい」に応えられない
+
+設計書（次タスク.txt）の指示は「日単位、月単位、年単位でボタン切り替えか検索条件に設定（工数が少ない方で）」。本ステップでは：
+
+- **一覧タブ**：売上日の帯域検索（from-to）を追加
+- **集計タブ**：「月別売上」カードを日別／月別／年別の粒度切替対応に拡張（既定：月別）
+
+の 2 軸で対応する。
+
+### 6-3-2. 設計方針
+
+| 観点 | 方針 |
+|------|------|
+| フィルタ実装位置 | **クライアント側（`SalesList.vue` の `computed`）で完結**（Step 2-5-3 / Step 6-1 / Step 6-2 と同じ判断軸） |
+| API / DB 変更 | **なし**（既存 `GET /api/sales` の `salesDate`（`YYYY-MM-DD`）を流用） |
+| 一覧タブ UI | 既存の「予約を除外」チェックボックスと同じ行に `<a-date-picker>` 2 つで売上日の帯域を配置 |
+| 集計タブ UI | 「月別売上」カードのタイトル右側に `<a-radio-group>` で「日 / 月 / 年」切替。既定は「月」 |
+| 粒度切替の影響範囲 | 「月別売上」カードのみに適用。SKU別／決済方法別／購入区分別カードは粒度の概念がないためそのまま（運用上の文脈が違う） |
+| 列タイトルの動的化 | 粒度に応じてカードタイトルとカラム名を「日別売上 / 日付」「月別売上 / 年月」「年別売上 / 年」に切替 |
+
+理由：
+- 一覧の期間絞り込みは「特定の月だけ見たい」運用要求に直結し、日付帯域検索が UI として最も自然
+- 集計の粒度切替は「月別売上」のスキーマと最も親和性が高い（年月キーを `slice(0,4)` / `slice(0,7)` / `slice(0,10)` で切り出すだけ）
+- SKU別・決済方法別・購入区分別は「カテゴリ別の累計」を見る指標で、粒度切替を入れるとカードが増えて視認性が落ちる
+
+### 6-3-3. 検索仕様（一覧タブ）
+
+| 条件 | 入力 UI | 比較ロジック |
+|------|--------|-------------|
+| 売上日（最早） | `<a-date-picker value-format="YYYY-MM-DD">` | `s.salesDate >= salesDateFrom`（`salesDate` が null の行は除外） |
+| 売上日（最遅） | 同上 | `s.salesDate <= salesDateTo`（同上） |
+| 予約を除外 | 既存 `<a-checkbox>` | `excludePreorderInList = true` で `s.preorder = TRUE` を除外 |
+
+`filteredSalesForList` computed で「日付帯域 + 予約除外」を AND 重ね掛けする。日付は `YYYY-MM-DD` 文字列の辞書順比較（時系列順と一致）。
+
+### 6-3-4. 集計粒度仕様（集計タブ「月別売上」カード）
+
+| 粒度 | キー切り出し | カードタイトル | カラム名 |
+|------|------------|--------------|---------|
+| 日 | `salesDate.slice(0, 10)` | 日別売上 | 日付 |
+| 月（既定） | `salesDate.slice(0, 7)` | 月別売上 | 年月 |
+| 年 | `salesDate.slice(0, 4)` | 年別売上 | 年 |
+
+ソート：キーの降順（直近を先頭）。粒度ラジオは `summaryGranularity` ref で保持し、既定は `'month'`。「見込み表示」トグルとは独立に動作する（粒度切替は集計対象集合を変えない）。
+
+### 6-3-5. UI 変更（Console）
+
+`features/sales/pages/SalesList.vue`：
+- 一覧タブの予約除外チェックの行に売上日の `<a-date-picker>` 2 つを並べる
+- 集計タブの「月別売上」カードヘッダー右側（`extra` スロット）に `<a-radio-group>` で粒度切替
+- `filteredSalesForList` を「日付帯域 + 予約除外」の AND に拡張
+- `summaryByMonth` を `summaryByGranularity` にリネームし、粒度別キー切り出しに対応
+- カードタイトル / カラム title を粒度に応じて差し替え
+
+### 6-3-6. DB 変更
+**なし**
+
+### 6-3-7. API 変更
+**なし**（`GET /api/sales` をそのまま流用）
+
+### 6-3-8. TDD テストケース
+
+表示変更のみのため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- 一覧タブの売上日 from / to で期間内の行だけ残る
+- 一覧タブの予約除外と日付帯域は AND で重ね掛けされる
+- 集計タブの粒度ラジオで「日別 / 月別 / 年別」に切り替わる
+- 粒度切替時に「見込み表示」トグルの効果（予約含む/除く）が維持される
+- 既定状態（粒度 = 月）で従来の「月別売上」と同じ集計結果になる
 
 ---
 

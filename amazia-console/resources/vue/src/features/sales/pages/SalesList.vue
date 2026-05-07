@@ -4,8 +4,25 @@
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="list" tab="一覧">
-        <div style="margin-bottom: 12px">
+        <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
           <a-checkbox v-model:checked="excludePreorderInList">予約を除外</a-checkbox>
+          <span>
+            売上日：
+            <a-date-picker
+              v-model:value="salesDateFrom"
+              value-format="YYYY-MM-DD"
+              placeholder="最早"
+              style="width: 140px"
+            />
+            <span style="margin: 0 6px">〜</span>
+            <a-date-picker
+              v-model:value="salesDateTo"
+              value-format="YYYY-MM-DD"
+              placeholder="最遅"
+              style="width: 140px"
+            />
+            <a-button size="small" style="margin-left: 8px" @click="resetSalesDateRange">クリア</a-button>
+          </span>
         </div>
         <a-table
           :dataSource="filteredSalesForList"
@@ -31,11 +48,18 @@
         </div>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-card title="月別売上" size="small">
+            <a-card :title="granularityCardTitle" size="small">
+              <template #extra>
+                <a-radio-group v-model:value="summaryGranularity" size="small" button-style="solid">
+                  <a-radio-button value="day">日</a-radio-button>
+                  <a-radio-button value="month">月</a-radio-button>
+                  <a-radio-button value="year">年</a-radio-button>
+                </a-radio-group>
+              </template>
               <a-table
-                :dataSource="summaryByMonth"
-                :columns="summaryMonthColumns"
-                rowKey="month"
+                :dataSource="summaryByGranularity"
+                :columns="summaryGranularityColumns"
+                rowKey="bucket"
                 size="small"
                 :pagination="false"
               />
@@ -112,9 +136,29 @@ const excludePreorderInList = ref(false);
 // フェーズ16 Step2: 集計タブの「見込み表示」トグル（既定 OFF＝予約除外）
 const includePreorderInSummary = ref(false);
 
-const filteredSalesForList = computed(() =>
-  excludePreorderInList.value ? sales.value.filter(s => !s.preorder) : sales.value
-);
+// フェーズ16 Step6-3: 一覧タブの売上日帯域検索
+const salesDateFrom = ref(null);
+const salesDateTo = ref(null);
+const resetSalesDateRange = () => {
+  salesDateFrom.value = null;
+  salesDateTo.value = null;
+};
+
+// フェーズ16 Step6-3: 集計タブの「月別売上」カードの粒度切替（既定: 月）
+const summaryGranularity = ref('month');
+
+const filteredSalesForList = computed(() => {
+  return sales.value.filter(s => {
+    if (excludePreorderInList.value && s.preorder) return false;
+    if (salesDateFrom.value) {
+      if (!s.salesDate || s.salesDate < salesDateFrom.value) return false;
+    }
+    if (salesDateTo.value) {
+      if (!s.salesDate || s.salesDate > salesDateTo.value) return false;
+    }
+    return true;
+  });
+});
 
 // 集計タブの元データ：見込み表示中なら全件、通常時は予約除外
 const salesForSummary = computed(() =>
@@ -141,13 +185,19 @@ const listColumns = [
     customRender: ({ text }) => text ? '予約' : '通常' },
 ];
 
-const summaryMonthColumns = [
-  { title: '年月',     dataIndex: 'month',    key: 'month' },
+const GRANULARITY_LABELS = {
+  day:   { card: '日別売上', column: '日付' },
+  month: { card: '月別売上', column: '年月' },
+  year:  { card: '年別売上', column: '年' },
+};
+const granularityCardTitle = computed(() => GRANULARITY_LABELS[summaryGranularity.value].card);
+const summaryGranularityColumns = computed(() => [
+  { title: GRANULARITY_LABELS[summaryGranularity.value].column, dataIndex: 'bucket', key: 'bucket' },
   { title: '件数',     dataIndex: 'count',    key: 'count' },
   { title: '数量',     dataIndex: 'quantity', key: 'quantity' },
   { title: '売上（円）', dataIndex: 'amount',  key: 'amount',
     customRender: ({ text }) => text.toLocaleString() },
-];
+]);
 const summarySkuColumns = [
   { title: '商品名',   dataIndex: 'productName', key: 'productName' },
   { title: '色',       dataIndex: 'color',       key: 'color' },
@@ -170,18 +220,20 @@ const summaryPreorderColumns = [
     customRender: ({ text }) => text.toLocaleString() },
 ];
 
-const summaryByMonth = computed(() => {
+const GRANULARITY_SLICE = { day: 10, month: 7, year: 4 };
+const summaryByGranularity = computed(() => {
+  const sliceLen = GRANULARITY_SLICE[summaryGranularity.value];
   const map = new Map();
   for (const s of salesForSummary.value) {
-    const month = (s.salesDate ?? '').slice(0, 7);
-    if (!month) continue;
-    const cur = map.get(month) ?? { month, count: 0, quantity: 0, amount: 0 };
+    const bucket = (s.salesDate ?? '').slice(0, sliceLen);
+    if (!bucket) continue;
+    const cur = map.get(bucket) ?? { bucket, count: 0, quantity: 0, amount: 0 };
     cur.count += 1;
     cur.quantity += s.quantity ?? 0;
     cur.amount += s.amount ?? 0;
-    map.set(month, cur);
+    map.set(bucket, cur);
   }
-  return Array.from(map.values()).sort((a, b) => b.month.localeCompare(a.month));
+  return Array.from(map.values()).sort((a, b) => b.bucket.localeCompare(a.bucket));
 });
 
 const summaryBySku = computed(() => {

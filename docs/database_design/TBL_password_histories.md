@@ -14,8 +14,8 @@
 
 | # | カラム名 | 論理名 | 型 | 長さ | NULL | デフォルト | 備考 |
 |---|----------|--------|-----|------|------|------------|------|
-| 1 | id | 履歴ID | BIGINT | - | NOT NULL | AUTO_INCREMENT | PK |
-| 2 | user_id | ユーザーID | BIGINT | - | NOT NULL | - | FK: users.id |
+| 1 | id | 履歴ID | BIGINT UNSIGNED | - | NOT NULL | AUTO_INCREMENT | PK |
+| 2 | user_id | ユーザーID | BIGINT UNSIGNED | - | NOT NULL | - | FK: users.id（044・045 同型の signed/unsigned ドリフト回避のため UNSIGNED） |
 | 3 | password_hash | パスワードハッシュ | VARCHAR | 255 | NOT NULL | - | bcrypt（変更前のハッシュを保持） |
 | 4 | created_at | 作成日時 | DATETIME | - | NOT NULL | CURRENT_TIMESTAMP | パスワード変更時刻 |
 
@@ -24,12 +24,13 @@
 | インデックス名 | 種別 | カラム |
 |----------------|------|--------|
 | PRIMARY | PRIMARY KEY | id |
+| idx_password_histories_user | INDEX | user_id |
 
 ## 外部キー
 
 | FK名 | カラム | 参照先 |
 |------|--------|--------|
-| _匿名_ | user_id | users(id) |
+| fk_password_histories_user | user_id | users(id) |
 
 ## 関連テーブル
 
@@ -42,9 +43,10 @@
 - パスワード変更時は変更前のハッシュをこのテーブルに INSERT し、`users.password_hash` を新しい値で UPDATE する。
 - 再利用検証では、新しい平文を直近 N 件のハッシュと bcrypt 比較する（N の値はアプリ側設定）。
 - Market 顧客側 `market_customer_password_histories` とは独立したテーブル（系統が違う）。
-- このテーブルは Flyway V1（`db/migration/V1__create_auth_tables.sql`）で定義されているが、本番 schema.sql には CREATE TABLE が含まれていない。Entity 定義（`com.example.auth.entity.PasswordHistory`）から JPA が自動生成する経路、または既存環境に残った V1 適用済みテーブルを利用する形となっている。新規環境構築時は schema.sql への追加検討が必要（037 起因の DB 初期化方式に注意）。
+- 本テーブルは長らく schema.sql に未記載で、本番ではテーブルが存在しないまま運用されていた（呼ばれた瞬間 1146）。phaseX-6 の主要テーブル存在確認ヘルスチェックで初めて検知され、2026-05-07 に schema.sql へ追記して解消（[048 派生節](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md) 経由で初到達したヘルスチェックの実成果）。
+- FK 列 `user_id` は `users.id` の `BIGINT UNSIGNED` に合わせる（044・045 同型のドリフト回避）。
 
 ## マイグレーションファイル
 
-- `amazia-core/src/main/resources/db/migration/V1__create_auth_tables.sql`（フェーズ11 / Flyway 適用済み環境のみ）
-- 本番 schema.sql には未記載（要検討事項）
+- `amazia-core/src/main/resources/schema.sql` — `password_histories` の CREATE TABLE IF NOT EXISTS（2026-05-07 追記）
+- `amazia-core/src/main/resources/db/migration/V1__create_auth_tables.sql`（フェーズ11 当時 / Flyway 適用済み環境にのみ存在。本番は Flyway 未使用 — 037 参照）

@@ -31,6 +31,19 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- パスワード変更履歴（V1 マイグレーション相当 / 044・045 同型対策）
+-- V1__create_auth_tables.sql に DDL があるが本番は Flyway 未使用（037）。
+-- schema.sql にも書かないと本番でテーブルが作られず、社員パスワード変更時に 1146 で 500。
+-- users.id が BIGINT UNSIGNED のため FK 列も UNSIGNED に揃える（044・045 同型）。
+CREATE TABLE IF NOT EXISTS password_histories (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id       BIGINT UNSIGNED NOT NULL,
+    password_hash VARCHAR(255)    NOT NULL,
+    created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_password_histories_user (user_id),
+    CONSTRAINT fk_password_histories_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS workflow_requests (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     target_type   VARCHAR(20)  NOT NULL,

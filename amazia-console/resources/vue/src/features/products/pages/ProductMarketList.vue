@@ -5,9 +5,80 @@
       sub-title="Marketに公開されているSKU集約データの確認用"
     />
 
+    <a-card size="small" style="margin-bottom: 16px" :body-style="{ padding: '12px 16px' }">
+      <a-form layout="inline" :model="searchForm">
+        <a-form-item label="商品名">
+          <a-input
+            v-model:value="searchForm.name"
+            placeholder="部分一致で検索"
+            allow-clear
+            style="width: 200px"
+          />
+        </a-form-item>
+        <a-form-item label="価格">
+          <a-input-number
+            v-model:value="searchForm.minPrice"
+            placeholder="最低"
+            :min="0"
+            :step="100"
+            style="width: 110px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-input-number
+            v-model:value="searchForm.maxPrice"
+            placeholder="最高"
+            :min="0"
+            :step="100"
+            style="width: 110px"
+          />
+          <span style="margin-left: 4px">円</span>
+        </a-form-item>
+        <a-form-item label="発売日">
+          <a-date-picker
+            v-model:value="searchForm.releaseDateFrom"
+            value-format="YYYY-MM-DD"
+            placeholder="最早"
+            style="width: 140px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-date-picker
+            v-model:value="searchForm.releaseDateTo"
+            value-format="YYYY-MM-DD"
+            placeholder="最遅"
+            style="width: 140px"
+          />
+        </a-form-item>
+        <a-form-item label="予約開始日">
+          <a-date-picker
+            v-model:value="searchForm.preorderStartDateFrom"
+            value-format="YYYY-MM-DD"
+            placeholder="最早"
+            style="width: 140px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-date-picker
+            v-model:value="searchForm.preorderStartDateTo"
+            value-format="YYYY-MM-DD"
+            placeholder="最遅"
+            style="width: 140px"
+          />
+        </a-form-item>
+        <a-form-item label="在庫">
+          <a-radio-group v-model:value="searchForm.stockFilter" button-style="solid">
+            <a-radio-button value="all">すべて</a-radio-button>
+            <a-radio-button value="inStock">在庫あり</a-radio-button>
+            <a-radio-button value="outOfStock">在庫なし</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item>
+          <a-button @click="resetSearch">クリア</a-button>
+        </a-form-item>
+      </a-form>
+    </a-card>
+
     <a-table
       :columns="columns"
-      :data-source="products"
+      :data-source="filteredProducts"
       :loading="loading"
       row-key="productId"
       :expand-row-by-click="true"
@@ -87,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { getMarketProducts } from '../api/products';
 import { getProductSkus, getSkuPrices, getSkuStock } from '../../skus/api/skus';
@@ -97,6 +168,74 @@ const loading = ref(false);
 const expandedRowKeys = ref([]);
 const skuMap = ref({});
 const skuLoadingMap = ref({});
+
+const searchForm = ref({
+  name: '',
+  minPrice: null,
+  maxPrice: null,
+  releaseDateFrom: null,
+  releaseDateTo: null,
+  preorderStartDateFrom: null,
+  preorderStartDateTo: null,
+  stockFilter: 'all',
+});
+
+const resetSearch = () => {
+  searchForm.value = {
+    name: '',
+    minPrice: null,
+    maxPrice: null,
+    releaseDateFrom: null,
+    releaseDateTo: null,
+    preorderStartDateFrom: null,
+    preorderStartDateTo: null,
+    stockFilter: 'all',
+  };
+};
+
+const filteredProducts = computed(() => {
+  const {
+    name,
+    minPrice,
+    maxPrice,
+    releaseDateFrom,
+    releaseDateTo,
+    preorderStartDateFrom,
+    preorderStartDateTo,
+    stockFilter,
+  } = searchForm.value;
+  const keyword = (name || '').trim().toLowerCase();
+
+  return products.value.filter(p => {
+    if (keyword && !(p.productName || '').toLowerCase().includes(keyword)) return false;
+
+    if (minPrice != null) {
+      if (p.maxPrice == null || p.maxPrice < minPrice) return false;
+    }
+    if (maxPrice != null) {
+      if (p.minPrice == null || p.minPrice > maxPrice) return false;
+    }
+
+    if (releaseDateFrom) {
+      if (!p.releaseDate || p.releaseDate < releaseDateFrom) return false;
+    }
+    if (releaseDateTo) {
+      if (!p.releaseDate || p.releaseDate > releaseDateTo) return false;
+    }
+
+    if (preorderStartDateFrom) {
+      if (!p.preorderStartDate || p.preorderStartDate < preorderStartDateFrom) return false;
+    }
+    if (preorderStartDateTo) {
+      if (!p.preorderStartDate || p.preorderStartDate > preorderStartDateTo) return false;
+    }
+
+    if (stockFilter === 'inStock'    && !(p.totalStock > 0))  return false;
+    if (stockFilter === 'outOfStock' && !(p.totalStock <= 0)) return false;
+
+    return true;
+  });
+});
 
 const columns = [
   { title: 'ID',         dataIndex: 'productId',   key: 'productId',   width: 80 },
