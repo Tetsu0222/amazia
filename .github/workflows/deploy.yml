@@ -468,7 +468,10 @@ jobs:
             echo "::error::主要テーブル一覧ファイルが存在しない: $REQUIRED_FILE"
             exit 1
           fi
-          TABLES=$(grep -vE '^[[:space:]]*(#|$)' "$REQUIRED_FILE" | tr -d '[:space:]' | tr '\n' ',' | sed 's/,$//')
+          # 各行のスペース・タブ・CR のみを削除する（\n は残す）。
+          # tr -d '[:space:]' は \n も対象に含むため、ファイル全体が改行ゼロの 1 行に潰れて
+          # EXPECTED_COUNT=1 / 全テーブル不足の誤検知になる（048 派生節 参照）。
+          TABLES=$(grep -vE '^[[:space:]]*(#|$)' "$REQUIRED_FILE" | tr -d ' \t\r' | tr '\n' ',' | sed 's/,$//')
           if [ -z "$TABLES" ]; then
             echo "::error::主要テーブル一覧が空（required_tables.txt のコメント・空行を除いて 0 件）"
             exit 1

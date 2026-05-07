@@ -696,6 +696,17 @@ SKU 行の「選択」ボタンで開く。
 - `/skus?productId=2` で開くと id=2 の商品行が初期展開される（ProductList の「SKU管理」ボタン互換）
 - `is_active = false` の商品行はグレーアウト表示される
 
+## 5-9. 申し送り（フェーズ17 へ）
+
+本 Step 5 のレビュー時に、価格管理タブの **「適用開始日」に未来日を入れても即時反映される** 実装ギャップが見つかった。フェーズ10 設計書 §5.3 で計画されながら実装されていなかった「未来日価格の自動切替」を、フェーズ17 の日次バッチとして正式に取り込む：
+
+- `phase17_batch_processing.md` r7 改訂で **3.1 ⑥ `ApplyScheduledPricesJob`** を新設
+- DB：`product_sku_prices.is_active` カラム追加 + 新規 `product_sku_scheduled_prices` テーブル
+- API：`GET / PUT / DELETE /api/skus/{id}/scheduled-price` 新設、既存 `GET /api/skus/{id}/prices` を「`is_active = TRUE` の現行価格 1 件」を返す仕様に統一
+- UI：本 Step 5 で導入した SKU 詳細モーダル「価格管理」タブを「現行価格 / 予約変更 / 履歴」3 ブロック構成へ拡張（フェーズ17 Step 6.5 として実装）
+
+本 Step 5 のスコープは「商品プルダウン廃止 → 商品一覧 + 展開 + モーダル化」までに留め、API / DB の変更は伴わない（規約遵守）。
+
 ---
 
 # 機能詳細

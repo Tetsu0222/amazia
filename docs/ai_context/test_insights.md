@@ -408,6 +408,7 @@ SSM RunShellScript → ホスト bash → コンテナ内 sh の3層を貫通す
 - [ ] INNER に動的に埋め込むリテラル（SQL 本文・S3 キー・ファイルパスなど）について、埋め込み直前に `'` を `'\''` でエスケープしているか（`sed`/`printf` 経由はシェルエスケープと sed エスケープの噛み合わせで壊れた事例があるため、bash パラメータ展開 `${var//$APOS/$ESC_APOS}` が推奨）
 - [ ] CD ヘルスチェックの「故意失敗テストデプロイ」が、認証エラー経路（[046](../troubles/046_cd_healthcheck_mysql_root_password_unexpanded.md)）と SQL クォートエラー経路（[048](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md)）の **両方** を実機で通る検証になっているか
 - [ ] 同じファイル内に同パターンが複数ある場合、3不変条件をすべての箇所で満たしているか（コピペ展開ではなく1箇所ずつ確認）
+- [ ] 行ベースのストリーム処理で `tr -d '[:space:]'` / `sed 's/[[:space:]]//g'` のような **空白クラス全削除** を使っていないか（POSIX `[:space:]` は `\n` を含むためファイル全体が 1 行に潰れる。「行末を整えたい」ときは `tr -d ' \t\r'` のように対象文字を明示する。[048 派生節](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md)）
 
 ---
 
