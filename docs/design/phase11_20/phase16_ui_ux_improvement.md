@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 完了 / Step 2 実装完了・2026-05-07）
+🟡 着手中（Step 1 / Step 1.5 / Step 2 実装完了・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -60,6 +60,71 @@
   - 一覧フィルタが正しく機能する
 - Market
   - 無効化された商品は商品詳細 URL を直叩きしても 404 / 一覧から消える
+
+---
+
+## Step 1.5：商品「ステータス」UI の見直し ✅ 実装完了（2026-05-07）
+
+### 背景・目的
+Step 1 で `is_active`（Market 露出 ON/OFF）を導入した結果、`status_code`（`WAITING` / `RESERVATION` / `ON_SALE`）は **`release_date` / `preorder_start_date` から自動算出できる軸** と重複していることが運用で明確になった。
+
+- `status_code` は `PreorderStatusService#judge()` で `release_date` と `preorder_start_date` から導出可能
+- 手動運用すると「日付は発売後なのに `status_code = RESERVATION` のまま」のような不整合を生む
+- ただし将来「販売段階を手動で上書きしたい」要件が再浮上する可能性は残るため、**DB カラム（`products.status_code`）は削除しない**
+
+そこで「Console UI から `status_code` の表示・設定を一旦外し、発売日ベースの自動表示に切り替える」運用に変更する。
+
+### 設計方針
+- `products.status_code` カラム・関連 API・`PreorderStatusService` は **そのまま残す**（将来の再導入に備える）
+- Console の **入力 UI と表示 UI からだけ** `status_code` を取り除く
+- 商品マスタ系画面で消した「ステータス」の代替として、SKU 管理画面に「発売日基準のステータス表示」と日付列を追加する
+
+### UI 変更（Console）
+
+#### 商品マスタ登録画面 / 編集画面（`ProductForm.vue`）
+- 「ステータス」`<a-form-item>` および関連 select・`statuses` 取得処理を削除
+- 送信ペイロードからは `statusCode` を含めない（既存値は Core 側で保持）
+
+#### 商品マスタ一覧画面（`ProductList.vue`）
+- 「ステータス」列を削除（`statusLabel` / `statusColor` / `STATUS_MAP` も削除）
+- 「公開状態」「有効/無効」列はそのまま残す
+
+#### 商品一覧（SKU 管理）画面（`SkuList.vue`）
+SKU 一覧テーブルの列を以下に変更する：
+
+| 列 | 表示内容 | データソース |
+|----|---------|-------------|
+| SKUコード | 既存 | `sku.skuCode` |
+| 色 | 既存 | `sku.color` |
+| サイズ | 既存 | `sku.size` |
+| ステータス | **発売日前 / 発売中 の 2 値表示**（バッジ）<br>判定：`release_date` 未設定 or 当日含む過去 → `発売中`、未来 → `発売前` | 選択中の `product.releaseDate` |
+| 予約開始日 | `YYYY-MM-DD` 表示（NULL は「公開と同時」） | 選択中の `product.preorderStartDate` |
+| 発売日 | `YYYY-MM-DD` 表示（NULL は「未設定」） | 選択中の `product.releaseDate` |
+| （操作列） | 既存「選択中／選択」 | 既存ロジック |
+
+- 「ステータス」列の値は **SKU 自身の `sku.status` ではなく、親商品の `release_date` から算出した発売前/発売中 の 2 値**
+  - 既存の `sku.status`（`ACTIVE` 等）は SKU 単位の有効/無効軸であり、画面要件「発売日前か後かを表示」にそぐわないため、列のラベルは「ステータス」のまま意味を差し替える
+  - SKU 単位の `status` は将来の機能（販売停止など）に備えて DB に残す
+- 発売日・予約開始日は商品単位の値のため、同じ商品内では全 SKU 行で同じ値が並ぶことになるが、SKU 一覧のみを見ている運用者が「この SKU は発売前か」を即判断できる方が優先
+
+#### 商品一覧（SKU 集約版）画面（`ProductMarketList.vue`・`/products/market-view`）
+Market 公開データ確認用画面の列に以下を追加する。データソースは Core `GET /api/products/market` の `ProductMarketSummary` DTO（既に `releaseDate` / `preorderStartDate` を保有しているため API 変更不要）。
+
+| 追加列 | 表示内容 | データソース |
+|--------|---------|-------------|
+| ステータス | **発売前 / 発売中 の 2 値表示**（バッジ）<br>判定：`releaseDate` 未設定 or 当日含む過去 → `発売中`、未来 → `発売前` | `record.releaseDate` |
+| 予約開始日 | `YYYY-MM-DD` 表示（NULL は「公開と同時」） | `record.preorderStartDate` |
+| 発売日 | `YYYY-MM-DD` 表示（NULL は「未設定」） | `record.releaseDate` |
+
+### DB 変更
+**なし**（`products.status_code` は残置、`skus.status` も残置）。
+
+### API 変更
+**なし**（Core / Console とも `statusCode` を返し続け、フロントが使わないだけ）。
+
+### TDD テストケース
+- 表示変更のみのため Vue ユニットテストは追加せず、フェーズ16冒頭の方針通り E2E / 表示確認で担保
+- ProductForm の送信時に `statusCode` プロパティが含まれない / 含まれても Core 側既存値が保持される（既存 Update テストで担保済み）
 
 ---
 

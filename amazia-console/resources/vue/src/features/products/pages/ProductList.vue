@@ -68,11 +68,6 @@
                 <template v-if="column.key === 'stock'">
                   {{ sku.stock != null ? sku.stock + ' 個' : '0 個' }}
                 </template>
-                <template v-if="column.key === 'status'">
-                  <a-tag :color="sku.status === 'ACTIVE' ? 'green' : 'default'">
-                    {{ sku.status }}
-                  </a-tag>
-                </template>
               </template>
             </a-table>
           </template>
@@ -98,11 +93,6 @@
         </template>
         <template v-if="column.key === 'totalStock'">
           {{ record.totalStock }} 個
-        </template>
-        <template v-if="column.key === 'status'">
-          <a-tag :color="statusColor(record.statusCode)">
-            {{ statusLabel(record.statusCode) }}
-          </a-tag>
         </template>
         <template v-if="column.key === 'published'">
           <a-badge
@@ -159,15 +149,6 @@ const filteredProducts = computed(() => {
   return products.value;
 });
 
-const STATUS_MAP = {
-  WAITING:     { label: '入荷待',     color: 'default' },
-  RESERVATION: { label: '予約受付中', color: 'blue' },
-  ON_SALE:     { label: '販売中',     color: 'green' },
-};
-
-const statusLabel = (code) => STATUS_MAP[code]?.label ?? '未設定';
-const statusColor = (code) => STATUS_MAP[code]?.color ?? 'default';
-
 const isPublished = (product) => {
   const now = new Date();
   if (product.publishStart && new Date(product.publishStart) > now) return false;
@@ -181,7 +162,6 @@ const columns = [
   { title: 'SKU数',    key: 'skuCount',                             width: 80 },
   { title: '価格帯',   key: 'price',                                width: 200 },
   { title: '合計在庫', key: 'totalStock',                           width: 100 },
-  { title: 'ステータス', key: 'status',                             width: 120 },
   { title: '公開状態', key: 'published',                            width: 100 },
   { title: '有効/無効', key: 'active',                              width: 90 },
   { title: '操作',     key: 'action',                               width: 200 },
@@ -193,7 +173,6 @@ const skuColumns = [
   { title: 'サイズ',   dataIndex: 'size',    key: 'size',    width: 80 },
   { title: '価格',      key: 'price',                         width: 120 },
   { title: '在庫',      key: 'stock',                         width: 100 },
-  { title: 'ステータス', key: 'status',                        width: 100 },
 ];
 
 const fetchProducts = async () => {

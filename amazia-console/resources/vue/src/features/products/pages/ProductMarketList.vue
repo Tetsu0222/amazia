@@ -70,6 +70,17 @@
         <template v-if="column.key === 'totalStock'">
           {{ record.totalStock != null ? record.totalStock + ' 個' : '0 個' }}
         </template>
+        <template v-if="column.key === 'releaseStatus'">
+          <a-tag :color="isReleased(record) ? 'green' : 'blue'">
+            {{ isReleased(record) ? '発売中' : '発売前' }}
+          </a-tag>
+        </template>
+        <template v-if="column.key === 'preorderStartDate'">
+          {{ record.preorderStartDate ?? '公開と同時' }}
+        </template>
+        <template v-if="column.key === 'releaseDate'">
+          {{ record.releaseDate ?? '未設定' }}
+        </template>
       </template>
     </a-table>
   </div>
@@ -93,7 +104,17 @@ const columns = [
   { title: 'メイン画像', key: 'mainImage',                              width: 100 },
   { title: '最低価格',   key: 'minPrice',                               width: 140 },
   { title: '合計在庫',   key: 'totalStock',                             width: 100 },
+  { title: 'ステータス', key: 'releaseStatus',                          width: 110 },
+  { title: '予約開始日', key: 'preorderStartDate',                      width: 130 },
+  { title: '発売日',     key: 'releaseDate',                            width: 130 },
 ];
+
+const isReleased = (record) => {
+  if (!record.releaseDate) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(record.releaseDate) <= today;
+};
 
 const skuColumns = [
   { title: 'SKUコード', dataIndex: 'skuCode', key: 'skuCode', width: 140 },

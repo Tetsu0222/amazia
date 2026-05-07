@@ -37,7 +37,24 @@
         style="margin-bottom: 8px"
         @row-click="onSkuRowClick"
         :custom-row="(r) => ({ onClick: () => onSkuRowClick(r) })"
-      />
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'releaseStatus'">
+            <a-tag :color="isReleased ? 'green' : 'blue'">
+              {{ isReleased ? '発売中' : '発売前' }}
+            </a-tag>
+          </template>
+          <template v-if="column.key === 'preorderStartDate'">
+            {{ selectedProduct?.preorderStartDate ?? '公開と同時' }}
+          </template>
+          <template v-if="column.key === 'releaseDate'">
+            {{ selectedProduct?.releaseDate ?? '未設定' }}
+          </template>
+          <template v-if="column.key === 'action'">
+            {{ record.id === selectedSkuId ? '◀ 選択中' : '選択' }}
+          </template>
+        </template>
+      </a-table>
 
       <!-- SKU追加フォーム -->
       <a-form
@@ -163,7 +180,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { message } from 'ant-design-vue';
 // 管理画面では公開期間外の商品（予約開始前など）も SKU 編集対象にするため admin 一覧を使う
@@ -197,14 +214,26 @@ const skuRules = {
   size:  [{ required: true, message: 'サイズは必須です' }],
 };
 const skuColumns = [
-  { title: 'SKUコード', dataIndex: 'skuCode', key: 'skuCode' },
-  { title: '色',        dataIndex: 'color',   key: 'color' },
-  { title: 'サイズ',    dataIndex: 'size',    key: 'size' },
-  { title: 'ステータス', dataIndex: 'status', key: 'status' },
-  { title: '',          key: 'action',
-    customRender: ({ record }) => record.id === selectedSkuId.value ? '◀ 選択中' : '選択',
-  },
+  { title: 'SKUコード',  dataIndex: 'skuCode', key: 'skuCode' },
+  { title: '色',         dataIndex: 'color',   key: 'color' },
+  { title: 'サイズ',     dataIndex: 'size',    key: 'size' },
+  { title: 'ステータス', key: 'releaseStatus' },
+  { title: '予約開始日', key: 'preorderStartDate' },
+  { title: '発売日',     key: 'releaseDate' },
+  { title: '',           key: 'action' },
 ];
+
+const selectedProduct = computed(() =>
+  products.value.find(p => p.id === selectedProductId.value) ?? null
+);
+
+const isReleased = computed(() => {
+  const releaseDate = selectedProduct.value?.releaseDate;
+  if (!releaseDate) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(releaseDate) <= today;
+});
 
 // 価格
 const prices = ref([]);

@@ -28,23 +28,6 @@
         />
       </a-form-item>
 
-      <a-form-item label="ステータス" name="statusCode">
-        <a-select
-          v-model:value="form.statusCode"
-          placeholder="ステータスを選択"
-          :loading="statusesLoading"
-          allow-clear
-        >
-          <a-select-option
-            v-for="s in statuses"
-            :key="s.code"
-            :value="s.code"
-          >
-            {{ s.name }}
-          </a-select-option>
-        </a-select>
-      </a-form-item>
-
       <a-row :gutter="16">
         <a-col :span="12">
           <a-form-item label="公開開始日時" name="publishStart">
@@ -130,22 +113,19 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import {
-  getProduct, createProduct, updateProduct, getProductStatuses,
+  getProduct, createProduct, updateProduct,
 } from '../api/products';
 
 const route = useRoute();
 const router = useRouter();
 const formRef = ref();
 const submitting = ref(false);
-const statuses = ref([]);
-const statusesLoading = ref(false);
 
 const isEdit = computed(() => route.path !== '/products/new');
 
 const form = ref({
   name: '',
   description: '',
-  statusCode: null,
   publishStart: null,
   publishEnd: null,
   preorderStartDate: null,
@@ -160,22 +140,12 @@ const rules = {
 };
 
 onMounted(async () => {
-  statusesLoading.value = true;
-  try {
-    statuses.value = await getProductStatuses();
-  } catch {
-    message.warning('ステータス一覧の取得に失敗しました');
-  } finally {
-    statusesLoading.value = false;
-  }
-
   if (isEdit.value) {
     try {
       const product = await getProduct(route.params.id);
       form.value = {
         name:              product.name,
         description:       product.description ?? '',
-        statusCode:        product.statusCode ?? null,
         publishStart:      product.publishStart ?? null,
         publishEnd:        product.publishEnd ?? null,
         preorderStartDate: product.preorderStartDate ?? null,
