@@ -23,4 +23,6 @@ Route::middleware('auth.jwt')->group(function () {
     require __DIR__.'/api/User.php';
     require __DIR__.'/api/Workflow.php';
     require __DIR__.'/api/OperationLog.php';
+    require __DIR__.'/api/Delivery.php';
+    require __DIR__.'/api/Inbound.php';
 });
