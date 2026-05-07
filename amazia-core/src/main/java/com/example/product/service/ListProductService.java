@@ -11,14 +11,19 @@ import java.util.stream.Collectors;
 public class ListProductService {
 
     private final ProductRepository repository;
+    private final PreorderStatusService preorderStatusService;
 
-    public ListProductService(ProductRepository repository) {
+    public ListProductService(ProductRepository repository,
+                              PreorderStatusService preorderStatusService) {
         this.repository = repository;
+        this.preorderStatusService = preorderStatusService;
     }
 
     public List<Product> getPublished() {
+        // 設計書 phase14_5_preorder_status.md §2-2: 公開判定は JST 0:00 基準。
+        // 旧 Product#isPublished()（秒単位）は廃止し PreorderStatusService に集約。
         return repository.findAll().stream()
-                .filter(Product::isPublished)
+                .filter(preorderStatusService::isPublished)
                 .collect(Collectors.toList());
     }
 

@@ -40,6 +40,24 @@ public class PreorderStatusService {
         return PreorderStatusResponse.of(product, judgeInternal(product));
     }
 
+    /**
+     * 設計書 phase14_5_preorder_status.md §2-2 の JST 0:00 基準で公開期間内かを判定する。
+     * 既存の Product#isPublished() (秒単位 LocalDateTime) を置き換える統一判定窓口。
+     * publishStart / publishEnd が NULL のときは「制限なし」扱い（phase14 既存挙動）。
+     */
+    public boolean isPublished(Product product) {
+        LocalDate today = LocalDate.now(clock);
+        if (product.getPublishStart() != null
+                && today.isBefore(product.getPublishStart().toLocalDate())) {
+            return false;
+        }
+        if (product.getPublishEnd() != null
+                && today.isAfter(product.getPublishEnd().toLocalDate())) {
+            return false;
+        }
+        return true;
+    }
+
     private PreorderStatus judgeInternal(Product product) {
         LocalDate today = LocalDate.now(clock);
 

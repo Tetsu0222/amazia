@@ -10,6 +10,7 @@ import com.example.payment.service.PaymentService;
 import com.example.paymentmethod.repository.PaymentMethodRepository;
 import com.example.product.entity.Product;
 import com.example.product.repository.ProductRepository;
+import com.example.product.service.PreorderStatusService;
 import com.example.sales.entity.Sales;
 import com.example.sales.repository.SalesRepository;
 import com.example.sku.entity.ProductSku;
@@ -60,6 +61,7 @@ public class OrderConfirmationService {
     private final AddressRepository addressRepository;
     private final SalesRepository salesRepository;
     private final PaymentService paymentService;
+    private final PreorderStatusService preorderStatusService;
 
     private final long pendingStatusId;
     private final String txTypeSale;
@@ -75,6 +77,7 @@ public class OrderConfirmationService {
             AddressRepository addressRepository,
             SalesRepository salesRepository,
             PaymentService paymentService,
+            PreorderStatusService preorderStatusService,
             @Value("${amazia.sales.shipping-statuses.pending-id}") long pendingStatusId,
             @Value("${amazia.sales.sku-stock-tx-types.sale}") String txTypeSale) {
         this.customerRepository = customerRepository;
@@ -87,6 +90,7 @@ public class OrderConfirmationService {
         this.addressRepository = addressRepository;
         this.salesRepository = salesRepository;
         this.paymentService = paymentService;
+        this.preorderStatusService = preorderStatusService;
         this.pendingStatusId = pendingStatusId;
         this.txTypeSale = txTypeSale;
     }
@@ -105,7 +109,10 @@ public class OrderConfirmationService {
 
         Product product = productRepository.findById(sku.getProductId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "product not found"));
-        if (!product.isPublished()) {
+        // 設計書 phase14_5_preorder_status.md §2-2: 公開判定は JST 0:00 基準。
+        // 旧 Product#isPublished() は秒単位 LocalDateTime 比較で PreorderStatusService と
+        // 整合しないため、判定を統一窓口の PreorderStatusService に集約。
+        if (!preorderStatusService.isPublished(product)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product is not published");
         }
 

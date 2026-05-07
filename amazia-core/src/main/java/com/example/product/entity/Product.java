@@ -58,12 +58,8 @@ public class Product {
         updatedAt = LocalDateTime.now();
     }
 
-    public boolean isPublished() {
-        LocalDateTime now = LocalDateTime.now();
-        if (publishStart != null && now.isBefore(publishStart)) return false;
-        if (publishEnd   != null && now.isAfter(publishEnd))    return false;
-        return true;
-    }
+    // 公開判定 (isPublished) は PreorderStatusService.isPublished(Product) に集約。
+    // 設計書 phase14_5_preorder_status.md §2-2 に従い JST 0:00 基準で判定する。
 
     public Long getId() { return id; }
     public String getName() { return name; }
