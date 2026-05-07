@@ -24,6 +24,7 @@
 **仕様**
 - SKU なしの商品は除外済み（Core 側）
 - フェーズ14.5: `preorderStatus = NOT_PUBLIC` の商品は除外。在庫 0 商品も `SOLD_OUT`/`BACK_ORDER`/`PRE_ORDER` 等として一覧に含まれる
+- フェーズ16 Step1: 商品マスタの `is_active = FALSE`（Console 商品マスタの「Market 公開」スイッチ OFF）の商品は Core 側で `NOT_PUBLIC` 扱いとなり一覧から除外される
 - `mainImage` が null の場合はフロントで NOIMAGE 表示
 - `preorderStatus` に応じて `ProductList.jsx` がラベル（通常販売 / 予約受付中 / 完売 等）と補足表示（在庫数 / 発売日 / 予約開始日）を切り替える
 
@@ -86,6 +87,8 @@
 ```
 
 `ProductDetail.jsx` は `preorderStatus` でステータスラベル（Chip）と購入ボタン文言（購入する / 予約する / 非表示）を切り替える。`PRE_ORDER` / `BACK_ORDER` のときは checkout に `&preorder=1` を付加して遷移する。
+
+フェーズ16 Step1: 商品マスタの `is_active = FALSE` の商品は本エンドポイントでも 404 を返す（URL 直叩き対策）。
 
 ---
 

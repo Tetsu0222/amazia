@@ -58,6 +58,7 @@ public class AdminListProductService {
             s.setStatusCode(p.getStatusCode());
             s.setPublishStart(p.getPublishStart());
             s.setPublishEnd(p.getPublishEnd());
+            s.setActive(p.isActive());
 
             List<ProductSku> skus = skusByProduct.getOrDefault(p.getId(), List.of());
             s.setSkuCount(skus.size());

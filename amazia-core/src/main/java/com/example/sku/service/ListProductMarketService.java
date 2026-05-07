@@ -59,6 +59,11 @@ public class ListProductMarketService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
 
+        // フェーズ16 Step1: is_active=false の商品は Market 詳細では 404 扱い（直叩き対策）
+        if (!product.isActive()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません");
+        }
+
         List<SkuDetail> skuDetails = skuRepository.findByProductIdOrderByIdAsc(productId).stream()
                 .map(this::buildSkuDetail)
                 .collect(Collectors.toList());

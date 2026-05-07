@@ -1,5 +1,6 @@
 package com.example.product.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 
@@ -38,6 +39,9 @@ public class Product {
 
     @Column(nullable = false)
     private boolean acceptBackorder;
+
+    @Column(nullable = false)
+    private boolean isActive = true;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -84,6 +88,10 @@ public class Product {
     public void setAcceptPreorder(boolean acceptPreorder) { this.acceptPreorder = acceptPreorder; }
     public boolean isAcceptBackorder() { return acceptBackorder; }
     public void setAcceptBackorder(boolean acceptBackorder) { this.acceptBackorder = acceptBackorder; }
+    @JsonProperty("isActive")
+    public boolean isActive() { return isActive; }
+    @JsonProperty("isActive")
+    public void setActive(boolean active) { this.isActive = active; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }

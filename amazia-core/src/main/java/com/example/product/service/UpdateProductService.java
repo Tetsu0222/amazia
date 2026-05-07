@@ -27,6 +27,7 @@ public class UpdateProductService {
         existing.setStatusCode(request.getStatusCode());
         existing.setPublishStart(request.getPublishStart());
         existing.setPublishEnd(request.getPublishEnd());
+        existing.setActive(request.isActive());
         return repository.save(existing);
     }
 }

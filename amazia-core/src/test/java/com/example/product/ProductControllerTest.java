@@ -180,6 +180,64 @@ public class ProductControllerTest {
         mockMvc.perform(get("/api/products/" + id2)).andExpect(status().isNotFound());
     }
 
+    // ---- フェーズ16 Step1: is_active スイッチ ----------------------------------
+
+    @Test
+    void 新規商品はデフォルトで_is_active_true_でレスポンスされる() throws Exception {
+        mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"既定有効\",\"description\":\"\",\"price\":1000,\"stock\":1}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isActive").value(true));
+    }
+
+    @Test
+    void is_active_false_で更新でき_Market一覧に出ない() throws Exception {
+        String created = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"非表示テスト\",\"description\":\"\",\"price\":1000,\"stock\":1}"))
+                .andReturn().getResponse().getContentAsString();
+        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(put("/api/products/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"非表示テスト\",\"description\":\"\",\"statusCode\":null,"
+                        + "\"publishStart\":null,\"publishEnd\":null,\"isActive\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isActive").value(false));
+
+        // Market 露出 API（/api/products）には is_active=false の商品は含まれない
+        mockMvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void is_active_true_に戻すとMarket一覧に再表示される() throws Exception {
+        String created = mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"再表示テスト\",\"description\":\"\",\"price\":1000,\"stock\":1}"))
+                .andReturn().getResponse().getContentAsString();
+        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(put("/api/products/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"再表示テスト\",\"description\":\"\",\"statusCode\":null,"
+                        + "\"publishStart\":null,\"publishEnd\":null,\"isActive\":false}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/products/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"再表示テスト\",\"description\":\"\",\"statusCode\":null,"
+                        + "\"publishStart\":null,\"publishEnd\":null,\"isActive\":true}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].isActive").value(true));
+    }
+
     @Test
     void 一括在庫更新が反映されること() throws Exception {
         String created = mockMvc.perform(post("/api/products")

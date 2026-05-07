@@ -20,6 +20,14 @@
         <a-textarea v-model:value="form.description" :rows="3" placeholder="説明を入力（任意）" />
       </a-form-item>
 
+      <a-form-item label="Market 公開" name="isActive" extra="OFF にすると Market から即時非表示になります（公開期間とは独立）">
+        <a-switch
+          v-model:checked="form.isActive"
+          checked-children="有効"
+          un-checked-children="無効"
+        />
+      </a-form-item>
+
       <a-form-item label="ステータス" name="statusCode">
         <a-select
           v-model:value="form.statusCode"
@@ -144,6 +152,7 @@ const form = ref({
   releaseDate: null,
   acceptPreorder: false,
   acceptBackorder: false,
+  isActive: true,
 });
 
 const rules = {
@@ -173,6 +182,7 @@ onMounted(async () => {
         releaseDate:       product.releaseDate ?? null,
         acceptPreorder:    product.acceptPreorder ?? false,
         acceptBackorder:   product.acceptBackorder ?? false,
+        isActive:          product.isActive ?? true,
       };
     } catch {
       message.error('商品データの取得に失敗しました');

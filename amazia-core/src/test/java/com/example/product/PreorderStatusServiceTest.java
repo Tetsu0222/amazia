@@ -204,6 +204,38 @@ class PreorderStatusServiceTest {
         assertEquals(PreorderStatus.ON_SALE, service.judge(pid));
     }
 
+    // ---- フェーズ16 Step1: is_active スイッチ ----------------------------------
+
+    @Test
+    void is_active_false_なら_期間内でも_NOT_PUBLIC() {
+        // フェーズ16 Step1: 公開期間内・在庫ありでも、is_active=false なら NOT_PUBLIC を返す。
+        Long pid = createProduct(p -> {
+            p.setPublishStart(FIXED_TODAY.minusDays(30).atStartOfDay());
+            p.setReleaseDate(FIXED_TODAY.minusDays(7));
+            p.setActive(false);
+        });
+        createSkuWithStock(pid, "赤", "M", 5);
+
+        assertEquals(PreorderStatus.NOT_PUBLIC, service.judge(pid));
+    }
+
+    @Test
+    void is_active_false_なら_isPublishedもfalse() {
+        Product p = new Product();
+        p.setName("inactive");
+        p.setActive(false);
+        // 期間 NULL（制限なし）でも is_active=false で false。
+        assertFalse(service.isPublished(p));
+    }
+
+    @Test
+    void is_active_true_既定値で_期間NULLなら_isPublishedはtrue() {
+        Product p = new Product();
+        p.setName("default-active");
+        // setActive 未呼び出し（既定値 true）
+        assertTrue(service.isPublished(p));
+    }
+
     // ---- 異常系 ---------------------------------------------------------------
 
     @Test

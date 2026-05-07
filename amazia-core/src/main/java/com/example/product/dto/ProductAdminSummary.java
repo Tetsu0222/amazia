@@ -1,5 +1,7 @@
 package com.example.product.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDateTime;
 
 public class ProductAdminSummary {
@@ -9,6 +11,7 @@ public class ProductAdminSummary {
     private String statusCode;
     private LocalDateTime publishStart;
     private LocalDateTime publishEnd;
+    private boolean isActive;
 
     private int skuCount;
     private Integer minPrice;
@@ -31,6 +34,11 @@ public class ProductAdminSummary {
 
     public LocalDateTime getPublishEnd() { return publishEnd; }
     public void setPublishEnd(LocalDateTime publishEnd) { this.publishEnd = publishEnd; }
+
+    @JsonProperty("isActive")
+    public boolean isActive() { return isActive; }
+    @JsonProperty("isActive")
+    public void setActive(boolean active) { this.isActive = active; }
 
     public int getSkuCount() { return skuCount; }
     public void setSkuCount(int skuCount) { this.skuCount = skuCount; }

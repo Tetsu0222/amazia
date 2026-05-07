@@ -65,10 +65,6 @@ public class GetMyPurchaseHistoryService {
         Map<Long, Product> productMap = new HashMap<>();
         productRepository.findAllById(productIds).forEach(p -> productMap.put(p.getId(), p));
 
-        Set<Long> statusIds = salesList.stream().map(Sales::getShippingStatusId).collect(Collectors.toSet());
-        Map<Long, ShippingStatus> statusMap = new HashMap<>();
-        shippingStatusRepository.findAllById(statusIds).forEach(s -> statusMap.put(s.getId(), s));
-
         // フェーズ15 r5：sales 1 件ごとに対応する delivery を取得（sales:deliveries=1:1 / RR-3）
         // 旧 sales（フェーズ15 以前）には delivery が無いため null 許容で扱う。
         Map<Long, Delivery> deliveryMap = new HashMap<>();
@@ -77,11 +73,23 @@ public class GetMyPurchaseHistoryService {
                     .ifPresent(d -> deliveryMap.put(s.getId(), d));
         }
 
+        // 表示用 shipping_status は deliveries 側を「真」とする（Console の状態遷移は deliveries のみを更新するため）。
+        // 旧 sales（delivery 無し）のみ sales.shipping_status_id にフォールバック。
+        Set<Long> statusIds = salesList.stream()
+                .map(s -> {
+                    Delivery d = deliveryMap.get(s.getId());
+                    return d != null ? d.getShippingStatusId() : s.getShippingStatusId();
+                })
+                .collect(Collectors.toSet());
+        Map<Long, ShippingStatus> statusMap = new HashMap<>();
+        shippingStatusRepository.findAllById(statusIds).forEach(s -> statusMap.put(s.getId(), s));
+
         return salesList.stream().map(s -> {
             ProductSku sku = skuMap.get(s.getSkuId());
             Product product = sku != null ? productMap.get(sku.getProductId()) : null;
-            ShippingStatus status = statusMap.get(s.getShippingStatusId());
             Delivery d = deliveryMap.get(s.getId());
+            Long effectiveStatusId = d != null ? d.getShippingStatusId() : s.getShippingStatusId();
+            ShippingStatus status = statusMap.get(effectiveStatusId);
             PurchaseHistoryItem.DeliveryInfo info = (d == null) ? null : new PurchaseHistoryItem.DeliveryInfo(
                     d.getScheduledDate(),
                     d.getShippedDate(),

@@ -389,3 +389,11 @@ CREATE INDEX idx_deliveries_scheduled_date     ON deliveries (scheduled_date);
 --    schema.sql L221 で「phase15 で shipping_methods 作成後に追加」と保留されていた制約。
 --    shipping_methods マスタ実体化により FK を有効化。
 ALTER TABLE sales ADD CONSTRAINT fk_sales_shipping_method FOREIGN KEY (shipping_method_id) REFERENCES shipping_methods(id);
+
+-- ============================================================================
+-- フェーズ16 Step1: 商品 Market 露出スイッチ
+--   設計書: docs/design/phase11_20/phase16_ui_ux_improvement.md §Step 1
+--   公開期間 (publish_start / publish_end) とは独立した、Market 露出 ON/OFF の手動スイッチ。
+--   既存全件は TRUE 既定で挙動互換。重複実行は continue-on-error で許容。
+-- ============================================================================
+ALTER TABLE products ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;

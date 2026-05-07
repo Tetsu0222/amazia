@@ -15,6 +15,11 @@
             一括削除（{{ selectedRowKeys.length }}件）
           </a-button>
         </a-popconfirm>
+        <a-radio-group v-model:value="activeFilter" button-style="solid">
+          <a-radio-button value="all">すべて</a-radio-button>
+          <a-radio-button value="active">有効のみ</a-radio-button>
+          <a-radio-button value="inactive">無効のみ</a-radio-button>
+        </a-radio-group>
       </a-space>
       <a-space>
         <a-button @click="$router.push('/products/import')">
@@ -28,12 +33,13 @@
 
     <a-table
       :columns="columns"
-      :data-source="products"
+      :data-source="filteredProducts"
       :loading="loading"
       row-key="id"
       :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
       :expand-row-by-click="true"
       :expanded-row-keys="expandedRowKeys"
+      :row-class-name="(record) => (record.isActive ? '' : 'row-inactive')"
       @expand="onExpand"
     >
       <template #expandedRowRender="{ record }">
@@ -104,6 +110,11 @@
             :text="isPublished(record) ? '公開中' : '非公開'"
           />
         </template>
+        <template v-if="column.key === 'active'">
+          <a-tag :color="record.isActive ? 'green' : 'red'">
+            {{ record.isActive ? '有効' : '無効' }}
+          </a-tag>
+        </template>
         <template v-if="column.key === 'action'">
           <a-space>
             <a-button size="small" @click.stop="$router.push(`/products/${record.id}/edit`)">
@@ -129,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { getAdminProducts, deleteProduct, bulkDeleteProducts } from '../api/products';
 import { getProductSkus, getSkuPrices, getSkuStock } from '../../skus/api/skus';
@@ -140,6 +151,13 @@ const selectedRowKeys = ref([]);
 const expandedRowKeys = ref([]);
 const skuMap = ref({});
 const skuLoadingMap = ref({});
+const activeFilter = ref('all');
+
+const filteredProducts = computed(() => {
+  if (activeFilter.value === 'active')   return products.value.filter(p => p.isActive);
+  if (activeFilter.value === 'inactive') return products.value.filter(p => !p.isActive);
+  return products.value;
+});
 
 const STATUS_MAP = {
   WAITING:     { label: '入荷待',     color: 'default' },
@@ -165,6 +183,7 @@ const columns = [
   { title: '合計在庫', key: 'totalStock',                           width: 100 },
   { title: 'ステータス', key: 'status',                             width: 120 },
   { title: '公開状態', key: 'published',                            width: 100 },
+  { title: '有効/無効', key: 'active',                              width: 90 },
   { title: '操作',     key: 'action',                               width: 200 },
 ];
 
@@ -251,3 +270,10 @@ const handleBulkDelete = async () => {
 
 onMounted(fetchProducts);
 </script>
+
+<style scoped>
+:deep(.row-inactive) td {
+  background-color: #fafafa;
+  color: #999;
+}
+</style>

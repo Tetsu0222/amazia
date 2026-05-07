@@ -62,4 +62,33 @@ class UpdateProductTest extends TestCase
             && $req['acceptBackorder']   === true
         );
     }
+
+    public function test_isActive_falseがCoreに透過されること(): void
+    {
+        // フェーズ16 Step1: Market 露出 ON/OFF スイッチを Core に透過する。
+        Http::fake(["{$this->coreApiUrl}/1" => Http::response(['id' => 1, 'name' => '非表示商品', 'isActive' => false], 200)]);
+
+        $this->putJson('/api/products/1', [
+            'name'     => '非表示商品',
+            'isActive' => false,
+        ])->assertStatus(200);
+
+        Http::assertSent(fn($req) =>
+            $req->url() === "{$this->coreApiUrl}/1"
+            && $req['isActive'] === false
+        );
+    }
+
+    public function test_isActive未指定時はtrueを既定値としてCoreに送ること(): void
+    {
+        Http::fake(["{$this->coreApiUrl}/1" => Http::response(['id' => 1], 200)]);
+
+        $this->putJson('/api/products/1', ['name' => 'デフォルト'])
+             ->assertStatus(200);
+
+        Http::assertSent(fn($req) =>
+            $req->url() === "{$this->coreApiUrl}/1"
+            && $req['isActive'] === true
+        );
+    }
 }

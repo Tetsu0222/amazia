@@ -108,6 +108,7 @@
 | preorderStartDate | date | × | 予約開始日（YYYY-MM-DD）。フェーズ14.5 追加 |
 | acceptPreorder | boolean | × | 予約購入受付フラグ。既定 false。フェーズ14.5 追加 |
 | acceptBackorder | boolean | × | 在庫切れ予約継続フラグ。既定 false。フェーズ14.5 追加 |
+| isActive | boolean | × | Market 露出フラグ。既定 true。FALSE で Market 非表示。フェーズ16 Step1 追加 |
 
 そのまま Core `POST /api/products` に中継する。
 
@@ -132,7 +133,7 @@
 
 **リクエストボディ**
 
-商品登録と同じパラメータ（フェーズ14.5 追加 4 カラム含む）を Core `PUT /api/products/{id}` に中継する。
+商品登録と同じパラメータ（フェーズ14.5 追加 4 カラム + フェーズ16 Step1 追加 `isActive` 含む）を Core `PUT /api/products/{id}` に中継する。
 
 ---
 

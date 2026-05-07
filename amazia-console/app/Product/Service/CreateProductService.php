@@ -35,6 +35,7 @@ class CreateProductService
             'preorderStartDate' => $data['preorderStartDate'] ?? null,
             'acceptPreorder'    => $data['acceptPreorder']    ?? false,
             'acceptBackorder'   => $data['acceptBackorder']   ?? false,
+            'isActive'          => $data['isActive']          ?? true,
         ];
     }
 }
