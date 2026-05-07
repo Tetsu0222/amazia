@@ -481,10 +481,15 @@ jobs:
 
           SQL="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='amazia' AND table_name IN (${IN_LIST});"
 
-          # SSM 経由で MySQL コンテナに接続。MYSQL_ROOT_PASSWORD は EC2 上の .env で解決される。
-          PARAMS_JSON=$(jq -n --arg sql "$SQL" '{
+          # SSM 経由で MySQL コンテナに接続。
+          # MYSQL_ROOT_PASSWORD は amazia-mysql コンテナ内の env で解決させる。
+          # SSM RunShellScript は EC2 ホスト側で bash 解釈するため、$MYSQL_ROOT_PASSWORD を
+          # シングルクォート（'…'）で包み、ホスト側で空展開されないようにする。
+          # 旧実装はダブルクォートで包んでおりホスト側で空文字に展開され `Access denied (using password: NO)` で落ちていた。
+          INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$SQL\""
+          PARAMS_JSON=$(jq -n --arg inner "$INNER_SH" '{
             commands: [
-              ("docker exec amazia-mysql sh -c \"mysql -uroot -p$MYSQL_ROOT_PASSWORD amazia -N -e \\\"" + $sql + "\\\"\"")
+              ("docker exec amazia-mysql sh -c '\''" + $inner + "'\''")
             ]
           }')
           CID=$(aws ssm send-command \
@@ -537,9 +542,11 @@ jobs:
           if [ "$ACTUAL_COUNT" -lt "$EXPECTED_COUNT" ]; then
             # 不足テーブルを特定（実在テーブル一覧を取得して required との差分を出す）
             DIFF_SQL="SELECT table_name FROM information_schema.tables WHERE table_schema='amazia' AND table_name IN (${IN_LIST}) ORDER BY table_name;"
-            DIFF_PARAMS_JSON=$(jq -n --arg sql "$DIFF_SQL" '{
+            # 上記 SQL 同様、$MYSQL_ROOT_PASSWORD はシングルクォートで包んでコンテナ内まで届ける
+            DIFF_INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$DIFF_SQL\""
+            DIFF_PARAMS_JSON=$(jq -n --arg inner "$DIFF_INNER_SH" '{
               commands: [
-                ("docker exec amazia-mysql sh -c \"mysql -uroot -p$MYSQL_ROOT_PASSWORD amazia -N -e \\\"" + $sql + "\\\"\"")
+                ("docker exec amazia-mysql sh -c '\''" + $inner + "'\''")
               ]
             }')
             DIFF_CID=$(aws ssm send-command \
@@ -634,11 +641,14 @@ jobs:
           S3_KEY="schema-snapshots/${DATE}.sql"
           S3_URI="s3://fullstack-renaissance-demo/${S3_KEY}"
 
-          # MYSQL_ROOT_PASSWORD は EC2 上の .env から解決させる。
+          # MYSQL_ROOT_PASSWORD は amazia-mysql コンテナ内の env で解決させる。
+          # sh -c の引数はシングルクォートで包み、EC2 ホスト側で $MYSQL_ROOT_PASSWORD が空展開されないようにする
+          # （旧実装はダブルクォート展開で空文字になり 044 同型の認証エラーが発生していた）。
           # mysqldump は標準出力に DDL を吐き、aws s3 cp - で直接アップロード（中間ファイル不要）。
-          PARAMS_JSON=$(jq -n --arg uri "$S3_URI" '{
+          DUMP_INNER_SH='mysqldump --no-data --no-tablespaces -uroot -p"$MYSQL_ROOT_PASSWORD" amazia'
+          PARAMS_JSON=$(jq -n --arg uri "$S3_URI" --arg inner "$DUMP_INNER_SH" '{
             commands: [
-              ("docker exec amazia-mysql sh -c \"mysqldump --no-data --no-tablespaces -uroot -p$MYSQL_ROOT_PASSWORD amazia\" | aws s3 cp - " + $uri)
+              ("docker exec amazia-mysql sh -c '\''" + $inner + "'\'' | aws s3 cp - " + $uri)
             ]
           }')
           CID=$(aws ssm send-command \

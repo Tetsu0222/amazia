@@ -117,10 +117,10 @@
               title="削除しますか？"
               ok-text="削除"
               cancel-text="キャンセル"
+              placement="topRight"
               @confirm="handleDelete(record.id)"
-              @click.stop
             >
-              <a-button size="small" danger>削除</a-button>
+              <a-button size="small" danger @click.stop>削除</a-button>
             </a-popconfirm>
           </a-space>
         </template>
