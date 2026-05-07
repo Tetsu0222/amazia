@@ -1,70 +1,74 @@
 <template>
-  <div style="padding: 24px; max-width: 1200px">
-    <a-page-header title="予約管理" sub-title="Amazia Console" />
+  <div style="padding: 24px">
+    <a-page-header title="予約管理">
+      <template #description>
+        <span style="color: rgba(0, 0, 0, 0.45); font-size: 13px">
+          {{ countLabel }}
+        </span>
+      </template>
+    </a-page-header>
 
-    <a-card size="small" style="margin-bottom: 16px" :body-style="{ padding: '12px 16px' }">
-      <a-form layout="inline" :model="searchForm">
-        <a-form-item label="商品名">
-          <a-input
-            v-model:value="searchForm.name"
-            placeholder="部分一致で検索"
-            allow-clear
-            style="width: 200px"
-          />
-        </a-form-item>
-        <a-form-item label="価格">
+    <SearchCard
+      wide-field-label="商品名"
+      wide-field-placeholder="部分一致で検索"
+      v-model:wide-field-value="searchForm.name"
+      @clear="resetSearch"
+    >
+      <a-form-item label="価格" class="span-2">
+        <a-input-group compact>
           <a-input-number
             v-model:value="searchForm.minPrice"
             placeholder="最低"
             :min="0"
             :step="100"
-            style="width: 110px"
+            style="width: 120px"
           />
-          <span style="margin: 0 6px">〜</span>
+          <span class="range-sep">〜</span>
           <a-input-number
             v-model:value="searchForm.maxPrice"
             placeholder="最高"
             :min="0"
             :step="100"
-            style="width: 110px"
+            style="width: 120px"
           />
-          <span style="margin-left: 4px">円</span>
-        </a-form-item>
-        <a-form-item label="発売日">
+          <span class="range-unit">円</span>
+        </a-input-group>
+      </a-form-item>
+      <a-form-item label="発売日" class="span-2">
+        <a-input-group compact>
           <a-date-picker
             v-model:value="searchForm.releaseDateFrom"
             value-format="YYYY-MM-DD"
             placeholder="最早"
-            style="width: 140px"
+            style="width: 150px"
           />
-          <span style="margin: 0 6px">〜</span>
+          <span class="range-sep">〜</span>
           <a-date-picker
             v-model:value="searchForm.releaseDateTo"
             value-format="YYYY-MM-DD"
             placeholder="最遅"
-            style="width: 140px"
+            style="width: 150px"
           />
-        </a-form-item>
-        <a-form-item label="予約開始日">
+        </a-input-group>
+      </a-form-item>
+      <a-form-item label="予約開始日" class="span-2">
+        <a-input-group compact>
           <a-date-picker
             v-model:value="searchForm.preorderStartDateFrom"
             value-format="YYYY-MM-DD"
             placeholder="最早"
-            style="width: 140px"
+            style="width: 150px"
           />
-          <span style="margin: 0 6px">〜</span>
+          <span class="range-sep">〜</span>
           <a-date-picker
             v-model:value="searchForm.preorderStartDateTo"
             value-format="YYYY-MM-DD"
             placeholder="最遅"
-            style="width: 140px"
+            style="width: 150px"
           />
-        </a-form-item>
-        <a-form-item>
-          <a-button @click="resetSearch">クリア</a-button>
-        </a-form-item>
-      </a-form>
-    </a-card>
+        </a-input-group>
+      </a-form-item>
+    </SearchCard>
 
     <a-table
       :dataSource="filteredPreorders"
@@ -72,7 +76,8 @@
       :loading="loading"
       rowKey="productId"
       size="small"
-      :pagination="{ pageSize: 50 }"
+      :pagination="paginationConfig"
+      :locale="{ emptyText: '該当データがありません' }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'preorderStartDate'">
@@ -112,11 +117,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { listPreorders } from '../api/preorderApi.js';
+import SearchCard from '../../../components/SearchCard.vue';
 
 const preorders = ref([]);
 const loading = ref(false);
 
-const searchForm = ref({
+const initialSearchForm = () => ({
   name: '',
   minPrice: null,
   maxPrice: null,
@@ -126,16 +132,10 @@ const searchForm = ref({
   preorderStartDateTo: null,
 });
 
+const searchForm = ref(initialSearchForm());
+
 const resetSearch = () => {
-  searchForm.value = {
-    name: '',
-    minPrice: null,
-    maxPrice: null,
-    releaseDateFrom: null,
-    releaseDateTo: null,
-    preorderStartDateFrom: null,
-    preorderStartDateTo: null,
-  };
+  searchForm.value = initialSearchForm();
 };
 
 const filteredPreorders = computed(() => {
@@ -178,6 +178,27 @@ const filteredPreorders = computed(() => {
   });
 });
 
+const isFilterApplied = computed(() => {
+  const f = searchForm.value;
+  return !!(
+    (f.name || '').trim() ||
+    f.minPrice != null ||
+    f.maxPrice != null ||
+    f.releaseDateFrom ||
+    f.releaseDateTo ||
+    f.preorderStartDateFrom ||
+    f.preorderStartDateTo
+  );
+});
+
+const countLabel = computed(() => {
+  const total = preorders.value.length;
+  const shown = filteredPreorders.value.length;
+  return isFilterApplied.value
+    ? `全 ${total} 件中 ${shown} 件を表示（フィルタ適用中）`
+    : `全 ${total} 件中 ${shown} 件を表示`;
+});
+
 const columns = [
   { title: '商品ID',       dataIndex: 'productId',         key: 'productId' },
   { title: '商品名',       dataIndex: 'productName',       key: 'productName' },
@@ -186,10 +207,17 @@ const columns = [
   { title: '発売日',       dataIndex: 'releaseDate',       key: 'releaseDate' },
   { title: '発売まで',     dataIndex: 'daysUntilRelease',  key: 'daysUntilRelease' },
   { title: '予約受付',     dataIndex: 'acceptPreorder',    key: 'acceptPreorder' },
-  { title: '予約数',       dataIndex: 'preorderQuantity',  key: 'preorderQuantity' },
-  { title: '予約金額（円）', dataIndex: 'preorderAmount',  key: 'preorderAmount' },
+  { title: '予約数',       dataIndex: 'preorderQuantity',  key: 'preorderQuantity', align: 'right' },
+  { title: '予約金額（円）', dataIndex: 'preorderAmount',  key: 'preorderAmount',   align: 'right' },
   { title: 'Market 公開',  dataIndex: 'isActive',          key: 'isActive' },
 ];
+
+const paginationConfig = {
+  defaultPageSize: 50,
+  showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+  showSizeChanger: true,
+  pageSizeOptions: ['50', '100', '200'],
+};
 
 function formatDaysUntilRelease(days) {
   if (days == null) return '—';

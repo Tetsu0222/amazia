@@ -1,100 +1,104 @@
 <template>
-  <div style="padding: 24px; max-width: 1400px">
-    <a-page-header title="配送管理" sub-title="Amazia Console" />
+  <div style="padding: 24px">
+    <a-page-header title="配送管理">
+      <template #description>
+        <a-space :size="8">
+          <span style="color: rgba(0, 0, 0, 0.65); font-size: 14px">{{ countLabel }}</span>
+          <a-tag v-if="isFilterApplied" color="blue">フィルタ適用中</a-tag>
+        </a-space>
+      </template>
+    </a-page-header>
 
-    <a-card size="small" style="margin-bottom: 16px" :body-style="{ padding: '12px 16px' }">
-      <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px">
-        <span style="font-weight: 500; min-width: 80px">追跡番号</span>
-        <a-input
-          v-model:value="searchForm.trackingCode"
-          placeholder="部分一致で検索"
-          allow-clear
-          style="flex: 1; max-width: 480px"
+    <SearchCard
+      wide-field-label="追跡番号"
+      :wide-field-value="searchForm.trackingCode"
+      @update:wide-field-value="searchForm.trackingCode = $event"
+      @clear="resetSearch"
+    >
+      <a-form-item label="売上ID">
+        <a-input-number
+          v-model:value="searchForm.salesId"
+          placeholder="完全一致"
+          :min="1"
+          style="width: 100%"
         />
-      </div>
-      <a-form layout="inline" :model="searchForm">
-        <a-form-item label="売上ID">
-          <a-input-number
-            v-model:value="searchForm.salesId"
-            placeholder="完全一致"
-            :min="1"
-            style="width: 110px"
-          />
-        </a-form-item>
-        <a-form-item label="配送方法">
-          <a-select
-            v-model:value="searchForm.shippingMethodId"
-            allow-clear
-            placeholder="すべて"
-            style="width: 140px"
-          >
-            <a-select-option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="配送ステータス">
-          <a-select
-            v-model:value="searchForm.shippingStatusId"
-            allow-clear
-            placeholder="すべて"
-            style="width: 180px"
-          >
-            <a-select-option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="配送予定日">
+      </a-form-item>
+      <a-form-item label="配送方法">
+        <a-select
+          v-model:value="searchForm.shippingMethodId"
+          allow-clear
+          placeholder="すべて"
+          style="width: 100%"
+        >
+          <a-select-option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item label="配送ステータス">
+        <a-select
+          v-model:value="searchForm.shippingStatusId"
+          allow-clear
+          placeholder="すべて"
+          style="width: 100%"
+        >
+          <a-select-option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item label="配送予定日" class="span-2">
+        <a-input-group compact class="range-group">
           <a-date-picker
             v-model:value="searchForm.scheduledDateFrom"
             value-format="YYYY-MM-DD"
             placeholder="最早"
-            style="width: 140px"
+            style="flex: 1; min-width: 0"
           />
-          <span style="margin: 0 6px">〜</span>
+          <span class="range-sep">〜</span>
           <a-date-picker
             v-model:value="searchForm.scheduledDateTo"
             value-format="YYYY-MM-DD"
             placeholder="最遅"
-            style="width: 140px"
+            style="flex: 1; min-width: 0"
           />
-        </a-form-item>
-        <a-form-item label="発送日">
+        </a-input-group>
+      </a-form-item>
+      <a-form-item label="発送日" class="span-2">
+        <a-input-group compact class="range-group">
           <a-date-picker
             v-model:value="searchForm.shippedDateFrom"
             value-format="YYYY-MM-DD"
             placeholder="最早"
-            style="width: 140px"
+            style="flex: 1; min-width: 0"
           />
-          <span style="margin: 0 6px">〜</span>
+          <span class="range-sep">〜</span>
           <a-date-picker
             v-model:value="searchForm.shippedDateTo"
             value-format="YYYY-MM-DD"
             placeholder="最遅"
-            style="width: 140px"
+            style="flex: 1; min-width: 0"
           />
-        </a-form-item>
-        <a-form-item label="配達完了日">
+        </a-input-group>
+      </a-form-item>
+      <a-form-item label="配達完了日" class="span-2">
+        <a-input-group compact class="range-group">
           <a-date-picker
             v-model:value="searchForm.deliveredDateFrom"
             value-format="YYYY-MM-DD"
             placeholder="最早"
-            style="width: 140px"
+            style="flex: 1; min-width: 0"
           />
-          <span style="margin: 0 6px">〜</span>
+          <span class="range-sep">〜</span>
           <a-date-picker
             v-model:value="searchForm.deliveredDateTo"
             value-format="YYYY-MM-DD"
             placeholder="最遅"
-            style="width: 140px"
+            style="flex: 1; min-width: 0"
           />
-        </a-form-item>
-        <a-form-item>
-          <a-button @click="resetSearch">クリア</a-button>
-        </a-form-item>
-      </a-form>
-    </a-card>
+        </a-input-group>
+      </a-form-item>
+    </SearchCard>
 
     <a-table
       :dataSource="filteredDeliveries"
@@ -102,11 +106,12 @@
       :loading="loading"
       rowKey="id"
       size="small"
-      :pagination="{ pageSize: 50 }"
+      :pagination="paginationConfig"
+      :locale="{ emptyText: '該当データがありません' }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
-          <a-button type="link" size="small" @click="goDetail(record.id)">詳細</a-button>
+          <a-button type="default" size="small" @click="goDetail(record.id)">詳細</a-button>
         </template>
       </template>
     </a-table>
@@ -114,17 +119,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, h } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { listDeliveries } from '../api/deliveryApi.js';
+import SearchCard from '../../../components/SearchCard.vue';
 
 const SHIPPING_STATUS_LABEL = {
-  1: '配送準備中（PENDING）',
-  2: '配送済（SHIPPED）',
-  3: '配送完了（DELIVERED）',
-  4: '返品申請中（RETURN_REQUESTED）',
-  5: '返品完了（RETURNED）',
+  1: '配送準備中',
+  2: '配送済',
+  3: '配送完了',
+  4: '返品申請中',
+  5: '返品完了',
 };
 
 const SHIPPING_METHOD_LABEL = {
@@ -151,7 +157,7 @@ const methodOptions = [
   { value: 3, label: '置き配' },
 ];
 
-const searchForm = ref({
+const initialSearchForm = () => ({
   trackingCode: '',
   salesId: null,
   shippingMethodId: undefined,
@@ -164,19 +170,10 @@ const searchForm = ref({
   deliveredDateTo: null,
 });
 
+const searchForm = ref(initialSearchForm());
+
 const resetSearch = () => {
-  searchForm.value = {
-    trackingCode: '',
-    salesId: null,
-    shippingMethodId: undefined,
-    shippingStatusId: undefined,
-    scheduledDateFrom: null,
-    scheduledDateTo: null,
-    shippedDateFrom: null,
-    shippedDateTo: null,
-    deliveredDateFrom: null,
-    deliveredDateTo: null,
-  };
+  searchForm.value = initialSearchForm();
 };
 
 const filteredDeliveries = computed(() => {
@@ -212,9 +209,39 @@ const filteredDeliveries = computed(() => {
   });
 });
 
+const isFilterApplied = computed(() => {
+  const f = searchForm.value;
+  return !!(
+    (f.trackingCode || '').trim() ||
+    f.salesId != null ||
+    f.shippingMethodId != null ||
+    f.shippingStatusId != null ||
+    f.scheduledDateFrom ||
+    f.scheduledDateTo ||
+    f.shippedDateFrom ||
+    f.shippedDateTo ||
+    f.deliveredDateFrom ||
+    f.deliveredDateTo
+  );
+});
+
+const countLabel = computed(() => {
+  const total = deliveries.value.length;
+  const shown = filteredDeliveries.value.length;
+  return `全 ${total} 件中 ${shown} 件を表示`;
+});
+
+const headerLeft = (label) => () =>
+  h('span', { style: 'display: block; text-align: left' }, label);
+
+const dimmedDash = (text) =>
+  text == null
+    ? h('span', { style: 'color: #ccc' }, '—')
+    : text;
+
 const columns = [
-  { title: 'ID',          dataIndex: 'id',                key: 'id',         width: 80 },
-  { title: '売上ID',      dataIndex: 'salesId',           key: 'salesId',    width: 100 },
+  { title: headerLeft('ID'),       dataIndex: 'id',                key: 'id',         width: 80, align: 'right' },
+  { title: headerLeft('売上ID'),   dataIndex: 'salesId',           key: 'salesId',    width: 100, align: 'right' },
   { title: '配送方法',    dataIndex: 'shippingMethodId',  key: 'shippingMethodId',
     customRender: ({ text }) => SHIPPING_METHOD_LABEL[text] ?? `#${text}` },
   { title: '配送ステータス', dataIndex: 'shippingStatusId', key: 'shippingStatusId',
@@ -222,13 +249,20 @@ const columns = [
   { title: '配送予定日',  dataIndex: 'scheduledDate',     key: 'scheduledDate',
     customRender: ({ text }) => text ?? '入荷待ち' },
   { title: '発送日',      dataIndex: 'shippedDate',       key: 'shippedDate',
-    customRender: ({ text }) => text ?? '—' },
+    customRender: ({ text }) => dimmedDash(text) },
   { title: '配達完了日',  dataIndex: 'deliveredDate',     key: 'deliveredDate',
-    customRender: ({ text }) => text ?? '—' },
-  { title: '追跡番号',    dataIndex: 'trackingCode',      key: 'trackingCode',
-    customRender: ({ text }) => text ?? '—' },
-  { title: '操作',        key: 'actions',                 width: 100 },
+    customRender: ({ text }) => dimmedDash(text) },
+  { title: '追跡番号',    dataIndex: 'trackingCode',      key: 'trackingCode', width: 140,
+    customRender: ({ text }) => dimmedDash(text) },
+  { title: '操作',        key: 'actions',                 width: 80 },
 ];
+
+const paginationConfig = {
+  defaultPageSize: 50,
+  showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+  showSizeChanger: true,
+  pageSizeOptions: ['50', '100', '200'],
+};
 
 async function reload() {
   loading.value = true;
@@ -249,3 +283,11 @@ function goDetail(id) {
 
 onMounted(reload);
 </script>
+
+<style scoped>
+:deep(.range-group) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+</style>

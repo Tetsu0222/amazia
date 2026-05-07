@@ -1,14 +1,24 @@
 <template>
-  <div style="padding: 24px; max-width: 1200px">
-    <a-page-header title="返品管理" sub-title="Amazia Console" />
+  <div style="padding: 24px">
+    <a-page-header title="返品管理">
+      <template #description>
+        <a-space :size="8">
+          <span style="color: rgba(0, 0, 0, 0.65); font-size: 14px">{{ countLabel }}</span>
+          <a-tag v-if="isFilterApplied" color="blue">フィルタ適用中</a-tag>
+        </a-space>
+      </template>
+      <template #extra>
+        <a-button @click="fetchList" :loading="loading">再読込</a-button>
+      </template>
+    </a-page-header>
 
-    <a-form layout="inline" style="margin-bottom: 16px">
+    <SearchCard @clear="resetSearch">
       <a-form-item label="状態">
         <a-select
-          v-model:value="statusFilter"
-          style="width: 200px"
+          v-model:value="searchForm.status"
           allow-clear
           placeholder="すべて"
+          style="width: 100%"
         >
           <a-select-option value="REQUESTED">申請中</a-select-option>
           <a-select-option value="APPROVED">承認済み</a-select-option>
@@ -16,10 +26,53 @@
           <a-select-option value="REFUNDED">返金完了</a-select-option>
         </a-select>
       </a-form-item>
-      <a-form-item>
-        <a-button @click="fetchList" :loading="loading">再読込</a-button>
+      <a-form-item label="顧客名">
+        <a-input
+          v-model:value="searchForm.customerKeyword"
+          placeholder="部分一致で検索"
+          allow-clear
+        />
       </a-form-item>
-    </a-form>
+      <a-form-item label="商品名">
+        <a-input
+          v-model:value="searchForm.productKeyword"
+          placeholder="部分一致で検索"
+          allow-clear
+        />
+      </a-form-item>
+      <a-form-item label="売上ID">
+        <a-input-number
+          v-model:value="searchForm.salesId"
+          placeholder="完全一致"
+          :min="1"
+          style="width: 100%"
+        />
+      </a-form-item>
+      <a-form-item label="申請日" class="span-2">
+        <a-input-group compact class="range-group">
+          <a-date-picker
+            v-model:value="searchForm.createdAtFrom"
+            value-format="YYYY-MM-DD"
+            placeholder="最早"
+            style="flex: 1; min-width: 0"
+          />
+          <span class="range-sep">〜</span>
+          <a-date-picker
+            v-model:value="searchForm.createdAtTo"
+            value-format="YYYY-MM-DD"
+            placeholder="最遅"
+            style="flex: 1; min-width: 0"
+          />
+        </a-input-group>
+      </a-form-item>
+      <a-form-item label="理由">
+        <a-input
+          v-model:value="searchForm.reasonKeyword"
+          placeholder="部分一致で検索"
+          allow-clear
+        />
+      </a-form-item>
+    </SearchCard>
 
     <a-table
       :dataSource="filteredList"
@@ -27,11 +80,37 @@
       :loading="loading"
       rowKey="id"
       size="small"
-      :pagination="{ pageSize: 50 }"
+      :pagination="paginationConfig"
+      :locale="{ emptyText: '該当する返品申請がありません' }"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'action'">
-          <a-space>
+        <template v-if="column.key === 'createdAt'">
+          <div class="datetime-block">
+            <div>{{ record.createdAt?.slice(0, 10) ?? '—' }}</div>
+            <div class="datetime-time">{{ record.createdAt?.slice(11, 16) ?? '' }}</div>
+          </div>
+        </template>
+        <template v-else-if="column.key === 'approvedAt'">
+          <div class="datetime-block">
+            <div>{{ record.approvedAt?.slice(0, 10) ?? '—' }}</div>
+            <div class="datetime-time">{{ record.approvedAt?.slice(11, 16) ?? '' }}</div>
+          </div>
+        </template>
+        <template v-else-if="column.key === 'customerName'">
+          {{ normalizeName(record.customerName) ?? '' }}
+        </template>
+        <template v-else-if="column.key === 'reason'">
+          <a-tooltip v-if="record.reason" :title="record.reason" placement="topLeft">
+            <span class="reason-cell">{{ record.reason }}</span>
+          </a-tooltip>
+        </template>
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="STATUS_COLORS[record.status]" style="margin: 0">
+            {{ STATUS_LABELS[record.status] ?? record.status }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <a-space :size="4">
             <a-button
               v-if="record.status === 'REQUESTED'"
               type="primary"
@@ -53,16 +132,7 @@
               :loading="actionLoading[record.id] === 'refund'"
               @click="confirmAction(record, 'refund')"
             >返金完了</a-button>
-            <span v-if="record.status === 'REJECTED' || record.status === 'REFUNDED'" style="color: #888">—</span>
           </a-space>
-        </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="STATUS_COLORS[record.status]">
-            {{ STATUS_LABELS[record.status] ?? record.status }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'reason'">
-          <span :title="record.reason">{{ record.reason || '—' }}</span>
         </template>
       </template>
     </a-table>
@@ -78,6 +148,8 @@ import {
   rejectSalesReturn,
   refundSalesReturn,
 } from '../api/salesReturnApi.js';
+import SearchCard from '../../../components/SearchCard.vue';
+import { normalizeName } from '../../../utils/normalizeName.js';
 
 const STATUS_LABELS = {
   REQUESTED: '申請中',
@@ -100,29 +172,83 @@ const ACTION_DEF = {
 
 const list = ref([]);
 const loading = ref(false);
-const statusFilter = ref(null);
 const actionLoading = reactive({});
 
-const columns = [
-  { title: '申請日',     dataIndex: 'createdAt', key: 'createdAt',
-    customRender: ({ text }) => text ? text.replace('T', ' ').slice(0, 16) : '—' },
-  { title: '顧客',       dataIndex: 'customerName', key: 'customerName' },
-  { title: '商品名',     dataIndex: 'productName',  key: 'productName' },
-  { title: '色',         dataIndex: 'color',        key: 'color' },
-  { title: 'サイズ',     dataIndex: 'size',         key: 'size' },
-  { title: '数量',       dataIndex: 'quantity',     key: 'quantity' },
-  { title: '理由',       dataIndex: 'reason',       key: 'reason', ellipsis: true, width: 200 },
-  { title: '状態',       dataIndex: 'status',       key: 'status' },
-  { title: '承認日',     dataIndex: 'approvedAt',   key: 'approvedAt',
-    customRender: ({ text }) => text ? text.replace('T', ' ').slice(0, 16) : '—' },
-  { title: '売上ID',     dataIndex: 'salesId',      key: 'salesId' },
-  { title: '操作',       key: 'action', width: 200 },
-];
+const initialSearchForm = () => ({
+  status: undefined,
+  customerKeyword: '',
+  productKeyword: '',
+  salesId: null,
+  createdAtFrom: null,
+  createdAtTo: null,
+  reasonKeyword: '',
+});
+
+const searchForm = ref(initialSearchForm());
+
+const resetSearch = () => {
+  searchForm.value = initialSearchForm();
+};
 
 const filteredList = computed(() => {
-  if (!statusFilter.value) return list.value;
-  return list.value.filter((r) => r.status === statusFilter.value);
+  const f = searchForm.value;
+  const customerKeyword = (f.customerKeyword || '').trim();
+  const productKeyword = (f.productKeyword || '').trim().toLowerCase();
+  const reasonKeyword = (f.reasonKeyword || '').trim().toLowerCase();
+
+  return list.value.filter(r => {
+    if (f.status && r.status !== f.status) return false;
+    if (customerKeyword && !(normalizeName(r.customerName) || '').includes(customerKeyword)) return false;
+    if (productKeyword && !(r.productName || '').toLowerCase().includes(productKeyword)) return false;
+    if (f.salesId != null && r.salesId !== f.salesId) return false;
+    if (f.createdAtFrom && (r.createdAt?.slice(0, 10) ?? '') < f.createdAtFrom) return false;
+    if (f.createdAtTo   && (r.createdAt?.slice(0, 10) ?? '') > f.createdAtTo)   return false;
+    if (reasonKeyword && !(r.reason || '').toLowerCase().includes(reasonKeyword)) return false;
+    return true;
+  });
 });
+
+const isFilterApplied = computed(() => {
+  const f = searchForm.value;
+  return !!(
+    f.status ||
+    (f.customerKeyword || '').trim() ||
+    (f.productKeyword || '').trim() ||
+    f.salesId != null ||
+    f.createdAtFrom ||
+    f.createdAtTo ||
+    (f.reasonKeyword || '').trim()
+  );
+});
+
+const countLabel = computed(() => {
+  const total = list.value.length;
+  const shown = filteredList.value.length;
+  const suffix = isFilterApplied.value ? '（フィルタ適用中）' : '';
+  return `全 ${total} 件中 ${shown} 件を表示${suffix}`;
+});
+
+const columns = [
+  { title: '申請日',   dataIndex: 'createdAt',    key: 'createdAt',    width: 140 },
+  { title: '顧客',     dataIndex: 'customerName', key: 'customerName', width: 120 },
+  { title: '商品名',   dataIndex: 'productName',  key: 'productName' },
+  { title: '色',       dataIndex: 'color',        key: 'color' },
+  { title: 'サイズ',   dataIndex: 'size',         key: 'size' },
+  { title: '数量',     dataIndex: 'quantity',     key: 'quantity', align: 'right' },
+  { title: '理由',     dataIndex: 'reason',       key: 'reason', width: 240,
+    ellipsis: { showTitle: false } },
+  { title: '状態',     dataIndex: 'status',       key: 'status' },
+  { title: '承認日',   dataIndex: 'approvedAt',   key: 'approvedAt',   width: 140 },
+  { title: '売上ID',   dataIndex: 'salesId',      key: 'salesId', align: 'right' },
+  { title: '操作',     key: 'action', width: 180 },
+];
+
+const paginationConfig = {
+  defaultPageSize: 50,
+  showTotal: (total, range) => `${range[0]}-${range[1]} / 全 ${total} 件`,
+  showSizeChanger: true,
+  pageSizeOptions: ['50', '100', '200'],
+};
 
 async function fetchList() {
   loading.value = true;
@@ -141,7 +267,7 @@ function confirmAction(record, action) {
   const def = ACTION_DEF[action];
   Modal.confirm({
     title: `${def.label}しますか？`,
-    content: `売上ID ${record.salesId}（${record.productName} / ${record.color} / ${record.size}）の返品申請を${def.label}します。`,
+    content: `売上ID ${record.salesId}：${record.productName}（${record.color} / ${record.size}）`,
     okText: def.label,
     cancelText: 'キャンセル',
     onOk: () => runAction(record, action),
@@ -171,3 +297,26 @@ async function runAction(record, action) {
 
 onMounted(fetchList);
 </script>
+
+<style scoped>
+.datetime-block {
+  line-height: 1.3;
+}
+.datetime-time {
+  color: #999;
+  font-size: 12px;
+}
+.reason-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+:deep(.range-group) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+</style>

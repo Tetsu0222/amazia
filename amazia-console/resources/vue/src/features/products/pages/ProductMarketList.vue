@@ -17,7 +17,7 @@
 
     <a-card size="small" style="margin-bottom: 16px" :body-style="{ padding: '12px 16px' }">
       <a-form layout="vertical" :model="searchForm">
-        <div class="search-grid">
+        <div class="search-row search-row--basic">
           <a-form-item label="商品名">
             <a-input
               v-model:value="searchForm.name"
@@ -45,6 +45,8 @@
               <span class="range-unit">円</span>
             </a-input-group>
           </a-form-item>
+        </div>
+        <div class="search-row search-row--dates">
           <a-form-item label="発売日">
             <a-input-group compact class="range-group">
               <a-date-picker
@@ -79,6 +81,8 @@
               />
             </a-input-group>
           </a-form-item>
+        </div>
+        <div class="search-row search-row--status">
           <a-form-item label="在庫">
             <a-radio-group v-model:value="searchForm.stockFilter" button-style="solid">
               <a-radio-button value="all">すべて</a-radio-button>
@@ -390,15 +394,25 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.search-grid {
+.search-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  column-gap: 16px;
-  row-gap: 8px;
+  gap: 0 16px;
   align-items: end;
 }
 
-.search-grid :deep(.ant-form-item) {
+.search-row--basic {
+  grid-template-columns: 2fr 1fr;
+}
+
+.search-row--dates {
+  grid-template-columns: 1fr 1fr;
+}
+
+.search-row--status {
+  grid-template-columns: auto 1fr;
+}
+
+.search-row :deep(.ant-form-item) {
   margin-bottom: 8px;
 }
 
@@ -434,6 +448,11 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .search-row--basic,
+  .search-row--dates,
+  .search-row--status {
+    grid-template-columns: 1fr;
+  }
   .search-clear {
     justify-self: start;
   }

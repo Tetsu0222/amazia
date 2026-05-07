@@ -4,27 +4,36 @@
 
     <a-form layout="inline" style="margin-bottom: 16px" @submit.prevent="fetchList">
       <a-form-item label="画面名">
-        <a-input
+        <a-select
           v-model:value="screenNameInput"
-          placeholder="例: console.sales_return"
+          placeholder="画面名を選択"
           style="width: 240px"
           allow-clear
+          show-search
+          option-filter-prop="label"
+          :options="screenNameOptions"
         />
       </a-form-item>
       <a-form-item label="API名">
-        <a-input
+        <a-select
           v-model:value="apiNameInput"
-          placeholder="例: /api/sales-returns"
+          placeholder="API名を選択"
           style="width: 240px"
           allow-clear
+          show-search
+          option-filter-prop="label"
+          :options="apiNameOptions"
         />
       </a-form-item>
       <a-form-item label="操作">
-        <a-input
+        <a-select
           v-model:value="actionInput"
-          placeholder="例: approve_sales_return"
+          placeholder="操作を選択"
           style="width: 240px"
           allow-clear
+          show-search
+          option-filter-prop="label"
+          :options="actionOptions"
         />
       </a-form-item>
       <a-form-item>
@@ -71,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import { listOperationLogs } from '../api/operationLogApi.js';
 import {
@@ -85,9 +94,16 @@ import {
 const logs = ref([]);
 const loading = ref(false);
 
-const screenNameInput = ref('');
-const apiNameInput = ref('');
-const actionInput = ref('');
+const screenNameInput = ref(undefined);
+const apiNameInput = ref(undefined);
+const actionInput = ref(undefined);
+
+const toOptions = (map) =>
+  Object.entries(map).map(([value, label]) => ({ value, label }));
+
+const screenNameOptions = computed(() => toOptions(SCREEN_NAME_LABELS));
+const apiNameOptions = computed(() => toOptions(API_NAME_LABELS));
+const actionOptions = computed(() => toOptions(ACTION_LABELS));
 
 const columns = [
   { title: '操作日時', key: 'createdAt',  width: 160 },
@@ -122,9 +138,9 @@ async function fetchList() {
 }
 
 function resetFilters() {
-  screenNameInput.value = '';
-  apiNameInput.value = '';
-  actionInput.value = '';
+  screenNameInput.value = undefined;
+  apiNameInput.value = undefined;
+  actionInput.value = undefined;
   fetchList();
 }
 
