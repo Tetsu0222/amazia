@@ -243,6 +243,8 @@ flowchart TD
 | Phase X-2 | デプロイパイプライン再設計 | ✅ 完了 | [phaseX-2_deploy_pipeline_redesign.md](docs/design/phaseX/phaseX-2_deploy_pipeline_redesign.md) |
 | Phase X-3 | HTTPS化（CloudFront + DDNS / 1ドメイン構成） | ✅ 完了 | [phaseX-3_https_via_cloudfront.md](docs/design/phaseX/phaseX-3_https_via_cloudfront.md) |
 | Phase X-4 | t3.micro 復帰のためのメモリ最適化（Spring Heap制限 + Swap） | ✅ 完了  | [phaseX-4_memory_optimization_for_t3_micro.md](docs/design/phaseX/phaseX-4_memory_optimization_for_t3_micro.md) |
+| Phase X-5 | 都道府県別リードタイムマスタ化 | 🔲 未着手 | [phaseX-5_prefecture_based_lead_time.md](docs/design/phaseX/phaseX-5_prefecture_based_lead_time.md) |
+| Phase X-6 | デプロイ後 主要テーブル存在確認 + 起動 WARN ログ抽出 | ✅ 完了 | [phaseX-6_post_deploy_schema_healthcheck.md](docs/design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) |
 | Phase X-7 | AI協働アンチパターン集の整備 | ✅ 完了 | [phaseX-7_ai_collaboration_antipatterns.md](docs/design/phaseX/phaseX-7_ai_collaboration_antipatterns.md) |
 
 ---
