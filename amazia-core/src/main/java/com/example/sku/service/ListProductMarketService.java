@@ -44,10 +44,14 @@ public class ListProductMarketService {
         // 設計書 phase14_5_preorder_status.md §4-2:
         //   NOT_PUBLIC のみ一覧から除外。SOLD_OUT / BACK_ORDER / PRE_ORDER 等は表示する
         //   （ステータス別の見せ方は Market 側で分岐）
+        // 040: 価格未登録（全 SKU で minPrice=null）の商品も Market から除外する。
+        //   Console での出品ミス（SKU 価格未登録のまま公開）が UI に露出しないよう
+        //   サーバ側で弾く（Market 側の UI 防御と二重化）。
         return productRepository.findAll().stream()
                 .map(this::buildSummary)
                 .filter(summary -> summary != null)
                 .filter(summary -> summary.getPreorderStatus() != PreorderStatus.NOT_PUBLIC)
+                .filter(summary -> summary.getMinPrice() != null)
                 .collect(Collectors.toList());
     }
 
@@ -58,6 +62,12 @@ public class ListProductMarketService {
         List<SkuDetail> skuDetails = skuRepository.findByProductIdOrderByIdAsc(productId).stream()
                 .map(this::buildSkuDetail)
                 .collect(Collectors.toList());
+
+        // 040: SKU 0 件 / 全 SKU で価格未登録 の商品は Market 詳細でも 404 とする
+        boolean anyPriceRegistered = skuDetails.stream().anyMatch(s -> s.getPrice() != null);
+        if (skuDetails.isEmpty() || !anyPriceRegistered) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません");
+        }
 
         PreorderStatus status = preorderStatusService.judge(productId);
         return new ProductMarketDetail(product, skuDetails, status);

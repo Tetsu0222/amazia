@@ -120,6 +120,20 @@ describe('Checkout', () => {
     expect(screen.getByRole('button', { name: '予約を確定する' })).toBeEnabled();
   });
 
+  it('予約モード: 価格未設定 SKU は合計が「価格未定」と表示される', async () => {
+    productsApi.getMarketProduct.mockResolvedValue({
+      product: { name: '価格未定商品', description: '' },
+      skus: [{ skuId: 301, color: 'DEFAULT', size: 'FREE', price: null, stock: 0, images: [] }],
+      preorderStatus: 'PRE_ORDER',
+    });
+    renderCheckout('product_id=9&sku_id=301&quantity=1&preorder=1');
+
+    await waitFor(() => screen.getByText('ご予約内容の確認'));
+    expect(screen.getByText('価格未定')).toBeInTheDocument();
+    // 0 円表記が出ていないこと
+    expect(screen.queryByText('¥0')).not.toBeInTheDocument();
+  });
+
   it('予約モード: confirmOrder に preorder:true で送信される', async () => {
     checkoutApi.confirmOrder.mockResolvedValue({
       salesId: 2, paymentId: 'pay-2', amount: 4000, quantity: 1,

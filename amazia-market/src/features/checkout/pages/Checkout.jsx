@@ -83,8 +83,9 @@ export default function Checkout() {
     return productData.skus.find(s => s.skuId === skuId) ?? null;
   }, [productData, skuId]);
 
+  // 価格未設定 SKU は totalAmount=null として「価格未定」を表示する
   const totalAmount = useMemo(() => {
-    if (!selectedSku || selectedSku.price == null) return 0;
+    if (!selectedSku || selectedSku.price == null) return null;
     return selectedSku.price * quantity;
   }, [selectedSku, quantity]);
 
@@ -200,7 +201,9 @@ export default function Checkout() {
 
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Typography variant="subtitle1">合計</Typography>
-            <Typography variant="h5" color="primary">¥{totalAmount.toLocaleString()}</Typography>
+            <Typography variant="h5" color="primary">
+              {totalAmount != null ? `¥${totalAmount.toLocaleString()}` : '価格未定'}
+            </Typography>
           </Stack>
 
           {submitError && <Alert severity="error">{submitError}</Alert>}

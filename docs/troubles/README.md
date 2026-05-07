@@ -49,6 +49,7 @@
 | 037 | [Flyway 利用と誤認しフェーズ14テーブルが本番に作成されず](037_flyway_misassumed_phase14_tables_missing.md) | 本プロジェクトは Flyway 未導入で `schema.sql` 方式だが、`db/migration/` ディレクトリの存在から Flyway と外挿。Step 0/A で作った V6-V11 が死ファイル化し、注文確定 API が `payment_methods` 不在で 500 になっていた。035 と同型の「外挿による誤認」の再発（メタ評価対象） | ✅ 解決済 | - | - |
 | 038 | [products.price/stock の NOT NULL 残存で Console 商品登録が500](038_products_price_stock_not_null_drift.md) | フェーズ10で SKU 側に移行された旧 `price`/`stock` カラムの NOT NULL 制約が本番 MySQL に残存。Vue ProductForm が price/stock を送らない（=設計通り）リクエストで MySQL 1048 で 500。H2 テストでは Entity 通りに NULL 許容で再生成されるため検知されなかった。027 と同種の H2/本番乖離 | ✅ 解決済 | - | - |
 | 039 | [Market Checkout が preorder モード未対応で予約フローでも在庫バリデーションが効く](039_market_checkout_preorder_mode_missing.md) | C-4 で追加した予約フロー導線で `&preorder=1` 付きで checkout に遷移しても、Checkout.jsx 側がクエリを読み取っていなかったため通常注文フォームと同じ動作（在庫超過警告で確定不可）になっていた。Checkout のテスト未整備で画面間契約が漏れた | ✅ 解決済 | - | - |
+| 040 | [SKU 価格未登録の商品が Market に出て注文時に 400](040_market_lists_products_without_sku_price.md) | C-4 で在庫 0 商品も Market に表示するようにした副作用で、SKU 価格未登録の商品まで露出。注文画面まで進めても Core が `sku price not registered` で 400 を返す。EC 業界標準は「価格未登録は出品不可」。Service 層に「販売可否」概念が無かった構造的な問題 | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

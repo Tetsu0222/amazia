@@ -180,6 +180,50 @@ public class SkuAggregateControllerTest {
                 .andExpect(jsonPath("$.length()").value(1));
     }
 
+    // 040: 価格未登録（全 SKU で minPrice=null）の商品は Market から除外される
+    @Test
+    void 価格未登録の商品は一覧から除外されること() throws Exception {
+        Product noPriceProduct = new Product();
+        noPriceProduct.setName("価格未登録商品");
+        noPriceProduct.setDescription("");
+        Long noPriceId = productRepository.save(noPriceProduct).getId();
+
+        ProductSku sku = new ProductSku();
+        sku.setProductId(noPriceId);
+        sku.setSkuCode("SKU-NO-PRICE");
+        sku.setColor("DEFAULT");
+        sku.setSize("FREE");
+        Long npSkuId = skuRepository.save(sku).getId();
+
+        ProductSkuStock stock = new ProductSkuStock();
+        stock.setSkuId(npSkuId);
+        stock.setQuantity(5);
+        stockRepository.save(stock);
+        // 価格は登録しない
+
+        mockMvc.perform(get("/api/products/market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].productId").value(productId));
+    }
+
+    @Test
+    void 価格未登録の商品は詳細でも404が返ること() throws Exception {
+        Product noPriceProduct = new Product();
+        noPriceProduct.setName("価格未登録商品");
+        Long noPriceId = productRepository.save(noPriceProduct).getId();
+
+        ProductSku sku = new ProductSku();
+        sku.setProductId(noPriceId);
+        sku.setSkuCode("SKU-NO-PRICE-DETAIL");
+        sku.setColor("DEFAULT");
+        sku.setSize("FREE");
+        skuRepository.save(sku);
+
+        mockMvc.perform(get("/api/products/{id}/market", noPriceId))
+                .andExpect(status().isNotFound());
+    }
+
     @Test
     void SKU集約商品詳細が取得できること() throws Exception {
         mockMvc.perform(get("/api/products/{id}/market", productId))
