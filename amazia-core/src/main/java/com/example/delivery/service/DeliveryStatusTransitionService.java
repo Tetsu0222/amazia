@@ -2,6 +2,7 @@ package com.example.delivery.service;
 
 import com.example.delivery.entity.Delivery;
 import com.example.delivery.repository.DeliveryRepository;
+import com.example.inventory.service.InventorySyncService;
 import com.example.operationlog.entity.OperationLog;
 import com.example.operationlog.repository.OperationLogRepository;
 import com.example.sales.entity.Sales;
@@ -59,6 +60,7 @@ public class DeliveryStatusTransitionService {
     private final ProductSkuRepository skuRepository;
     private final ProductSkuStockRepository skuStockRepository;
     private final ProductSkuStockTransactionRepository skuStockTransactionRepository;
+    private final InventorySyncService inventorySyncService;
     private final OperationLogRepository operationLogRepository;
 
     private final long pendingId;
@@ -66,6 +68,7 @@ public class DeliveryStatusTransitionService {
     private final long deliveredId;
     private final long returnRequestedId;
     private final long returnedId;
+    private final long defaultWarehouseId;
     private final String txTypePreorderShipment;
 
     /** key=現在のステータス ID, value=許容される次ステータス ID 集合 */
@@ -77,24 +80,28 @@ public class DeliveryStatusTransitionService {
             ProductSkuRepository skuRepository,
             ProductSkuStockRepository skuStockRepository,
             ProductSkuStockTransactionRepository skuStockTransactionRepository,
+            InventorySyncService inventorySyncService,
             OperationLogRepository operationLogRepository,
             @Value("${amazia.sales.shipping-statuses.pending-id}")           long pendingId,
             @Value("${amazia.sales.shipping-statuses.shipped-id}")           long shippedId,
             @Value("${amazia.sales.shipping-statuses.delivered-id}")         long deliveredId,
             @Value("${amazia.sales.shipping-statuses.return-requested-id}")  long returnRequestedId,
             @Value("${amazia.sales.shipping-statuses.returned-id}")          long returnedId,
+            @Value("${amazia.delivery.default-warehouse-id}")                long defaultWarehouseId,
             @Value("${amazia.delivery.sku-stock-tx-types.sale-preorder-shipment}") String txTypePreorderShipment) {
         this.deliveryRepository = deliveryRepository;
         this.salesRepository = salesRepository;
         this.skuRepository = skuRepository;
         this.skuStockRepository = skuStockRepository;
         this.skuStockTransactionRepository = skuStockTransactionRepository;
+        this.inventorySyncService = inventorySyncService;
         this.operationLogRepository = operationLogRepository;
         this.pendingId = pendingId;
         this.shippedId = shippedId;
         this.deliveredId = deliveredId;
         this.returnRequestedId = returnRequestedId;
         this.returnedId = returnedId;
+        this.defaultWarehouseId = defaultWarehouseId;
         this.txTypePreorderShipment = txTypePreorderShipment;
 
         this.allowedTransitions = Map.of(
@@ -191,8 +198,9 @@ public class DeliveryStatusTransitionService {
         tx.setCreatedByUserId(actorUserId);
         skuStockTransactionRepository.save(tx);
 
-        // 並行運用期：inventories の同期減算は B-5 で InventorySyncService を DI して
-        // ここから呼び出す（RRRR-2）。本 Step B-2 ではフックポイントだけ確保。
+        // 並行運用：inventories も同期減算（RRRR-2）
+        inventorySyncService.applyDelta(sku.getProductId(), defaultWarehouseId,
+                -sales.getQuantity());
     }
 
     /**

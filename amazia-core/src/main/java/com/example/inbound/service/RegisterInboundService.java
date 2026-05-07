@@ -4,6 +4,7 @@ import com.example.delivery.service.DeliveryRescheduleService;
 import com.example.inbound.dto.RegisterInboundRequest;
 import com.example.inbound.entity.Inbound;
 import com.example.inbound.repository.InboundRepository;
+import com.example.inventory.service.InventorySyncService;
 import com.example.operationlog.entity.OperationLog;
 import com.example.operationlog.repository.OperationLogRepository;
 import com.example.product.repository.ProductRepository;
@@ -45,6 +46,7 @@ public class RegisterInboundService {
     private final ProductRepository productRepository;
     private final ProductSkuRepository skuRepository;
     private final ReceiveProductSkuStockService receiveProductSkuStockService;
+    private final InventorySyncService inventorySyncService;
     private final DeliveryRescheduleService deliveryRescheduleService;
     private final OperationLogRepository operationLogRepository;
 
@@ -55,6 +57,7 @@ public class RegisterInboundService {
             ProductRepository productRepository,
             ProductSkuRepository skuRepository,
             ReceiveProductSkuStockService receiveProductSkuStockService,
+            InventorySyncService inventorySyncService,
             DeliveryRescheduleService deliveryRescheduleService,
             OperationLogRepository operationLogRepository,
             @Value("${amazia.delivery.default-warehouse-id}") long defaultWarehouseId) {
@@ -62,6 +65,7 @@ public class RegisterInboundService {
         this.productRepository = productRepository;
         this.skuRepository = skuRepository;
         this.receiveProductSkuStockService = receiveProductSkuStockService;
+        this.inventorySyncService = inventorySyncService;
         this.deliveryRescheduleService = deliveryRescheduleService;
         this.operationLogRepository = operationLogRepository;
         this.defaultWarehouseId = defaultWarehouseId;
@@ -99,10 +103,11 @@ public class RegisterInboundService {
         // 3. SKU 在庫加算（既存 Service を再利用）
         receiveProductSkuStockService.receive(request.getSkuId(), request.getQuantity());
 
-        // 4. inventories 同期加算（Step B-5 で InventorySyncService.applyDelta を DI して呼び出し）
-        // 5. deliveries.scheduled_date FIFO 再計算（B-4 で DI 済 / B-5 完成と同時に有効化）
-        //    inventories 行が無い商品では IllegalStateException で停止するため、B-5 で
-        //    applyDelta を経由した行作成または並行運用マイグレーション完了が前提となる。
+        // 4. inventories 同期加算（並行運用 / RRRR-2）
+        inventorySyncService.applyDelta(request.getProductId(), defaultWarehouseId,
+                request.getQuantity());
+
+        // 5. deliveries.scheduled_date FIFO 再計算（RRR-4 / RRRR-4）
         deliveryRescheduleService.recalculateForProduct(request.getProductId(), actorUserId);
 
         // 6. operation_logs 記録

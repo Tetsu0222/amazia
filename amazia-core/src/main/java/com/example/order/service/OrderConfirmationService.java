@@ -3,6 +3,7 @@ package com.example.order.service;
 import com.example.address.entity.Address;
 import com.example.address.repository.AddressRepository;
 import com.example.delivery.service.DeliveryCreationService;
+import com.example.inventory.service.InventorySyncService;
 import com.example.market.customer.entity.Customer;
 import com.example.market.customer.repository.CustomerRepository;
 import com.example.order.dto.ConfirmOrderRequest;
@@ -64,8 +65,10 @@ public class OrderConfirmationService {
     private final PaymentService paymentService;
     private final PreorderStatusService preorderStatusService;
     private final DeliveryCreationService deliveryCreationService;
+    private final InventorySyncService inventorySyncService;
 
     private final long pendingStatusId;
+    private final long defaultWarehouseId;
     private final String txTypeSale;
 
     public OrderConfirmationService(
@@ -81,7 +84,9 @@ public class OrderConfirmationService {
             PaymentService paymentService,
             PreorderStatusService preorderStatusService,
             DeliveryCreationService deliveryCreationService,
+            InventorySyncService inventorySyncService,
             @Value("${amazia.sales.shipping-statuses.pending-id}") long pendingStatusId,
+            @Value("${amazia.delivery.default-warehouse-id}") long defaultWarehouseId,
             @Value("${amazia.sales.sku-stock-tx-types.sale}") String txTypeSale) {
         this.customerRepository = customerRepository;
         this.skuRepository = skuRepository;
@@ -95,7 +100,9 @@ public class OrderConfirmationService {
         this.paymentService = paymentService;
         this.preorderStatusService = preorderStatusService;
         this.deliveryCreationService = deliveryCreationService;
+        this.inventorySyncService = inventorySyncService;
         this.pendingStatusId = pendingStatusId;
+        this.defaultWarehouseId = defaultWarehouseId;
         this.txTypeSale = txTypeSale;
     }
 
@@ -144,6 +151,9 @@ public class OrderConfirmationService {
         if (!request.isPreorder()) {
             stock.setQuantity(stock.getQuantity() - request.getQuantity());
             skuStockRepository.save(stock); // @Version で OptimisticLockException が起きうる
+            // 並行運用：inventories も同期減算（RRRR-2）
+            inventorySyncService.applyDelta(sku.getProductId(), defaultWarehouseId,
+                    -request.getQuantity());
         }
 
         // 4. INSERT sales（payment_id 採番 + UNIQUE 違反時の冪等処理）

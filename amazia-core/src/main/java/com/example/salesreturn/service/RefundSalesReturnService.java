@@ -1,13 +1,16 @@
 package com.example.salesreturn.service;
 
+import com.example.inventory.service.InventorySyncService;
 import com.example.operationlog.entity.OperationLog;
 import com.example.operationlog.repository.OperationLogRepository;
 import com.example.sales.entity.Sales;
 import com.example.sales.repository.SalesRepository;
 import com.example.salesreturn.entity.SalesReturn;
 import com.example.salesreturn.repository.SalesReturnRepository;
+import com.example.sku.entity.ProductSku;
 import com.example.sku.entity.ProductSkuStock;
 import com.example.sku.entity.ProductSkuStockTransaction;
+import com.example.sku.repository.ProductSkuRepository;
 import com.example.sku.repository.ProductSkuStockRepository;
 import com.example.sku.repository.ProductSkuStockTransactionRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,25 +50,34 @@ public class RefundSalesReturnService {
 
     private final SalesReturnRepository salesReturnRepository;
     private final SalesRepository salesRepository;
+    private final ProductSkuRepository skuRepository;
     private final ProductSkuStockRepository skuStockRepository;
     private final ProductSkuStockTransactionRepository skuStockTxRepository;
+    private final InventorySyncService inventorySyncService;
     private final OperationLogRepository operationLogRepository;
     private final long returnedStatusId;
+    private final long defaultWarehouseId;
     private final String txTypeReturn;
 
     public RefundSalesReturnService(SalesReturnRepository salesReturnRepository,
                                     SalesRepository salesRepository,
+                                    ProductSkuRepository skuRepository,
                                     ProductSkuStockRepository skuStockRepository,
                                     ProductSkuStockTransactionRepository skuStockTxRepository,
+                                    InventorySyncService inventorySyncService,
                                     OperationLogRepository operationLogRepository,
                                     @Value("${amazia.sales.shipping-statuses.returned-id}") long returnedStatusId,
+                                    @Value("${amazia.delivery.default-warehouse-id}") long defaultWarehouseId,
                                     @Value("${amazia.sales.sku-stock-tx-types.return}") String txTypeReturn) {
         this.salesReturnRepository = salesReturnRepository;
         this.salesRepository = salesRepository;
+        this.skuRepository = skuRepository;
         this.skuStockRepository = skuStockRepository;
         this.skuStockTxRepository = skuStockTxRepository;
+        this.inventorySyncService = inventorySyncService;
         this.operationLogRepository = operationLogRepository;
         this.returnedStatusId = returnedStatusId;
+        this.defaultWarehouseId = defaultWarehouseId;
         this.txTypeReturn = txTypeReturn;
     }
 
@@ -95,6 +107,13 @@ public class RefundSalesReturnService {
                         "sku stock not registered"));
         stock.setQuantity(stock.getQuantity() + saved.getQuantity());
         skuStockRepository.save(stock);
+
+        // 並行運用：inventories も同期加算（RRRR-2）
+        ProductSku sku = skuRepository.findById(sales.getSkuId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "sku not found"));
+        inventorySyncService.applyDelta(sku.getProductId(), defaultWarehouseId,
+                saved.getQuantity());
 
         // 3. transaction 記録
         ProductSkuStockTransaction tx = new ProductSkuStockTransaction();
