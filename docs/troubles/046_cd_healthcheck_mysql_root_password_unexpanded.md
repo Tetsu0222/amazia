@@ -75,3 +75,14 @@ docker exec amazia-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" amazia -N 
 | SSM 経由 docker exec のクォート方向 | コンテナ内環境変数を使うときは外側 `sh -c '...'` をシングルクォート固定にする運用ルールを `docs/ai_context/operational_insights.md` に追記 |
 | 同型ワークフロー追加時 | `docker exec ... sh -c "...$VAR..."` 形式（ダブルクォート）はホスト側展開で空文字化するため、レビューで検出する観点を `test_insights.md` に追記 |
 | ヘルスチェックの自己テスト不在 | 故意に schema.sql を欠損させたテストデプロイで改善① の `exit 1` を確認する運用検証（phaseX-6 残タスク）に、本ケースの認証クォート再発も併せて検証する観点を含める |
+
+## 訓戒（[048](048_cd_healthcheck_sql_quote_break_inside_sh_c.md) 起因の事後追記）
+本対応は `$MYSQL_ROOT_PASSWORD` という **1つの特殊文字（`$`）を守った点の対症療法** にすぎなかった。`docker exec ... sh -c '<INNER>'` という構造に持ち込まれる文字列のクラス全体に対する不変条件まで踏み込んでいなかったため、`<INNER>` に SQL 本文を埋め込むテンプレートが温存され、SQL リテラルの `'` が外側シングルクォートを閉じてしまうという同型バグ（[048](048_cd_healthcheck_sql_quote_break_inside_sh_c.md)）を後日踏んだ。
+
+横展開の正しいやり方は **「同じファイル内の同じパターンを直す」（点）ではなく「`sh -c '<INNER>'` に持ち込む全文字列が満たすべき不変条件」（クラス）まで整理すること**。具体的には:
+
+1. **外側を `'...'` シングルクォートで包むこと**（046 で対応）
+2. **`<INNER>` 中の `'` を `'\''` でエスケープすること**（048 で対応）
+3. **`<INNER>` 中の `\` を含むケースは別途検討すること**（将来課題）
+
+3不変条件は `docs/ai_context/operational_insights.md` に明記。本トラブル単独で考えるのではなく、このクラス全体を意識して以後のシェル構築 PR をレビューする。

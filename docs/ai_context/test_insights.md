@@ -397,6 +397,18 @@
 - [ ] リカバリは最大 2 回までで、それ以上は exit 1 で明示的失敗するか
 - [ ] 切り分けチェックリスト（AWS Health / EC2 / PingStatus / SG / 直近変更）が `docs/troubles/` または README に記載され参照可能か
 
+### `docker exec ... sh -c '<INNER>'` のシェルクォート設計レビュー観点（046・048 起因）
+
+SSM RunShellScript → ホスト bash → コンテナ内 sh の3層を貫通する `docker exec ... sh -c '<INNER>'` パターンは、INNER に持ち込む文字列の特殊文字でクォート構造が壊れる事例が046・048 で連続発生した。**046 は `$VAR` 起点の点修正にとどまり、048 で SQL リテラル中の `'` 起点の同型バグを踏んだ**。新規追加・改修 PR では「点（コピペした既存パターンを真似たか）」ではなく「クラス（INNER に入る全文字列が3不変条件を満たすか）」をレビューする。
+
+不変条件と詳細実装パターンは [`operational_insights.md`](operational_insights.md) カテゴリ2「`docker exec ... sh -c '<INNER>'` に持ち込む文字列の3不変条件」を参照。
+
+#### レビュー観点
+- [ ] 新規追加した SSM 経由 `docker exec ... sh -c '...'` ステップで、外側が **シングルクォート** `'...'` で包まれているか（ダブルクォートは `$VAR` のホスト側展開を許してしまうため禁止）
+- [ ] INNER に動的に埋め込むリテラル（SQL 本文・S3 キー・ファイルパスなど）について、埋め込み直前に `'` を `'\''` でエスケープしているか（`sed`/`printf` 経由はシェルエスケープと sed エスケープの噛み合わせで壊れた事例があるため、bash パラメータ展開 `${var//$APOS/$ESC_APOS}` が推奨）
+- [ ] CD ヘルスチェックの「故意失敗テストデプロイ」が、認証エラー経路（[046](../troubles/046_cd_healthcheck_mysql_root_password_unexpanded.md)）と SQL クォートエラー経路（[048](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md)）の **両方** を実機で通る検証になっているか
+- [ ] 同じファイル内に同パターンが複数ある場合、3不変条件をすべての箇所で満たしているか（コピペ展開ではなく1箇所ずつ確認）
+
 ---
 
 ## カテゴリ14: CD と systemd の compose 経路整合（023・028・029 起因）

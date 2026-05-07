@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 実装完了・2026-05-07）
+🟡 着手中（Step 1 / Step 1.5 / Step 2 / Step 3 / Step 3.1 / Step 4 / Step 5 実装完了・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -562,6 +562,139 @@ Core 側の Service 定数を網羅して以下を定義する：
 - `register_inbound` 行が「入荷登録」と表示される
 - `inbounds:3` 行の対象列が「入荷:3」と表示される
 - マップに存在しない未知の action は原文のまま表示される（フォールバック動作）
+
+---
+
+# Step 5：SKU 管理画面の起点を「商品プルダウン」から「商品一覧」へ ✅ 実装完了（2026-05-07）
+
+> 実装計画書: [phase16_step5_implementation_plan.md](../../implementation/phase16_step5_implementation_plan.md)
+
+## 5-1. 背景・目的
+
+`/skus`（SKU 管理画面）は画面トップに **商品プルダウン** があり、ここで商品を選ばない限り SKU 一覧が一切表示されない作りだった。商品数が増えると「目的の SKU を編集する」までに余計なクリックが必要で、SKU 中心の運用感が薄かった。
+
+設計書の指示：
+> 商品をプルダウン選択肢として表示するのではなく、最初から SKU 一覧を表示させておいてほしい。
+> 各商品マスタ押下 ⇒ SKU 展開 ⇒ 選択 ⇒ SKU 登録や編集とすると、アクション数は変わらないが UI は向上すると考える。
+
+これを踏まえ、画面の起点を **「最初から商品一覧が見える」** に変える。プルダウンは廃止し、行展開（expand）で SKU を表示、SKU 行の「選択」ボタンで詳細モーダルを開く構成にする。
+
+## 5-2. 設計方針
+
+| 観点 | 方針 |
+|------|------|
+| 起点 | 商品プルダウンを廃止し、`getAdminProducts()` の結果を最初からテーブル表示する |
+| SKU の表示 | `<a-table>` の `expandable` 機能で商品行を展開すると、その商品の SKU 一覧と「+ SKU を追加」フォームを表示する |
+| SKU 詳細管理（価格・在庫・画像） | SKU 行の「選択」ボタンで `<a-modal>` を開き、その中に既存の 3 タブ（価格管理 / 在庫管理 / 画像管理）を配置 |
+| 行クリック時の挙動 | 商品行クリック＝展開トグル（`expand-row-by-click`）／SKU 行の「選択」ボタンクリック＝モーダル起動 |
+| キャッシュ | 一度展開した商品の SKU は `skuMap[productId]` に保持。再展開時は再フェッチしない（`SkuList` 内で完結する短命キャッシュ） |
+| クエリパラメータ | 商品マスタ画面 `ProductList.vue` の「SKU管理」ボタンが `/skus?productId=N` で遷移する仕様を温存。受け側は該当商品行を初期展開する |
+| 配色・列構成 | 商品行は商品マスタ画面（`ProductList.vue`）と表記を揃える（公開状態 / 有効・無効 / SKU 数 / 発売バッジ）。SKU 行は Step 1.5 で確定した列（SKUコード / 色 / サイズ / ステータス / 予約開始日 / 発売日 / 操作）をそのまま採用 |
+| 無効商品の扱い | 商品行は `is_active = false` でグレーアウト（既存 `.row-inactive` スタイル準用）し、展開・SKU 編集は可能なまま残す |
+
+## 5-3. UI 変更（Console）
+
+### 商品一覧（メイン）
+
+`SkuList.vue` のトップレベル：
+
+```
+┌─ SKU管理（/skus） ────────────────────────────────────┐
+│ ┌ 商品一覧（最初から表示）─────────────────────────┐ │
+│ │ ▶ 1  Tシャツ夏モデル   発売中  公開中  有効  3SKU│ │
+│ │ ▼ 2  帽子              発売前  公開中  有効  2SKU│ │
+│ │   └ SKU一覧テーブル                              │ │
+│ │     ・HAT-RD-M  Red M  発売前  ...  [選択]      │ │
+│ │     ・HAT-RD-L  Red L  発売前  ...  [選択]      │ │
+│ │   └ [+ SKUを追加] フォーム                       │ │
+│ │ ▶ 3  シャツ秋モデル   発売中  非公開  無効  1SKU│ │
+│ └────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────┘
+```
+
+商品列：
+
+| 列 | 内容 |
+|----|------|
+| ID | `products.id` |
+| 商品名 | `products.name` |
+| SKU数 | `products.skuCount`（バッジ） |
+| 発売 | `release_date` ベースの「発売中／発売前」（バッジ・Step 1.5 と同ロジック） |
+| 公開状態 | `publishStart` / `publishEnd` 判定（`ProductList.vue` の `isPublished` と同ロジック） |
+| 有効/無効 | `is_active`（`ProductList.vue` と同じバッジ） |
+
+SKU 列（Step 1.5 確定列をそのまま踏襲）：
+
+| 列 | 内容 |
+|----|------|
+| SKUコード | `sku.skuCode` |
+| 色 | `sku.color` |
+| サイズ | `sku.size` |
+| ステータス | 親商品の `release_date` から「発売中／発売前」 |
+| 予約開始日 | `product.preorderStartDate`（NULL は「公開と同時」） |
+| 発売日 | `product.releaseDate`（NULL は「未設定」） |
+| 操作 | `[選択]` ボタン（モーダル起動） |
+
+SKU 一覧テーブル直下に **「+ SKU を追加」フォーム**（色・サイズ・登録ボタン）を配置。フォーム state は商品単位に独立（`skuForms[productId]`）で持ち、送信時はその商品行のみ `getProductSkus(productId)` を再フェッチする。
+
+### SKU 詳細モーダル
+
+SKU 行の「選択」ボタンで開く。
+
+- タイトル：`SKU詳細：HAT-RD-L（Red / L）`
+- 中身：`<a-tabs>`（価格管理 / 在庫管理 / 画像管理）— **既存 3 タブの UI とロジックをそのままモーダル内に移植**
+- 表示制御：`destroy-on-close` を設定し、閉じるたびに DOM ごと破棄。再度別 SKU を選び直しても確実にクリーンな状態で開く
+- フッター：`null`（タブ内のフォームが完了アクションを持つため、モーダル独自の OK/キャンセルは置かない）
+
+### 廃止・撤去
+
+- 画面トップの商品プルダウン `<a-select>` および付帯する `<a-form layout="inline">` ヘッダー
+- 下部固定の「選択中の SKU：…」`<a-divider>` と `<a-tabs>`（モーダル内へ移植）
+- `selected-row` ハイライト用 CSS（行選択の概念がモーダル方式に置き換わるため）
+
+## 5-4. データ取得
+
+| タイミング | 関数 | 備考 |
+|------------|------|------|
+| 画面 mount | `getAdminProducts()` | 商品全件 |
+| 商品行展開（初回） | `getProductSkus(productId)` | 既存 |
+| `route.query.productId` 指定 | 同上を内部呼び出し | ProductList の「SKU管理」ボタン互換 |
+| SKU モーダル `price` タブ | `getSkuPrices(skuId)` | 既存 |
+| SKU モーダル `stock` タブ | `getSkuStock(skuId)` + `getSkuStockHistory(skuId)` | 既存（参照のみ） |
+| SKU モーダル `image` タブ | `getSkuImages(skuId)` | 既存 |
+| SKU 追加 | `createProductSku(productId, data)` | 既存 |
+| 価格登録 | `createSkuPrice(skuId, data)` | 既存 |
+| 画像アップロード | `uploadSkuImage(skuId, file)` | 既存 |
+
+タブ単位の遅延ロード（`loadedTabs`）は維持。モーダルを閉じる／別 SKU で開き直すたびにリセット。
+
+## 5-5. DB 変更
+
+**なし**
+
+## 5-6. API 変更
+
+**なし**（Core / Console / Market いずれも既存エンドポイントをそのまま流用）
+
+## 5-7. UI 変更まとめ（Console）
+
+| 画面 | 変更内容 |
+|------|---------|
+| `features/skus/pages/SkuList.vue` | 商品プルダウン廃止 → 商品一覧テーブル化・SKU 詳細をモーダル化・「+ SKU を追加」を商品行配下に移動 |
+| `features/products/pages/ProductList.vue` | 変更なし（`/skus?productId=N` 遷移は受け側で互換維持） |
+| `router/index.js` | 変更なし（`/skus` ルートはそのまま） |
+
+## 5-8. TDD テストケース
+
+表示変更のみのため、フェーズ16冒頭の方針通り Vue ユニットテストは追加せず手動 E2E で担保する。
+
+- `/skus` を直接開いて商品一覧が初期表示される（プルダウンが存在しない）
+- 商品行を展開すると SKU 一覧と「+ SKU を追加」フォームが表示される
+- 別商品を展開しても、先に展開した商品の SKU は再取得されない（キャッシュ動作）
+- SKU 行の「選択」ボタンで詳細モーダルが開き、価格 / 在庫 / 画像の各タブが従来通り動く
+- モーダルを閉じて別 SKU を選び直すと、タブ表示が初期化される
+- `/skus?productId=2` で開くと id=2 の商品行が初期展開される（ProductList の「SKU管理」ボタン互換）
+- `is_active = false` の商品行はグレーアウト表示される
 
 ---
 

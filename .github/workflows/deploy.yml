@@ -480,13 +480,22 @@ jobs:
           IN_LIST="'${IN_LIST}'"
 
           SQL="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='amazia' AND table_name IN (${IN_LIST});"
+          # SQL 中のシングルクォートを '\'' でエスケープしてから INNER に埋め込む。
+          # これをしないと外側 sh -c '...' のクォートを SQL 中の ' が閉じてしまい、
+          # ホスト bash が `table_schema=amazia` のように裸のトークンとして解釈し
+          # `Unknown column 'amazia' in 'where clause'` で失敗する（046 修正後の同型バグ・048）。
+          # 変数経由にしているのは、sed/printf でリテラルの ' を組むと shell エスケープが
+          # 二重三重に絡み実機で復元結果が狂う事例があったため（048 当時の検証で確認済み）。
+          APOS="'"
+          ESC_APOS="'\\''"
+          SQL_ESC="${SQL//$APOS/$ESC_APOS}"
 
           # SSM 経由で MySQL コンテナに接続。
           # MYSQL_ROOT_PASSWORD は amazia-mysql コンテナ内の env で解決させる。
           # SSM RunShellScript は EC2 ホスト側で bash 解釈するため、$MYSQL_ROOT_PASSWORD を
           # シングルクォート（'…'）で包み、ホスト側で空展開されないようにする。
           # 旧実装はダブルクォートで包んでおりホスト側で空文字に展開され `Access denied (using password: NO)` で落ちていた。
-          INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$SQL\""
+          INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$SQL_ESC\""
           PARAMS_JSON=$(jq -n --arg inner "$INNER_SH" '{
             commands: [
               ("docker exec amazia-mysql sh -c '\''" + $inner + "'\''")
@@ -542,8 +551,11 @@ jobs:
           if [ "$ACTUAL_COUNT" -lt "$EXPECTED_COUNT" ]; then
             # 不足テーブルを特定（実在テーブル一覧を取得して required との差分を出す）
             DIFF_SQL="SELECT table_name FROM information_schema.tables WHERE table_schema='amazia' AND table_name IN (${IN_LIST}) ORDER BY table_name;"
-            # 上記 SQL 同様、$MYSQL_ROOT_PASSWORD はシングルクォートで包んでコンテナ内まで届ける
-            DIFF_INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$DIFF_SQL\""
+            # 上記 SQL 同様、$MYSQL_ROOT_PASSWORD はシングルクォートで包んでコンテナ内まで届ける。
+            # SQL 中の ' は '\'' でエスケープしないと外側 sh -c '...' を閉じてしまう（048 同型対策）。
+            # APOS/ESC_APOS は上のスコープで定義済み（同じ run ブロック内）。
+            DIFF_SQL_ESC="${DIFF_SQL//$APOS/$ESC_APOS}"
+            DIFF_INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$DIFF_SQL_ESC\""
             DIFF_PARAMS_JSON=$(jq -n --arg inner "$DIFF_INNER_SH" '{
               commands: [
                 ("docker exec amazia-mysql sh -c '\''" + $inner + "'\''")

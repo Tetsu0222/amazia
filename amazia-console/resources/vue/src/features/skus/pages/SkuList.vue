@@ -1,171 +1,215 @@
 <template>
-  <div style="padding: 24px; max-width: 960px">
+  <div style="padding: 24px">
     <a-page-header title="SKU管理" sub-title="Amazia Console" />
 
-    <!-- 商品選択 -->
-    <a-form layout="inline" style="margin-bottom: 24px">
-      <a-form-item label="商品">
-        <a-select
-          v-model:value="selectedProductId"
-          placeholder="商品を選択"
-          style="width: 280px"
-          :loading="productsLoading"
-          @change="onProductChange"
-          allow-clear
-        >
-          <a-select-option v-for="p in products" :key="p.id" :value="p.id">
-            {{ p.name }}
-          </a-select-option>
-        </a-select>
-      </a-form-item>
-    </a-form>
-
-    <template v-if="selectedProductId">
-      <!-- SKU一覧 -->
-      <a-table
-        :dataSource="skus"
-        :columns="skuColumns"
-        :loading="skusLoading"
-        rowKey="id"
-        :row-class-name="(r) => r.id === selectedSkuId ? 'selected-row' : ''"
-        style="margin-bottom: 8px"
-        @row-click="onSkuRowClick"
-        :custom-row="(r) => ({ onClick: () => onSkuRowClick(r) })"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'releaseStatus'">
-            <a-tag :color="isReleased ? 'green' : 'blue'">
-              {{ isReleased ? '発売中' : '発売前' }}
-            </a-tag>
-          </template>
-          <template v-if="column.key === 'preorderStartDate'">
-            {{ selectedProduct?.preorderStartDate ?? '公開と同時' }}
-          </template>
-          <template v-if="column.key === 'releaseDate'">
-            {{ selectedProduct?.releaseDate ?? '未設定' }}
-          </template>
-          <template v-if="column.key === 'action'">
-            {{ record.id === selectedSkuId ? '◀ 選択中' : '選択' }}
-          </template>
-        </template>
-      </a-table>
-
-      <!-- SKU追加フォーム -->
-      <a-form
-        :model="skuForm"
-        :rules="skuRules"
-        ref="skuFormRef"
-        layout="inline"
-        style="margin-bottom: 32px"
-        @finish="handleSkuSubmit"
-      >
-        <a-form-item label="色" name="color">
-          <a-input v-model:value="skuForm.color" placeholder="例: Red" style="width: 120px" />
-        </a-form-item>
-        <a-form-item label="サイズ" name="size">
-          <a-input v-model:value="skuForm.size" placeholder="例: M" style="width: 100px" />
-        </a-form-item>
-        <a-form-item>
-          <a-button type="primary" html-type="submit" :loading="skuSubmitting">SKUを追加</a-button>
-        </a-form-item>
-      </a-form>
-
-      <!-- SKU詳細パネル -->
-      <template v-if="selectedSkuId">
-        <a-divider>選択中のSKU：{{ selectedSkuLabel }}</a-divider>
-
-        <a-tabs v-model:activeKey="activeTab" @change="onTabChange">
-          <!-- 価格管理タブ -->
-          <a-tab-pane key="price" tab="価格管理">
-            <a-table
-              :dataSource="prices"
-              :columns="priceColumns"
-              :loading="pricesLoading"
-              rowKey="id"
-              size="small"
-              style="margin-bottom: 16px"
+    <!-- 商品一覧（最初から表示・行展開で SKU を出す） -->
+    <a-table
+      :columns="productColumns"
+      :data-source="products"
+      :loading="productsLoading"
+      row-key="id"
+      :expand-row-by-click="true"
+      :expanded-row-keys="expandedRowKeys"
+      :row-class-name="(r) => (r.isActive ? '' : 'row-inactive')"
+      @expand="onProductExpand"
+    >
+      <template #expandedRowRender="{ record }">
+        <div style="padding: 8px 0">
+          <a-spin v-if="skuLoadingMap[record.id]" />
+          <template v-else>
+            <a-empty
+              v-if="!skuMap[record.id] || skuMap[record.id].length === 0"
+              description="SKUが登録されていません"
+              :image-style="{ height: '40px' }"
+              style="margin: 8px 0"
             />
-            <a-form
-              :model="priceForm"
-              :rules="priceRules"
-              ref="priceFormRef"
-              layout="inline"
-              @finish="handlePriceSubmit"
+            <a-table
+              v-else
+              :columns="skuColumns"
+              :data-source="skuMap[record.id]"
+              row-key="id"
+              size="small"
+              :pagination="false"
+              style="margin-bottom: 12px"
             >
-              <a-form-item label="価格（円）" name="price">
-                <a-input-number v-model:value="priceForm.price" :min="0" style="width: 120px" placeholder="例: 1980" />
+              <template #bodyCell="{ column, record: sku }">
+                <template v-if="column.key === 'releaseStatus'">
+                  <a-tag :color="isReleased(record) ? 'green' : 'blue'">
+                    {{ isReleased(record) ? '発売中' : '発売前' }}
+                  </a-tag>
+                </template>
+                <template v-if="column.key === 'preorderStartDate'">
+                  {{ record.preorderStartDate ?? '公開と同時' }}
+                </template>
+                <template v-if="column.key === 'releaseDate'">
+                  {{ record.releaseDate ?? '未設定' }}
+                </template>
+                <template v-if="column.key === 'action'">
+                  <a-button size="small" type="primary" @click.stop="openSkuModal(record, sku)">
+                    選択
+                  </a-button>
+                </template>
+              </template>
+            </a-table>
+
+            <!-- SKU 追加フォーム（その商品配下） -->
+            <a-form
+              :model="getSkuForm(record.id)"
+              layout="inline"
+              @finish="handleSkuSubmit(record.id)"
+              @click.stop
+            >
+              <a-form-item label="色">
+                <a-input
+                  v-model:value="getSkuForm(record.id).color"
+                  placeholder="例: Red"
+                  style="width: 120px"
+                />
               </a-form-item>
-              <a-form-item label="適用開始日" name="startDate">
-                <a-date-picker v-model:value="priceForm.startDate" value-format="YYYY-MM-DD" placeholder="開始日" />
-              </a-form-item>
-              <a-form-item label="適用終了日">
-                <a-date-picker v-model:value="priceForm.endDate" value-format="YYYY-MM-DD" placeholder="未設定 = 恒久" />
+              <a-form-item label="サイズ">
+                <a-input
+                  v-model:value="getSkuForm(record.id).size"
+                  placeholder="例: M"
+                  style="width: 100px"
+                />
               </a-form-item>
               <a-form-item>
-                <a-button type="primary" html-type="submit" :loading="priceSubmitting">登録</a-button>
+                <a-button
+                  type="primary"
+                  html-type="submit"
+                  :loading="!!skuSubmittingMap[record.id]"
+                >
+                  SKUを追加
+                </a-button>
               </a-form-item>
             </a-form>
-          </a-tab-pane>
-
-          <!-- 在庫管理タブ（参照のみ。入荷登録は「入荷管理」画面へ移譲） -->
-          <a-tab-pane key="stock" tab="在庫管理">
-            <a-alert
-              message="入荷登録は「入荷管理」画面から行ってください。"
-              type="info"
-              show-icon
-              style="margin-bottom: 12px"
-            />
-            <a-descriptions bordered size="small" :column="1" style="margin-bottom: 16px; max-width: 300px">
-              <a-descriptions-item label="現在在庫">
-                {{ currentStock != null ? currentStock + ' 個' : '—' }}
-              </a-descriptions-item>
-            </a-descriptions>
-            <a-table
-              :dataSource="stockHistory"
-              :columns="stockHistoryColumns"
-              :loading="stockHistoryLoading"
-              rowKey="id"
-              size="small"
-            />
-          </a-tab-pane>
-
-          <!-- 画像管理タブ -->
-          <a-tab-pane key="image" tab="画像管理">
-            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px">
-              <div v-for="img in images" :key="img.id" style="position: relative; width: 120px">
-                <img
-                  :src="buildImageSrc(img)"
-                  style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #d9d9d9; border-radius: 4px"
-                />
-                <div style="text-align: center; font-size: 12px; color: #888; margin-top: 4px">
-                  {{ img.sortOrder === 1 ? 'メイン' : `順: ${img.sortOrder}` }}
-                </div>
-              </div>
-              <a-empty v-if="images.length === 0" description="画像がありません" style="width: 120px" />
-            </div>
-            <a-upload
-              accept=".png"
-              :show-upload-list="false"
-              :before-upload="handleImageUpload"
-              :disabled="imageUploading"
-            >
-              <a-button :loading="imageUploading">
-                画像を選択（PNG / 200KB以下）
-              </a-button>
-            </a-upload>
-          </a-tab-pane>
-        </a-tabs>
+          </template>
+        </div>
       </template>
 
-      <a-empty v-else description="SKUを選択すると価格・在庫・画像を管理できます" style="margin-top: 24px" />
-    </template>
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'skuCount'">
+          <a-badge
+            :count="record.skuCount"
+            :number-style="{ backgroundColor: record.skuCount > 0 ? '#1677ff' : '#d9d9d9' }"
+            show-zero
+          />
+        </template>
+        <template v-if="column.key === 'releaseStatus'">
+          <a-tag :color="isReleased(record) ? 'green' : 'blue'">
+            {{ isReleased(record) ? '発売中' : '発売前' }}
+          </a-tag>
+        </template>
+        <template v-if="column.key === 'published'">
+          <a-badge
+            :status="isPublished(record) ? 'success' : 'default'"
+            :text="isPublished(record) ? '公開中' : '非公開'"
+          />
+        </template>
+        <template v-if="column.key === 'active'">
+          <a-tag :color="record.isActive ? 'green' : 'red'">
+            {{ record.isActive ? '有効' : '無効' }}
+          </a-tag>
+        </template>
+      </template>
+    </a-table>
 
-    <a-empty v-else description="商品を選択してください" style="margin-top: 48px" />
+    <!-- SKU詳細モーダル -->
+    <a-modal
+      v-model:open="skuModalOpen"
+      :title="`SKU詳細：${selectedSkuLabel}`"
+      width="780px"
+      :footer="null"
+      destroy-on-close
+      @cancel="closeSkuModal"
+    >
+      <a-tabs v-model:activeKey="activeTab" @change="onTabChange">
+        <!-- 価格管理タブ -->
+        <a-tab-pane key="price" tab="価格管理">
+          <a-table
+            :dataSource="prices"
+            :columns="priceColumns"
+            :loading="pricesLoading"
+            rowKey="id"
+            size="small"
+            style="margin-bottom: 16px"
+          />
+          <a-form
+            :model="priceForm"
+            :rules="priceRules"
+            ref="priceFormRef"
+            layout="inline"
+            @finish="handlePriceSubmit"
+          >
+            <a-form-item label="価格（円）" name="price">
+              <a-input-number v-model:value="priceForm.price" :min="0" style="width: 120px" placeholder="例: 1980" />
+            </a-form-item>
+            <a-form-item label="適用開始日" name="startDate">
+              <a-date-picker v-model:value="priceForm.startDate" value-format="YYYY-MM-DD" placeholder="開始日" />
+            </a-form-item>
+            <a-form-item label="適用終了日">
+              <a-date-picker v-model:value="priceForm.endDate" value-format="YYYY-MM-DD" placeholder="未設定 = 恒久" />
+            </a-form-item>
+            <a-form-item>
+              <a-button type="primary" html-type="submit" :loading="priceSubmitting">登録</a-button>
+            </a-form-item>
+          </a-form>
+        </a-tab-pane>
+
+        <!-- 在庫管理タブ（参照のみ。入荷登録は「入荷管理」画面へ移譲） -->
+        <a-tab-pane key="stock" tab="在庫管理">
+          <a-alert
+            message="入荷登録は「入荷管理」画面から行ってください。"
+            type="info"
+            show-icon
+            style="margin-bottom: 12px"
+          />
+          <a-descriptions bordered size="small" :column="1" style="margin-bottom: 16px; max-width: 300px">
+            <a-descriptions-item label="現在在庫">
+              {{ currentStock != null ? currentStock + ' 個' : '—' }}
+            </a-descriptions-item>
+          </a-descriptions>
+          <a-table
+            :dataSource="stockHistory"
+            :columns="stockHistoryColumns"
+            :loading="stockHistoryLoading"
+            rowKey="id"
+            size="small"
+          />
+        </a-tab-pane>
+
+        <!-- 画像管理タブ -->
+        <a-tab-pane key="image" tab="画像管理">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px">
+            <div v-for="img in images" :key="img.id" style="position: relative; width: 120px">
+              <img
+                :src="buildImageSrc(img)"
+                style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #d9d9d9; border-radius: 4px"
+              />
+              <div style="text-align: center; font-size: 12px; color: #888; margin-top: 4px">
+                {{ img.sortOrder === 1 ? 'メイン' : `順: ${img.sortOrder}` }}
+              </div>
+            </div>
+            <a-empty v-if="images.length === 0" description="画像がありません" style="width: 120px" />
+          </div>
+          <a-upload
+            accept=".png"
+            :show-upload-list="false"
+            :before-upload="handleImageUpload"
+            :disabled="imageUploading"
+          >
+            <a-button :loading="imageUploading">
+              画像を選択（PNG / 200KB以下）
+            </a-button>
+          </a-upload>
+        </a-tab-pane>
+      </a-tabs>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { message } from 'ant-design-vue';
 // 管理画面では公開期間外の商品（予約開始前など）も SKU 編集対象にするため admin 一覧を使う
@@ -178,26 +222,47 @@ import {
 } from '../api/skus';
 
 const route = useRoute();
+
+// 商品一覧
 const products = ref([]);
 const productsLoading = ref(false);
+const expandedRowKeys = ref([]);
+const skuMap = ref({});            // productId -> sku[]
+const skuLoadingMap = ref({});     // productId -> bool
 
+// SKU 追加フォーム（商品単位に独立したフォーム state を保持）
+const skuForms = ref({});          // productId -> { color, size }
+const skuSubmittingMap = ref({});  // productId -> bool
+const getSkuForm = (productId) => {
+  if (!skuForms.value[productId]) {
+    skuForms.value[productId] = { color: '', size: '' };
+  }
+  return skuForms.value[productId];
+};
+
+// SKU モーダル
+const skuModalOpen = ref(false);
+const selectedSkuId = ref(null);
+const selectedSkuLabel = ref('');
+const activeTab = ref('price');
+const loadedTabs = ref(new Set());
+
+// 画像 URL ビルダー（モーダル内で利用）
 const apiBase = `${import.meta.env.BASE_URL}api`;
 const buildImageSrc = (img) =>
   `${apiBase}/skus/${selectedSkuId.value}/image-file/${img.imagePath.split('/').pop()}`;
-const skus = ref([]);
-const skusLoading = ref(false);
-const selectedProductId = ref(null);
-const selectedSkuId = ref(null);
-const selectedSkuLabel = ref('');
 
-// SKU追加
-const skuFormRef = ref();
-const skuForm = ref({ color: '', size: '' });
-const skuSubmitting = ref(false);
-const skuRules = {
-  color: [{ required: true, message: '色は必須です' }],
-  size:  [{ required: true, message: 'サイズは必須です' }],
-};
+// 商品列定義
+const productColumns = [
+  { title: 'ID',        dataIndex: 'id',         key: 'id',         width: 70 },
+  { title: '商品名',    dataIndex: 'name',       key: 'name' },
+  { title: 'SKU数',     key: 'skuCount',                            width: 80 },
+  { title: '発売',      key: 'releaseStatus',                       width: 100 },
+  { title: '公開状態',  key: 'published',                           width: 100 },
+  { title: '有効/無効', key: 'active',                              width: 90 },
+];
+
+// SKU 列定義（Step 1.5 の確定列を踏襲）
 const skuColumns = [
   { title: 'SKUコード',  dataIndex: 'skuCode', key: 'skuCode' },
   { title: '色',         dataIndex: 'color',   key: 'color' },
@@ -205,21 +270,26 @@ const skuColumns = [
   { title: 'ステータス', key: 'releaseStatus' },
   { title: '予約開始日', key: 'preorderStartDate' },
   { title: '発売日',     key: 'releaseDate' },
-  { title: '',           key: 'action' },
+  { title: '',           key: 'action',        width: 90 },
 ];
 
-const selectedProduct = computed(() =>
-  products.value.find(p => p.id === selectedProductId.value) ?? null
-);
-
-const isReleased = computed(() => {
-  const releaseDate = selectedProduct.value?.releaseDate;
+// 商品単位の発売前後判定（Step 1.5 と同ロジック）
+const isReleased = (product) => {
+  const releaseDate = product?.releaseDate;
   if (!releaseDate) return true;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return new Date(releaseDate) <= today;
-});
+};
 
+const isPublished = (product) => {
+  const now = new Date();
+  if (product.publishStart && new Date(product.publishStart) > now) return false;
+  if (product.publishEnd   && new Date(product.publishEnd)   < now) return false;
+  return true;
+};
+
+// モーダル内 state
 // 価格
 const prices = ref([]);
 const pricesLoading = ref(false);
@@ -251,58 +321,91 @@ const stockHistoryColumns = [
 const images = ref([]);
 const imageUploading = ref(false);
 
-// タブ
-const activeTab = ref('price');
-const loadedTabs = ref(new Set());
-
 onMounted(async () => {
-  productsLoading.value = true;
-  try {
-    products.value = await getAdminProducts();
-  } catch {
-    message.warning('商品一覧の取得に失敗しました');
-    return;
-  } finally {
-    productsLoading.value = false;
-  }
+  await fetchProducts();
 
   const initialProductId = route.query.productId
     ? Number(route.query.productId)
     : null;
   if (initialProductId) {
-    selectedProductId.value = initialProductId;
-    await fetchSkus(initialProductId);
+    const target = products.value.find(p => p.id === initialProductId);
+    if (target) {
+      expandedRowKeys.value = [...expandedRowKeys.value, target.id];
+      await loadSkusFor(target.id);
+    }
   }
 });
 
-const onProductChange = async (productId) => {
-  selectedSkuId.value = null;
-  selectedSkuLabel.value = '';
-  skus.value = [];
-  clearSkuDetail();
-  if (!productId) return;
-  await fetchSkus(productId);
-};
-
-const fetchSkus = async (productId) => {
-  skusLoading.value = true;
+const fetchProducts = async () => {
+  productsLoading.value = true;
   try {
-    skus.value = await getProductSkus(productId);
+    products.value = await getAdminProducts();
   } catch {
-    message.warning('SKU一覧の取得に失敗しました');
+    message.warning('商品一覧の取得に失敗しました');
   } finally {
-    skusLoading.value = false;
+    productsLoading.value = false;
   }
 };
 
-const onSkuRowClick = async (record) => {
-  selectedSkuId.value = record.id;
-  selectedSkuLabel.value = `${record.skuCode}（${record.color} / ${record.size}）`;
-  clearSkuDetail();
-  await fetchTabData('price', record.id);
+const onProductExpand = async (expanded, record) => {
+  if (!expanded) {
+    expandedRowKeys.value = expandedRowKeys.value.filter(k => k !== record.id);
+    return;
+  }
+  expandedRowKeys.value = [...expandedRowKeys.value, record.id];
+  if (skuMap.value[record.id]) return;
+  await loadSkusFor(record.id);
 };
 
-const clearSkuDetail = () => {
+const loadSkusFor = async (productId) => {
+  skuLoadingMap.value[productId] = true;
+  try {
+    skuMap.value = { ...skuMap.value, [productId]: await getProductSkus(productId) };
+  } catch {
+    message.warning('SKU一覧の取得に失敗しました');
+    skuMap.value = { ...skuMap.value, [productId]: [] };
+  } finally {
+    skuLoadingMap.value[productId] = false;
+  }
+};
+
+// SKU 追加
+const handleSkuSubmit = async (productId) => {
+  const form = getSkuForm(productId);
+  if (!form.color || !form.size) {
+    message.warning('色とサイズは必須です');
+    return;
+  }
+  skuSubmittingMap.value[productId] = true;
+  try {
+    await createProductSku(productId, form);
+    message.success('SKUを追加しました');
+    skuForms.value[productId] = { color: '', size: '' };
+    await loadSkusFor(productId);
+  } catch {
+    message.error('SKUの追加に失敗しました');
+  } finally {
+    skuSubmittingMap.value[productId] = false;
+  }
+};
+
+// SKU モーダル開閉
+const openSkuModal = async (product, sku) => {
+  selectedSkuId.value = sku.id;
+  selectedSkuLabel.value = `${sku.skuCode}（${sku.color} / ${sku.size}）`;
+  resetModalState();
+  skuModalOpen.value = true;
+  await fetchTabData('price', sku.id);
+};
+
+const closeSkuModal = () => {
+  skuModalOpen.value = false;
+  selectedSkuId.value = null;
+  selectedSkuLabel.value = '';
+  resetModalState();
+};
+
+const resetModalState = () => {
   prices.value = [];
   currentStock.value = null;
   stockHistory.value = [];
@@ -316,6 +419,7 @@ const onTabChange = async (tab) => {
 };
 
 const fetchTabData = async (tab, skuId) => {
+  if (!skuId) return;
   if (loadedTabs.value.has(tab)) return;
   if (tab === 'price') {
     await fetchPrices(skuId);
@@ -325,22 +429,6 @@ const fetchTabData = async (tab, skuId) => {
     await fetchImages(skuId);
   }
   loadedTabs.value.add(tab);
-};
-
-// SKU追加
-const handleSkuSubmit = async () => {
-  skuSubmitting.value = true;
-  try {
-    await createProductSku(selectedProductId.value, skuForm.value);
-    message.success('SKUを追加しました');
-    skuForm.value = { color: '', size: '' };
-    skuFormRef.value.resetFields();
-    await fetchSkus(selectedProductId.value);
-  } catch {
-    message.error('SKUの追加に失敗しました');
-  } finally {
-    skuSubmitting.value = false;
-  }
 };
 
 // 価格
@@ -418,10 +506,8 @@ const handleImageUpload = async (file) => {
 </script>
 
 <style scoped>
-:deep(.selected-row) {
-  background-color: #e6f4ff;
-}
-:deep(.ant-table-row) {
-  cursor: pointer;
+:deep(.row-inactive) td {
+  background-color: #fafafa;
+  color: #999;
 }
 </style>

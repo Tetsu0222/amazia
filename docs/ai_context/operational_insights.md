@@ -53,6 +53,42 @@
 - [ ] 終端処理（停止・削除・サービス復帰）が前段失敗でも実行されるよう `;` または明示的リカバリで担保されているか
 - [ ] 失敗時に残骸（コンテナ・ロックファイル等）が残った場合のリカバリ手順がドキュメント化されているか
 
+### `docker exec ... sh -c '<INNER>'` に持ち込む文字列の3不変条件（[046](../troubles/046_cd_healthcheck_mysql_root_password_unexpanded.md) / [048](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md) 起因）
+
+SSM RunShellScript から EC2 ホスト bash を経由して docker コンテナ内 sh まで届く `docker exec ... sh -c '<INNER>'` パターンは、**3層のシェル解釈**（SSM JSON ペイロード → ホスト bash → コンテナ内 sh）を通るためクォートが容易に壊れる。046 と 048 は同じ構造に対する別軸の不具合だった。**個別事象の対症療法ではなく、INNER に持ち込む文字列がクラスとして満たすべき不変条件で考える**。
+
+| 不変条件 | 守らなかった結果 | 起因 |
+|---|---|---|
+| ① 外側を `'<INNER>'` シングルクォートで包む。`"<INNER>"` ダブルクォートは禁止。 | INNER 中の `$VAR` がホスト側で空展開され、コンテナまで届かない（例：`$MYSQL_ROOT_PASSWORD` → `mysql -p amazia` 相当に劣化） | [046](../troubles/046_cd_healthcheck_mysql_root_password_unexpanded.md) |
+| ② INNER 中に動的に埋め込む文字列の `'` は **`'\''` にエスケープ** してから埋める。 | INNER 中の `'` がホスト bash の外側シングルクォートを閉じ、その後の文字列が裸トークンとしてホスト解釈される（例：SQL 中の `'amazia'` が `=amazia` に劣化して `Unknown column` で失敗） | [048](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md) |
+| ③ INNER 中に動的に埋め込む文字列の `\` は別途検討する。`'\''` エスケープでは守れず、用途によっては `\\` への二重化が必要。 | （現時点で再現事例なし。将来 INNER に Windows パス・正規表現リテラル等を埋め込むと踏みうる） | 将来課題 |
+
+#### 推奨実装（GitHub Actions の `shell: bash` を前提）
+
+bash パラメータ展開で `'` を `'\''` に置換するのが最も堅い。`sed`/`printf` を経由するとシェルエスケープと sed エスケープの噛み合わせで実機での復元結果が崩れる事例を確認している（[048](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md) で発覚）。
+
+```bash
+# SQL（あるいは任意のリテラル）を INNER に埋める前に必ずエスケープ
+APOS="'"
+ESC_APOS="'\\''"
+SQL_ESC="${SQL//$APOS/$ESC_APOS}"
+INNER_SH="mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" amazia -N -e \"$SQL_ESC\""
+
+# 外側 sh -c は必ずシングルクォート
+PARAMS_JSON=$(jq -n --arg inner "$INNER_SH" '{
+  commands: [ ("docker exec amazia-mysql sh -c '\''" + $inner + "'\''") ]
+}')
+```
+
+#### 横展開の正しい粒度
+
+046 修正時、3箇所のテンプレート（COUNT クエリ・DIFF クエリ・mysqldump）に展開したのは「同ファイル内の同パターン」としては合格だが、**「INNER に SQL リテラルを埋め込むテンプレート全体が満たすべき条件」**まで踏み込んでいなかった。新しい SSM 経由 docker exec ステップを追加する PR では、**点（ファイル内コピペ）ではなくクラス（不変条件3点）でレビューする**。
+
+### 設計観点（追加）
+- [ ] SSM 経由 `docker exec ... sh -c '<INNER>'` を新規追加・改修する PR で、INNER に持ち込む全リテラル（SQL 本文・S3 キー・ファイルパス等）に対し3不変条件を確認したか
+- [ ] 動的にリテラルを埋め込むテンプレートでは、埋め込み直前にシングルクォートを `'\''` でエスケープしているか（`sed`/`printf` ではなく bash パラメータ展開を推奨）
+- [ ] CD ヘルスチェック等で「故意失敗テストデプロイ」を行うとき、認証エラー経路（[046](../troubles/046_cd_healthcheck_mysql_root_password_unexpanded.md)）と SQL クォートエラー経路（[048](../troubles/048_cd_healthcheck_sql_quote_break_inside_sh_c.md)）を**両方**通るシナリオで検証しているか
+
 ---
 
 ## カテゴリ3: 設計書作成時の既存実装と環境設定の棚卸し（phase14 r4 / 037 起因）
