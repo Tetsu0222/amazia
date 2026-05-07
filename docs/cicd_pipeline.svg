@@ -31,7 +31,7 @@
   <line x1="285" y1="140" x2="285" y2="168" stroke="#6c8ebf" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
   <text x="305" y="160" font-size="11" fill="#1a6fa0">trigger</text>
 
-  <!-- ---- 並列テストジョブ ---- -->
+  <!-- 並列テストジョブ -->
   <rect x="65" y="210" width="170" height="70" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
   <text x="150" y="235" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">test-core</text>
   <text x="150" y="252" text-anchor="middle" font-size="11" fill="#555">mvn clean test</text>
@@ -52,7 +52,7 @@
   <line x1="810" y1="280" x2="540" y2="330" stroke="#82b366" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
   <text x="480" y="318" text-anchor="middle" font-size="11" fill="#82b366">全グリーン後</text>
 
-  <!-- ---- deploy ジョブ枠 ---- -->
+  <!-- deploy ジョブ枠 -->
   <rect x="55" y="335" width="850" height="280" rx="10" fill="#fff8e1" stroke="#d6b656" stroke-width="1.5"/>
   <text x="480" y="356" text-anchor="middle" font-size="14" font-weight="bold" fill="#8a6a00">deploy ジョブ（HTTPS_ENABLED で本番構成切替）</text>
 
@@ -204,9 +204,9 @@
   <text x="760" y="1083" text-anchor="middle" font-size="11" fill="#555">CloudFront → EC2 は HTTP（学習用途）</text>
   <text x="760" y="1097" text-anchor="middle" font-size="10" fill="#888">server_name で Host 検証</text>
 
-  <!-- CloudFront → EC2（オリジン） -->
-  <path d="M 295 1067 Q 480 1010 715 970" fill="none" stroke="#1976d2" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-darkblue)"/>
-  <text x="500" y="990" text-anchor="middle" font-size="11" fill="#1976d2">origin: HTTP → EC2</text>
+  <!-- CloudFront → EC2（オリジン）：CloudFront 上辺から真上 → 右折で Docker Compose 左側面へ（曲がり1回） -->
+  <path d="M 165 1032 L 165 870 L 515 870" fill="none" stroke="#1976d2" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-darkblue)"/>
+  <text x="305" y="862" font-size="11" fill="#1976d2">origin: HTTP → EC2</text>
 
   <!-- ========================================
        6. ブラウザアクセス
