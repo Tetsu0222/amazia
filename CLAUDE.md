@@ -82,6 +82,15 @@ DB スキーマ変更や API エンドポイント追加を伴うフェーズで
 - Market（React からの呼び出し）に関わる場合 → `Market_API.md` の対応エンドポイントも更新
 - パス変更・廃止は「実装済」「予定」「廃止済」の状態を明確に書き分ける（Market_API.md が「予定」のまま乖離した実例あり）
 
+### 主要テーブル定数の同期（phaseX-6 / 044 起因）
+
+`ops/healthcheck/required_tables.txt` は CD の「主要テーブル存在確認」ステップが参照する、本番 DB に必ず存在すべき Core テーブルの一覧（出典：`docs/database_design/README.md` Core システム）。`continue-on-error` で潰された DDL 失敗（044）をデプロイ後 1 分以内に検知するための定数。
+
+- **テーブルを追加するとき**：同フェーズ内で `TBL_*.md` 新設・`docs/database_design/README.md` 追記・`schema.sql` 追記・`ER_diagram.md` 反映に加え、**`ops/healthcheck/required_tables.txt` にも追記**する
+- **テーブルを廃止／リネームするとき**：同様に `required_tables.txt` から削除／更新する。残置すると次回デプロイで「不足テーブル」検知に引っかかり CD が `exit 1` で止まる
+- **対象範囲**：Core システムのテーブルのみ（Console の `sessions` / `personal_access_tokens` 等 Laravel 標準テーブルは対象外）
+- **更新が漏れた場合の挙動**：テーブル追加で更新を忘れても CD は通る（過大検知しない設計）。一方で本来検知すべき不足は検知されないため、PR レビューで `TBL_*.md` 追加と `required_tables.txt` 追加が両方あるかを必ず確認
+
 ### フェーズ完了の定義に組み込む
 
 フェーズ完了とみなすには、`docs/ai_context/test_insights.md` のまとめセクションに加え、**当該フェーズで触った DB / API がすべて設計書に反映されていること**を確認する。設計書未更新のままフェーズを閉じない。

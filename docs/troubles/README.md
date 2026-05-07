@@ -63,8 +63,8 @@
 | 優先 | 内容 | 関連 | ステータス |
 |------|------|------|-----------|
 | 高 | デプロイ後ヘルスチェックステップの追加（HTTP 200確認） | 003・005 | ✅ X-2にて対応（[phaseX-2](../design/phaseX/phaseX-2_deploy_pipeline_redesign.md) 完了条件に含む） |
-| 高 | **デプロイ後ヘルスチェックに「主要テーブル存在確認 SQL」を追加**。`continue-on-error` で潰された WARN を**デプロイ後に検知**する仕組みを次回品質改善フェーズで導入（H2/本番MySQLスキーマ乖離の系統的盲点への対策） | 027・037・038・044 | 🟡 設計起票（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善① — 着手待ち） |
-| 高 | Core 起動ログの WARN を CD ジョブログに `grep` 抽出するステップを deploy.yml に追加（`continue-on-error` の盲点対策） | 037・038・044 | 🟡 設計起票（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善② — 着手待ち） |
+| 高 | **デプロイ後ヘルスチェックに「主要テーブル存在確認 SQL」を追加**。`continue-on-error` で潰された WARN を**デプロイ後に検知**する仕組みを次回品質改善フェーズで導入（H2/本番MySQLスキーマ乖離の系統的盲点への対策） | 027・037・038・044 | ✅ X-6 にて対応（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善① — deploy.yml + `ops/healthcheck/required_tables.txt`） |
+| 高 | Core 起動ログの WARN を CD ジョブログに `grep` 抽出するステップを deploy.yml に追加（`continue-on-error` の盲点対策） | 037・038・044 | ✅ X-6 にて対応（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善② — deploy.yml「起動ログの schema 関連 WARN 抽出」ステップ） |
 | 高 | フェーズ完了条件に「本番環境での E2E（ログイン → リロード維持 → 画像表示）まで」を必須化 | 030・031・032・033 | ⬜ 未対応（CLAUDE.md 規約 / `test_insights.md` カテゴリ8 への接続） |
 | 中 | クロスサービス回帰テスト（Console 状態遷移 → Market 読み出しの往復）の観点を `test_insights.md` に追記 | 043 | ⬜ 未対応 |
 | 中 | Spring 発行 JWT を Console PHPUnit でフィクスチャ検証する E2E 寄りテスト導入。`JWT_SECRET` 64バイト以上を `setup.md` に明記 | 032 | ⬜ 未対応 |
@@ -74,8 +74,8 @@
 | 中 | 設計書「前提」セクションに **裏付け参照ファイル** を必須項目として明記する規約を CLAUDE.md に追加検討 | 037 | ⬜ 未対応 |
 | 中 | 開発環境セットアップ手順書の整備（Dockerボリューム管理・Composer拡張注意事項） | 002・006 | ⬜ 未対応 |
 | 低 | `console.error` を fail に昇格させる Vitest 設定（`@testing-library/react`）の導入を将来課題として記録 | 036 | ⬜ 未対応 |
-| 低 | `operational_insights.md` カテゴリ3 を「既存実装と環境設定の棚卸し」に拡張 | 037 | 🟡 設計起票（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善③ — 着手待ち） |
-| 低 | 本番 MySQL スキーマスナップショットを S3 に日次保存（schema.sql との週次差分レビュー用） | 027・037・038・044 | 🟡 設計起票（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善④ — 着手待ち） |
+| 低 | `operational_insights.md` カテゴリ3 を「既存実装と環境設定の棚卸し」に拡張 | 037 | ✅ X-6 にて対応（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善③ — `operational_insights.md` カテゴリ3 に schema.sql 編集時の3点観点を追記） |
+| 低 | 本番 MySQL スキーマスナップショットを S3 に日次保存（schema.sql との週次差分レビュー用） | 027・037・038・044 | ✅ X-6 にて対応（[phaseX-6](../design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md) §改善④ — deploy.yml「本番 DB スキーマスナップショット保存」ステップ。S3 ライフサイクル設定は別途手動） |
 | 低 | phase13 の観測網の死角（CSRF 403 件数 / ロック解除ログ / SES バウンス通知 / `market_sessions` GC）の整備 | 034 | ⬜ 未対応（仮説 B/C 切り分けの将来課題） |
 | 低 | デプロイスクリプトへのファイル存在確認ステップの標準化 | 005 | ⬜ 未対応 |
 

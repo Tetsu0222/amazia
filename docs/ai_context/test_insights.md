@@ -148,6 +148,18 @@
 - [ ] 設計書 §カラム定義で「NULL」と書かれた旧カラムについて、schema.sql に MODIFY が書かれているか
 - [ ] フェーズの完了条件として、UI フォームから最小ペイロード（必須項目のみ）で送信して 2xx が返ることを実機確認
 
+### FK 列 signed/unsigned の本番 MySQL 整合（044 起因）
+
+- 本プロジェクトの `users.id` は Laravel の `bigIncrements` 由来で **`BIGINT UNSIGNED`**。これを参照する FK 列を schema.sql に書くときは、**必ず `BIGINT UNSIGNED` を明示**する
+- `BIGINT NOT NULL` のままだと本番 MySQL は `ERROR 3780 incompatible` で DDL を拒否し、`continue-on-error=true` で WARN 化される。Core 起動・HTTP ヘルスチェックは通り、該当テーブルが呼ばれた瞬間に 1146 で 500（044 のサイレント故障パターン）
+- H2 には UNSIGNED 概念が無く、Entity の `Long` は signed BIGINT で生成され FK は問題なく成立する → CI で検知不能
+- 対策：`schema.sql` 編集後 `grep -nE 'REFERENCES users\(id\)' schema.sql` で参照箇所を洗い出し、対応する FK 列がすべて `BIGINT UNSIGNED` であることを目視確認
+
+#### テスト観点（追加）
+- [ ] schema.sql で `users(id)` を参照する FK 列がすべて `BIGINT UNSIGNED` か（grep + 目視）
+- [ ] `market_customers(id)` など他の `BIGINT UNSIGNED` 主キーを参照する FK 列も型が揃っているか
+- [ ] フェーズで新規テーブルを追加した直後、本番デプロイの「主要テーブル存在確認」（CD 改善① / phaseX-6）で実在件数が期待件数を満たすか
+
 ---
 
 ## カテゴリ7: Core API 依存の異常系テスト
@@ -254,6 +266,18 @@
 - [ ] amazia-console と amazia-core が 1 ワークフローで同時デプロイされる構成になっているか
 - [ ] デプロイ後に両レイヤー（`http://127.0.0.1:8000/...` と `http://127.0.0.1:8080/...`）を curl で確認しているか
 - [ ] AWS Billing アラートが設定されており、Cost Explorer を月次確認しているか
+
+### デプロイ後 主要テーブル存在確認（phaseX-6 / 044 起因）
+
+- HTTP 200 確認だけでは「Core プロセスは生存／該当テーブルだけ未作成」のサイレント故障（`continue-on-error` で潰された DDL 失敗）を検知できない
+- CD の改善① で `information_schema.tables` を経由して `ops/healthcheck/required_tables.txt` の全テーブルが存在するかを確認する。不足があれば `::error::` で `exit 1`
+- 改善② で Core 起動ログから `WARN.*(sql\.init|schema|DDL|ALTER|CREATE TABLE|FOREIGN KEY)` を `grep` 抽出し `::warning::` で表示する（fail はしない補助観測）
+- スナップショット保存（改善④）で本番 DB の DDL を S3 に日次保存し、週次レビューで `schema.sql` との差分を人手確認
+
+#### テスト観点（追加）
+- [ ] フェーズで Core テーブルを追加した場合、`ops/healthcheck/required_tables.txt` を同フェーズ内で更新したか
+- [ ] CD の「ヘルスチェック - 主要テーブル存在確認」ステップが緑（不足 0 件）で通っているか
+- [ ] 「起動ログの schema 関連 WARN 抽出」ステップで未対応 WARN が継続的に出ていないか（出ていれば schema.sql 編集で解消するか、許容リスト化を検討）
 
 ---
 

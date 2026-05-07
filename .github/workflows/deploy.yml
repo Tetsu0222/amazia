@@ -445,3 +445,228 @@ jobs:
           done
           echo "ERROR: ヘルスチェックタイムアウト"
           exit 1
+
+      # ============================================================================
+      # フェーズX-6: デプロイ後 主要テーブル存在確認 + 起動 WARN 抽出 + スキーマスナップショット
+      #   設計書: docs/design/phaseX/phaseX-6_post_deploy_schema_healthcheck.md
+      #   027 / 037 / 038 / 044 と同型の H2 / 本番 MySQL スキーマ乖離をデプロイ後 1 分以内に検知する。
+      #   schema.sql の DDL 失敗が `continue-on-error` で WARN 化され、Core 起動・HTTP 200 は通る一方で
+      #   該当テーブルだけ未作成のサイレント故障が発生していた構造的盲点への対策。
+      # ============================================================================
+
+      - name: ヘルスチェック - 主要テーブル存在確認
+        # 改善① ops/healthcheck/required_tables.txt にある全テーブルが
+        # 本番 MySQL に存在することを information_schema 経由で確認する。
+        # 不足があれば exit 1 で CD を明示失敗させる（::warning:: ではなく ::error::）。
+        if: success()
+        run: |
+          set -euo pipefail
+
+          # 主要テーブル一覧の読み込み（コメント・空行は除外）
+          REQUIRED_FILE="ops/healthcheck/required_tables.txt"
+          if [ ! -f "$REQUIRED_FILE" ]; then
+            echo "::error::主要テーブル一覧ファイルが存在しない: $REQUIRED_FILE"
+            exit 1
+          fi
+          TABLES=$(grep -vE '^[[:space:]]*(#|$)' "$REQUIRED_FILE" | tr -d '[:space:]' | tr '\n' ',' | sed 's/,$//')
+          if [ -z "$TABLES" ]; then
+            echo "::error::主要テーブル一覧が空（required_tables.txt のコメント・空行を除いて 0 件）"
+            exit 1
+          fi
+          EXPECTED_COUNT=$(echo "$TABLES" | tr ',' '\n' | wc -l)
+
+          # SQL 用に IN 句を組み立て（'a','b','c' 形式）
+          IN_LIST=$(echo "$TABLES" | sed "s/,/','/g")
+          IN_LIST="'${IN_LIST}'"
+
+          SQL="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='amazia' AND table_name IN (${IN_LIST});"
+
+          # SSM 経由で MySQL コンテナに接続。MYSQL_ROOT_PASSWORD は EC2 上の .env で解決される。
+          PARAMS_JSON=$(jq -n --arg sql "$SQL" '{
+            commands: [
+              ("docker exec amazia-mysql sh -c \"mysql -uroot -p$MYSQL_ROOT_PASSWORD amazia -N -e \\\"" + $sql + "\\\"\"")
+            ]
+          }')
+          CID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ap-southeast-2 \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS_JSON" \
+            --query 'Command.CommandId' --output text)
+
+          # コマンド完了待ち（最大 60 秒）
+          ST=Pending
+          for i in $(seq 1 12); do
+            sleep 5
+            ST=$(aws ssm get-command-invocation \
+              --command-id "$CID" \
+              --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+              --region ap-southeast-2 \
+              --query 'Status' --output text 2>/dev/null || echo "Pending")
+            [ "$ST" = "Success" ] && break
+            if [ "$ST" = "Failed" ] || [ "$ST" = "TimedOut" ] || [ "$ST" = "Cancelled" ]; then
+              break
+            fi
+          done
+
+          if [ "$ST" != "Success" ]; then
+            # 024 / 042 起因：Failed 時は StatusDetails / stdout / stderr の3点セットを出力する
+            echo "===== 主要テーブル存在確認 SQL: StatusDetails ====="
+            aws ssm get-command-invocation --command-id "$CID" --instance-id "${{ secrets.EC2_INSTANCE_ID }}" --region ap-southeast-2 --query 'StatusDetails' --output text || echo "(取得失敗)"
+            echo "===== StandardOutputContent ====="
+            aws ssm get-command-invocation --command-id "$CID" --instance-id "${{ secrets.EC2_INSTANCE_ID }}" --region ap-southeast-2 --query 'StandardOutputContent' --output text || echo "(取得失敗)"
+            echo "===== StandardErrorContent ====="
+            aws ssm get-command-invocation --command-id "$CID" --instance-id "${{ secrets.EC2_INSTANCE_ID }}" --region ap-southeast-2 --query 'StandardErrorContent' --output text || echo "(取得失敗)"
+            echo "::error::主要テーブル存在確認 SQL の実行に失敗（Status=$ST）"
+            exit 1
+          fi
+
+          ACTUAL_COUNT=$(aws ssm get-command-invocation \
+            --command-id "$CID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ap-southeast-2 \
+            --query 'StandardOutputContent' --output text | tr -d '[:space:]')
+
+          echo "期待: ${EXPECTED_COUNT} 件 / 実測: ${ACTUAL_COUNT} 件"
+
+          if [ -z "$ACTUAL_COUNT" ] || ! [[ "$ACTUAL_COUNT" =~ ^[0-9]+$ ]]; then
+            echo "::error::主要テーブル件数の取得に失敗（出力が数値でない: '${ACTUAL_COUNT}'）"
+            exit 1
+          fi
+
+          if [ "$ACTUAL_COUNT" -lt "$EXPECTED_COUNT" ]; then
+            # 不足テーブルを特定（実在テーブル一覧を取得して required との差分を出す）
+            DIFF_SQL="SELECT table_name FROM information_schema.tables WHERE table_schema='amazia' AND table_name IN (${IN_LIST}) ORDER BY table_name;"
+            DIFF_PARAMS_JSON=$(jq -n --arg sql "$DIFF_SQL" '{
+              commands: [
+                ("docker exec amazia-mysql sh -c \"mysql -uroot -p$MYSQL_ROOT_PASSWORD amazia -N -e \\\"" + $sql + "\\\"\"")
+              ]
+            }')
+            DIFF_CID=$(aws ssm send-command \
+              --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+              --region ap-southeast-2 \
+              --document-name "AWS-RunShellScript" \
+              --parameters "$DIFF_PARAMS_JSON" \
+              --query 'Command.CommandId' --output text)
+            for i in $(seq 1 12); do
+              sleep 5
+              DIFF_ST=$(aws ssm get-command-invocation --command-id "$DIFF_CID" --instance-id "${{ secrets.EC2_INSTANCE_ID }}" --region ap-southeast-2 --query 'Status' --output text 2>/dev/null || echo "Pending")
+              [ "$DIFF_ST" = "Success" ] && break
+              if [ "$DIFF_ST" = "Failed" ] || [ "$DIFF_ST" = "TimedOut" ] || [ "$DIFF_ST" = "Cancelled" ]; then
+                break
+              fi
+            done
+            EXISTING=$(aws ssm get-command-invocation --command-id "$DIFF_CID" --instance-id "${{ secrets.EC2_INSTANCE_ID }}" --region ap-southeast-2 --query 'StandardOutputContent' --output text 2>/dev/null | tr -s '[:space:]' '\n' | grep -v '^$' | sort -u || true)
+            REQUIRED=$(echo "$TABLES" | tr ',' '\n' | sort -u)
+            echo "===== 不足テーブル ====="
+            comm -23 <(echo "$REQUIRED") <(echo "$EXISTING") || echo "(差分取得失敗)"
+            echo "::error::主要テーブルが ${EXPECTED_COUNT} 件中 ${ACTUAL_COUNT} 件しか存在しない"
+            exit 1
+          fi
+
+          echo "主要テーブル ${EXPECTED_COUNT} 件すべて存在を確認"
+
+      - name: ヘルスチェック - 起動ログの schema 関連 WARN 抽出
+        # 改善② Core コンテナのログから schema.sql 由来の WARN を抽出して
+        # ::warning:: で表示する（fail はしない）。
+        # 044 で「DDL 失敗が WARN で潰された」事象が再発しても気付ける運用にする。
+        if: success()
+        run: |
+          set -uo pipefail
+
+          # 既にヘルスチェックで Core 200 を確認済みのため追加 sleep は不要。
+          # docker logs --since 5m で直近の起動ログをカバーする。
+          PARAMS_JSON=$(jq -n '{
+            commands: [
+              "docker logs --since 5m amazia-core 2>&1 | grep -iE \"WARN.*(sql\\.init|schema|DDL|ALTER|CREATE TABLE|FOREIGN KEY)\" || true"
+            ]
+          }')
+          CID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ap-southeast-2 \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS_JSON" \
+            --query 'Command.CommandId' --output text)
+
+          ST=Pending
+          for i in $(seq 1 12); do
+            sleep 5
+            ST=$(aws ssm get-command-invocation \
+              --command-id "$CID" \
+              --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+              --region ap-southeast-2 \
+              --query 'Status' --output text 2>/dev/null || echo "Pending")
+            [ "$ST" = "Success" ] && break
+            if [ "$ST" = "Failed" ] || [ "$ST" = "TimedOut" ] || [ "$ST" = "Cancelled" ]; then
+              break
+            fi
+          done
+
+          if [ "$ST" != "Success" ]; then
+            # 抽出失敗は CD 失敗にしない（観測ステップなので情報出して続行）
+            echo "::warning::Core 起動 WARN 抽出 SSM コマンドが失敗（Status=$ST）。デプロイは成功扱いで継続"
+            exit 0
+          fi
+
+          OUT=$(aws ssm get-command-invocation \
+            --command-id "$CID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ap-southeast-2 \
+            --query 'StandardOutputContent' --output text)
+
+          if [ -n "$(echo "$OUT" | tr -d '[:space:]')" ]; then
+            echo "::warning::Core 起動時に schema 関連の WARN が検出されました。詳細を確認してください。"
+            echo "===== Core 起動 schema 関連 WARN ====="
+            echo "$OUT"
+            echo "======================================"
+          else
+            echo "Core 起動 schema 関連 WARN なし"
+          fi
+
+      - name: 本番 DB スキーマスナップショット保存
+        # 改善④ mysqldump --no-data で DDL のみを取得し S3 に日次保存。
+        # 週次レビューで schema.sql との差分を人手確認する用途（自動アラートなし）。
+        # S3 ライフサイクル: prefix=schema-snapshots/ で 90日後 Glacier Deep Archive、365日後 Expire（コンソール側設定）。
+        if: success()
+        run: |
+          set -uo pipefail
+          DATE=$(date -u +%Y-%m-%d)
+          S3_KEY="schema-snapshots/${DATE}.sql"
+          S3_URI="s3://fullstack-renaissance-demo/${S3_KEY}"
+
+          # MYSQL_ROOT_PASSWORD は EC2 上の .env から解決させる。
+          # mysqldump は標準出力に DDL を吐き、aws s3 cp - で直接アップロード（中間ファイル不要）。
+          PARAMS_JSON=$(jq -n --arg uri "$S3_URI" '{
+            commands: [
+              ("docker exec amazia-mysql sh -c \"mysqldump --no-data --no-tablespaces -uroot -p$MYSQL_ROOT_PASSWORD amazia\" | aws s3 cp - " + $uri)
+            ]
+          }')
+          CID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ap-southeast-2 \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS_JSON" \
+            --query 'Command.CommandId' --output text)
+
+          ST=Pending
+          for i in $(seq 1 12); do
+            sleep 5
+            ST=$(aws ssm get-command-invocation \
+              --command-id "$CID" \
+              --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+              --region ap-southeast-2 \
+              --query 'Status' --output text 2>/dev/null || echo "Pending")
+            [ "$ST" = "Success" ] && break
+            if [ "$ST" = "Failed" ] || [ "$ST" = "TimedOut" ] || [ "$ST" = "Cancelled" ]; then
+              break
+            fi
+          done
+
+          if [ "$ST" != "Success" ]; then
+            # スナップショットは品質改善目的の補助機構。失敗しても CD は成功扱いで継続。
+            echo "::warning::スキーマスナップショット保存に失敗（Status=$ST）。デプロイは成功扱いで継続"
+            aws ssm get-command-invocation --command-id "$CID" --instance-id "${{ secrets.EC2_INSTANCE_ID }}" --region ap-southeast-2 --query 'StandardErrorContent' --output text || true
+            exit 0
+          fi
+
+          echo "スキーマスナップショット保存: ${S3_URI}"

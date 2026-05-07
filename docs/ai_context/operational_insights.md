@@ -110,6 +110,52 @@
 
 ---
 
+### schema.sql 編集時の3点観点（phaseX-6 / 027・038・044 起因）
+
+`amazia-core/src/main/resources/schema.sql` は本番 MySQL の DDL を `spring.sql.init.mode=always` + `continue-on-error=true` で起動時実行する。`continue-on-error` は H2/MySQL 互換差や重複実行を吸収する一方、**DDL 失敗を WARN に潰す**ため、編集時は以下3点を必ず確認する。
+
+#### 1. FK 列の signed/unsigned を参照先と一致させる（044 起因）
+
+- 本プロジェクトの `users.id` は Laravel の `bigIncrements` 由来で **`BIGINT UNSIGNED`**。Spring の `Long` フィールドを `@JoinColumn` で参照する場合、schema.sql 側は `BIGINT UNSIGNED` を**明示**する
+- `BIGINT NOT NULL` のまま FK を張ると本番 MySQL は `ERROR 3780 Referencing column ... incompatible` で DDL を拒否し、`continue-on-error` で WARN 化されたまま該当テーブルが作られない
+- H2 には UNSIGNED 概念が無く Entity 通りに signed BIGINT で生成されるため CI では検知不能（044 が顕在化までユーザー操作待ちだった理由）
+- 確認手順：`grep -nE 'REFERENCES users\(id\)' schema.sql` で参照箇所を洗い出し、対応する FK 列がすべて `BIGINT UNSIGNED` か目視確認する
+
+#### 2. 冪等性の担保
+
+- 新規テーブルは必ず `CREATE TABLE IF NOT EXISTS`
+- マスタデータは `INSERT IGNORE` または `ON DUPLICATE KEY UPDATE`
+- 既存テーブルへのカラム追加は `ALTER TABLE ... ADD COLUMN ...` を **`continue-on-error=true` 前提で再実行されても無害**な形に書く（MySQL は `ADD COLUMN IF NOT EXISTS` を ANSI 準拠でサポートしないため、再実行時の "Duplicate column" エラーは continue-on-error で吸収する設計）
+- インデックス・FK 追加も同様：`CREATE INDEX` / `ALTER TABLE ... ADD CONSTRAINT` を分離で書き、重複は continue-on-error で吸収
+- `MODIFY COLUMN` は冪等（同じ定義を再実行してもエラーにならない）。NOT NULL → NULL 許容の移行（038）は MODIFY で書く
+
+#### 3. H2 / MySQL 互換性（027 起因）
+
+- H2 は本プロジェクトのテストで使う（`spring.jpa.hibernate.ddl-auto=create-drop` だが H2 プロファイルでは schema.sql を読まない設定）
+- ただし schema.sql が H2 で読まれてしまう経路ができた場合に備え、以下は **書かない**：
+  - `CREATE TABLE` 内インライン `INDEX ...` 句 → `CREATE INDEX` で分離（H2 で「不明なデータ型」エラー）
+  - `ON UPDATE CURRENT_TIMESTAMP` を H2 で読ませる経路があれば NG（MySQL 専用）
+  - `ADD COLUMN IF NOT EXISTS` のような MySQL 8 系の拡張構文
+- JSON 列を扱うなら `@JdbcTypeCode(SqlTypes.JSON)` か AttributeConverter で対応（`columnDefinition = "JSON"` は文字列リテラル二重エスケープを起こす）
+- `DATETIME(6)` 等の精度指定は MySQL 固有なので、必要ならテストでも H2 互換であることを確認
+
+#### schema.sql 編集後の確認手順
+
+1. `mvn test` を流して H2 経路でテストが緑になることを確認（schema.sql 自体は test プロファイルで読まれないが、Entity の互換性を検査）
+2. ローカル本番（`docker-compose.local.yml` + MySQL）で `docker compose down -v && docker compose up --build` から再起動し、Core 起動ログに DDL 関連の WARN が出ていないかを `docker logs amazia-core 2>&1 | grep -iE 'WARN.*(schema|DDL|ALTER|CREATE TABLE|FOREIGN KEY)'` で確認
+3. 主要テーブルが期待通り作成されたことを `information_schema.tables` で件数確認（CD の改善① と同じ SQL）
+4. 本番 DB に新規テーブルを追加した場合は **`ops/healthcheck/required_tables.txt` への追記**を忘れない（CLAUDE.md §主要テーブル定数の同期）
+
+#### 設計書「前提」セクションへの裏付け参照ファイル要求（037 派生）
+
+設計書に「前提」として書く事実は、**裏付け参照ファイルを 1 つ以上引用**する。
+
+- 例：「本プロジェクトは Flyway 未使用」と書くなら `amazia-core/pom.xml` の依存ブロックを引用する
+- 例：「DB 初期化は schema.sql + data.sql」と書くなら `application-local.properties` の `spring.sql.init.mode=always` 行を引用する
+- 「ディレクトリの存在」だけを根拠にせず、**動作している設定値**を一次ソースとして示す（037 で `db/migration/` の存在から Flyway を外挿した経緯への対策）
+
+---
+
 ## カテゴリ4: 既存 DB / API 定義書を最初に読む（フェーズ15以降の設計書ドラフト前提）
 
 ### なぜこのカテゴリが要るか
