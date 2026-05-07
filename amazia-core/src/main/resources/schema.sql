@@ -293,3 +293,99 @@ ALTER TABLE products ADD COLUMN accept_backorder     BOOLEAN NOT NULL DEFAULT FA
 -- ----------------------------------------------------------------------------
 ALTER TABLE products MODIFY COLUMN price INT NULL;
 ALTER TABLE products MODIFY COLUMN stock INT NULL;
+
+-- ============================================================================
+-- フェーズ15: 配送管理（設計書 phase15_delivery_management.md r5）
+--   1. shipping_methods マスタ（P5-1）
+--   2. warehouses マスタ + ダミー1行（RRR-3）
+--   3. inventories（並行運用書き込み正本／RRRR-1）
+--   4. 既存 products.stock を inventories に初期複製（RRRR-1）
+--   5. inbounds（入荷管理／R-3）
+--   6. deliveries（配送実体／RR-3 / R-1 / R-9）
+--   注: H2 互換のため CREATE INDEX は分離・ALTER ADD CONSTRAINT も分離。
+--       重複実行は spring.sql.init.continue-on-error で許容（test_insights カテゴリ7-2）。
+-- ============================================================================
+
+-- 1. shipping_methods マスタ（P5-1）
+CREATE TABLE IF NOT EXISTS shipping_methods (
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(255) NULL
+);
+INSERT IGNORE INTO shipping_methods (id, name, description) VALUES
+    (1, 'home_delivery',  '宅配'),
+    (2, 'konbini_pickup', 'コンビニ受取'),
+    (3, 'dropoff',        '置き配');
+
+-- 2. warehouses マスタ + ダミー1行（RRR-3）
+CREATE TABLE IF NOT EXISTS warehouses (
+    id          BIGINT NOT NULL PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
+    description VARCHAR(255) NULL
+);
+INSERT IGNORE INTO warehouses (id, name, description) VALUES (1, 'default', '全社単一倉庫');
+
+-- 3. inventories（並行運用書き込み正本／RRRR-1）
+CREATE TABLE IF NOT EXISTS inventories (
+    id           BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    product_id   BIGINT NOT NULL,
+    warehouse_id BIGINT NOT NULL DEFAULT 1,
+    quantity     INT NOT NULL,
+    updated_at   DATETIME NOT NULL,
+    CONSTRAINT uk_inventories_product_warehouse UNIQUE (product_id, warehouse_id),
+    CONSTRAINT fk_inventories_product   FOREIGN KEY (product_id)   REFERENCES products(id),
+    CONSTRAINT fk_inventories_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+);
+CREATE INDEX idx_inventories_product_id ON inventories (product_id);
+ALTER TABLE inventories ADD CONSTRAINT chk_inventories_quantity_nonneg CHECK (quantity >= 0);
+
+-- 4. 既存 products.stock を inventories に初期複製（並行運用初期同期 / RRRR-1）
+--    INSERT IGNORE で UNIQUE 制約により再実行しても二重投入されない。
+INSERT IGNORE INTO inventories (product_id, warehouse_id, quantity, updated_at)
+SELECT p.id, 1, COALESCE(p.stock, 0), CURRENT_TIMESTAMP
+FROM products p;
+
+-- 5. inbounds（入荷管理／R-3）
+CREATE TABLE IF NOT EXISTS inbounds (
+    id           BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    product_id   BIGINT NOT NULL,
+    warehouse_id BIGINT NOT NULL DEFAULT 1,
+    supplier_id  BIGINT NULL,
+    quantity     INT NOT NULL,
+    inbounded_at DATE NOT NULL,
+    created_at   DATETIME NOT NULL,
+    updated_at   DATETIME NOT NULL,
+    CONSTRAINT fk_inbounds_product   FOREIGN KEY (product_id)   REFERENCES products(id),
+    CONSTRAINT fk_inbounds_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+);
+CREATE INDEX idx_inbounds_product_id   ON inbounds (product_id);
+CREATE INDEX idx_inbounds_inbounded_at ON inbounds (inbounded_at);
+ALTER TABLE inbounds ADD CONSTRAINT chk_inbounds_quantity_pos CHECK (quantity > 0);
+
+-- 6. deliveries（配送実体／RR-3 / R-1 / R-9）
+CREATE TABLE IF NOT EXISTS deliveries (
+    id                   BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    sales_id             BIGINT NOT NULL,
+    shipping_address_id  BIGINT UNSIGNED NOT NULL,
+    shipping_method_id   BIGINT NOT NULL,
+    shipping_status_id   BIGINT NOT NULL,
+    tracking_code        VARCHAR(100) NULL,
+    scheduled_date       DATE NULL,
+    shipped_date         DATE NULL,
+    delivered_date       DATE NULL,
+    created_at           DATETIME NOT NULL,
+    updated_at           DATETIME NOT NULL,
+    CONSTRAINT uk_deliveries_sales_id UNIQUE (sales_id),
+    CONSTRAINT fk_deliveries_sales            FOREIGN KEY (sales_id)            REFERENCES sales(id),
+    CONSTRAINT fk_deliveries_address          FOREIGN KEY (shipping_address_id) REFERENCES address(id),
+    CONSTRAINT fk_deliveries_shipping_method  FOREIGN KEY (shipping_method_id)  REFERENCES shipping_methods(id),
+    CONSTRAINT fk_deliveries_shipping_status  FOREIGN KEY (shipping_status_id)  REFERENCES shipping_statuses(id)
+);
+CREATE INDEX idx_deliveries_shipping_status_id ON deliveries (shipping_status_id);
+CREATE INDEX idx_deliveries_tracking_code      ON deliveries (tracking_code);
+CREATE INDEX idx_deliveries_scheduled_date     ON deliveries (scheduled_date);
+
+-- 7. sales.shipping_method_id への FK 追加
+--    schema.sql L221 で「phase15 で shipping_methods 作成後に追加」と保留されていた制約。
+--    shipping_methods マスタ実体化により FK を有効化。
+ALTER TABLE sales ADD CONSTRAINT fk_sales_shipping_method FOREIGN KEY (shipping_method_id) REFERENCES shipping_methods(id);

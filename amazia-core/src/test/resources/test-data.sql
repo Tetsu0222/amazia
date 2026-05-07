@@ -61,3 +61,10 @@ INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (
 INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (6, 'CANCELED',         '発送前キャンセル', '将来 phase21',     CURRENT_TIMESTAMP);
 INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (7, 'DELIVERY_FAILED',  '配達失敗',         '将来 phase21',     CURRENT_TIMESTAMP);
 INSERT INTO shipping_statuses (id, code, name, description, created_at) VALUES (8, 'RESCHEDULED',      '再配達手配中',     '将来 phase21',     CURRENT_TIMESTAMP);
+
+-- フェーズ15 マスタ（schema.sql と整合 / P5-1 / RRR-3）
+INSERT INTO shipping_methods (id, name, description) VALUES (1, 'home_delivery',  '宅配');
+INSERT INTO shipping_methods (id, name, description) VALUES (2, 'konbini_pickup', 'コンビニ受取');
+INSERT INTO shipping_methods (id, name, description) VALUES (3, 'dropoff',        '置き配');
+
+INSERT INTO warehouses (id, name, description) VALUES (1, 'default', '全社単一倉庫');

@@ -20,7 +20,7 @@
 | 4 | quantity | 購入数量 | INT | - | NOT NULL | - | CHECK: > 0 |
 | 5 | amount | 購入金額（合計） | INT | - | NOT NULL | - | 単価 × quantity の確定額（円） |
 | 6 | payment_method_id | 決済方法ID | BIGINT | - | NOT NULL | - | FK: payment_methods.id |
-| 7 | shipping_method_id | 配送方法ID | BIGINT | - | NOT NULL | - | フェーズ15 で `shipping_methods.id` への FK 制約を追加予定 |
+| 7 | shipping_method_id | 配送方法ID | BIGINT | - | NOT NULL | - | FK: shipping_methods.id（フェーズ15 r5 で有効化） |
 | 8 | shipping_address_id | 配送先住所ID | BIGINT UNSIGNED | - | NOT NULL | - | FK: address.id（注文時スナップショット） |
 | 9 | shipping_status_id | 配送ステータスID | BIGINT | - | NOT NULL | - | FK: shipping_statuses.id（初期値は PENDING=1） |
 | 10 | payment_id | 決済ID | VARCHAR | 100 | NOT NULL | - | UNIQUE。決済代行から払い出される一意ID。冪等キーを兼ねる |
@@ -59,7 +59,7 @@
 | fk_sales_payment_method | payment_method_id | payment_methods(id) |
 | fk_sales_shipping_status | shipping_status_id | shipping_statuses(id) |
 | fk_sales_shipping_address | shipping_address_id | address(id) |
-| _未付与_ | shipping_method_id | shipping_methods(id) ※フェーズ15で追加予定 |
+| fk_sales_shipping_method | shipping_method_id | shipping_methods(id) ※フェーズ15 r5 で有効化 |
 
 ## 関連テーブル
 
@@ -68,9 +68,11 @@
 | market_customers | N:1 | 購入者（Market 顧客） |
 | product_skus | N:1 | 購入SKU |
 | payment_methods | N:1 | 決済方法 |
+| shipping_methods | N:1 | 配送方法（phase15 r5 で FK 有効化） |
 | shipping_statuses | N:1 | 配送ステータス |
 | address | N:1 | 配送先住所スナップショット |
 | sales_return | 1:N | 返品申請 |
+| deliveries | 1:1 | 配送実体（phase15 r5：注文確定と同時に生成） |
 
 ## 設計上の注意
 

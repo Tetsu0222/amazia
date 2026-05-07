@@ -44,6 +44,7 @@
 |------------|------|------|
 | market_customers | N:1 | 住所所有者（Market 顧客） |
 | sales | 1:N | 配送先として参照される売上レコード |
+| deliveries | 1:N | 配送実体（phase15 r5：`deliveries.shipping_address_id` から参照） |
 
 ## 設計上の注意
 

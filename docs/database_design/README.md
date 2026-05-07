@@ -59,6 +59,16 @@
 | [TBL_shipping_statuses.md](TBL_shipping_statuses.md) | shipping_statuses | 配送ステータスマスタ | Core |
 | [TBL_operation_logs.md](TBL_operation_logs.md) | operation_logs | 操作履歴 | Core |
 
+### Core システム（配送管理・在庫並行運用）※フェーズ15追加
+
+| ファイル名 | テーブル名 | 論理名 | 所属システム |
+|------------|------------|--------|------------|
+| [TBL_shipping_methods.md](TBL_shipping_methods.md) | shipping_methods | 配送方法マスタ | Core |
+| [TBL_warehouses.md](TBL_warehouses.md) | warehouses | 倉庫マスタ | Core |
+| [TBL_inventories.md](TBL_inventories.md) | inventories | 商品×倉庫の現在在庫（並行運用書き込み正本） | Core |
+| [TBL_inbounds.md](TBL_inbounds.md) | inbounds | 商品入荷ヘッダ | Core |
+| [TBL_deliveries.md](TBL_deliveries.md) | deliveries | 配送実体（注文確定と同時に sales 1:1 で生成） | Core |
+
 ### Console システム（Laravel 標準）
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |
