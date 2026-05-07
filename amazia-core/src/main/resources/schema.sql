@@ -222,18 +222,19 @@ CREATE TABLE IF NOT EXISTS sales (
 );
 
 -- 返品テーブル（V6 + V8 相当）
+-- approver_id は users.id（BIGINT UNSIGNED）と型を揃える必要がある（trouble 045）
 CREATE TABLE IF NOT EXISTS sales_return (
-    id              BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    sales_id        BIGINT       NOT NULL,
-    status          VARCHAR(50)  NOT NULL,
-    reason          TEXT         NULL,
-    quantity        INT          NOT NULL,
-    approver_id     BIGINT       NULL,
-    approved_at     DATETIME     NULL,
-    notified_user   BOOLEAN      NOT NULL DEFAULT FALSE,
-    notified_admin  BOOLEAN      NOT NULL DEFAULT FALSE,
-    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id              BIGINT          AUTO_INCREMENT PRIMARY KEY,
+    sales_id        BIGINT          NOT NULL,
+    status          VARCHAR(50)     NOT NULL,
+    reason          TEXT            NULL,
+    quantity        INT             NOT NULL,
+    approver_id     BIGINT UNSIGNED NULL,
+    approved_at     DATETIME        NULL,
+    notified_user   BOOLEAN         NOT NULL DEFAULT FALSE,
+    notified_admin  BOOLEAN         NOT NULL DEFAULT FALSE,
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT chk_sales_return_quantity_positive CHECK (quantity > 0),
     INDEX idx_sales_return_sales_id (sales_id),
     INDEX idx_sales_return_status (status),

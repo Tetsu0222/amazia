@@ -19,7 +19,7 @@
 | 3 | status | 返品ステータス | VARCHAR | 50 | NOT NULL | - | requested / approved / rejected / completed 等 |
 | 4 | reason | 返品理由 | TEXT | - | NULL | NULL | 顧客が入力した自由記述 |
 | 5 | quantity | 返品数量 | INT | - | NOT NULL | - | CHECK: > 0。元注文の数量を超えない前提（アプリ側で検証） |
-| 6 | approver_id | 承認者ID | BIGINT | - | NULL | NULL | FK: users.id（Console 社員）。承認後にセット |
+| 6 | approver_id | 承認者ID | BIGINT UNSIGNED | - | NULL | NULL | FK: users.id（Console 社員）。承認後にセット。`users.id` が `BIGINT UNSIGNED` のため UNSIGNED で揃える（trouble 045） |
 | 7 | approved_at | 承認日時 | DATETIME | - | NULL | NULL | |
 | 8 | notified_user | 顧客通知済フラグ | BOOLEAN | - | NOT NULL | FALSE | 返品結果メールが顧客に送信済み |
 | 9 | notified_admin | 管理者通知済フラグ | BOOLEAN | - | NOT NULL | FALSE | 返品申請時の管理者通知が送信済み |

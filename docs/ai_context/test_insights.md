@@ -148,17 +148,28 @@
 - [ ] 設計書 §カラム定義で「NULL」と書かれた旧カラムについて、schema.sql に MODIFY が書かれているか
 - [ ] フェーズの完了条件として、UI フォームから最小ペイロード（必須項目のみ）で送信して 2xx が返ることを実機確認
 
-### FK 列 signed/unsigned の本番 MySQL 整合（044 起因）
+### FK 列 signed/unsigned の本番 MySQL 整合（044・045 起因）
 
 - 本プロジェクトの `users.id` は Laravel の `bigIncrements` 由来で **`BIGINT UNSIGNED`**。これを参照する FK 列を schema.sql に書くときは、**必ず `BIGINT UNSIGNED` を明示**する
 - `BIGINT NOT NULL` のままだと本番 MySQL は `ERROR 3780 incompatible` で DDL を拒否し、`continue-on-error=true` で WARN 化される。Core 起動・HTTP ヘルスチェックは通り、該当テーブルが呼ばれた瞬間に 1146 で 500（044 のサイレント故障パターン）
 - H2 には UNSIGNED 概念が無く、Entity の `Long` は signed BIGINT で生成され FK は問題なく成立する → CI で検知不能
 - 対策：`schema.sql` 編集後 `grep -nE 'REFERENCES users\(id\)' schema.sql` で参照箇所を洗い出し、対応する FK 列がすべて `BIGINT UNSIGNED` であることを目視確認
 
+#### 同型ドリフト不具合の修正範囲ルール（045 起因）
+
+044 修正時に発症した 1 列（`operation_logs.user_id`）だけ UNSIGNED に直して終わったため、同じ `users.id` を参照する `sales_return.approver_id` の同型ドリフトが 2 日後に 045 として再発した。**型ドリフト不具合を修正するときは、当該列だけでなく同一参照先を持つ全 FK 列を一括点検する**。
+
+- 修正手順：
+  1. `grep -nE 'REFERENCES <参照先>\(<列>\)' schema.sql` で同一参照先 FK を全件抽出
+  2. 各 FK 列の型を確認し、参照先と signed/unsigned が揃っていない列をすべて修正対象に含める
+  3. 1 つの修正 PR で複数列を一括是正（後追いリスクを残さない）
+- 検出された 1 件の対症療法ではなく **参照先単位での網羅的修正** を行う
+
 #### テスト観点（追加）
 - [ ] schema.sql で `users(id)` を参照する FK 列がすべて `BIGINT UNSIGNED` か（grep + 目視）
 - [ ] `market_customers(id)` など他の `BIGINT UNSIGNED` 主キーを参照する FK 列も型が揃っているか
 - [ ] フェーズで新規テーブルを追加した直後、本番デプロイの「主要テーブル存在確認」（CD 改善① / phaseX-6）で実在件数が期待件数を満たすか
+- [ ] 型ドリフト不具合を 1 件直したら、同じ参照先を持つ他 FK 列の grep 棚卸しを必ず行う（045 の再発防止）
 
 ---
 
@@ -505,9 +516,10 @@
 | **本番初動でのみ顕在化する潜在不具合**（ローカルで通っていても本番で踏む） | 030, 031, 032, 033 |
 | **API レスポンス契約とフロント参照名の乖離**（テストデータが実 JSON 形式と異なるためテストでは検知できない） | 035 |
 | **「外挿による誤認」**（実ファイル/設定を直接読まずに表面上の手がかりから前提を立てる、異レイヤーで同型再発） | 035, 037 |
-| **テスト DB 初期化方式と本番 DB 初期化方式の差異**（H2 + ddl-auto では通るが本番 MySQL + schema.sql では通らない） | 027, 037, 038, 044 |
+| **テスト DB 初期化方式と本番 DB 初期化方式の差異**（H2 + ddl-auto では通るが本番 MySQL + schema.sql では通らない） | 027, 037, 038, 044, 045 |
 | **Entity と本番 MySQL の NOT NULL 制約乖離**（旧カラムの ALTER MODIFY 漏れにより設計書通り NULL を送ると 1048 で 500） | 038 |
-| **`users.id` UNSIGNED 起因の FK 型ドリフト**（H2 では UNSIGNED 概念が無く FK 互換性エラーが起きないため、本番 MySQL でだけ DDL が `continue-on-error` で潰れて該当テーブル不在 → 1146 で 500） | 044 |
+| **`users.id` UNSIGNED 起因の FK 型ドリフト**（H2 では UNSIGNED 概念が無く FK 互換性エラーが起きないため、本番 MySQL でだけ DDL が `continue-on-error` で潰れて該当テーブル不在 → 1146 で 500） | 044, 045 |
+| **同型ドリフト不具合の修正範囲不足**（1 列の対症療法で終わらせると同じ参照先を持つ他 FK 列で同型再発する） | 045 |
 
 ---
 

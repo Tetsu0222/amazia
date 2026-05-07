@@ -55,6 +55,7 @@
 | 042 | [EC2ディスクフル起因のゾンビOnline・カナリア配信失敗](042_disk_full_zombie_online_docker_image_pile.md) | 旧 Docker イメージが `/var/lib/docker` に蓄積（33個・3.08GB）してルートボリューム 8GB を枯渇。systemd-journald がジャーナルを書けず無限エラー、SSM Agent も `echo canary-ok` を実行できず CD の `canary_check` が `Failed` で停止。EBSを16GBに拡張＋`docker system prune -af`で復旧、deploy.ymlに `docker image prune -af` 自動化と canary_check 失敗時の3点セットログ出力を追加 | ✅ 解決済 | - | - |
 | 043 | [Market 購入履歴の配送状況が Console の更新を反映しない](043_market_purchase_history_shipping_status_not_synced.md) | 配送ステータスが `sales.shipping_status_id` と `deliveries.shipping_status_id` の二重ソースになっており、Console の状態遷移は `deliveries` のみ更新する一方で Market 購入履歴 API は `sales` 側を読んでいたため、Console で「配送済」にしても Market 購入履歴は永続的に「配送準備中」表示。読み出し側を deliveries 優先（旧 sales のみフォールバック）に修正 | ✅ 解決済 | - | - |
 | 044 | [operation_logs テーブル不在 + users.id UNSIGNED ドリフトで操作履歴が500](044_operation_logs_table_missing_users_id_unsigned_drift.md) | schema.sql の `operation_logs.user_id BIGINT` が本番 `users.id BIGINT UNSIGNED` と FK 型互換せず Core 起動時の DDL が `continue-on-error` で潰されてテーブル未作成。呼び出された瞬間 1146 で 500。本番ホットフィックス＋schema.sql を UNSIGNED に修正。027・038 に続く H2／本番 MySQL 乖離系の3例目（メタ評価対象） | ✅ 解決済 | - | - |
+| 045 | [sales_return テーブル不在 + users.id UNSIGNED ドリフトで返品管理が500](045_sales_return_table_missing_users_id_unsigned_drift.md) | 044 と完全に同型。`sales_return.approver_id BIGINT` が本番 `users.id BIGINT UNSIGNED` と FK 型互換せず DDL が `continue-on-error` で潰されてテーブル未作成、呼び出された瞬間 1146 で 500。044 修正時に「同じ参照先を持つ全 FK 列の棚卸し」を行わなかったために 2 日後に同型再発。phaseX-6 のヘルスチェック完全運用後は同型不具合がデプロイ直後に検知される（メタ評価対象） | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

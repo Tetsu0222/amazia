@@ -188,3 +188,143 @@ phase17 が現状「🔲未着手」のため、phase17 実装着手前にこの
 | RV-12 | 🟢 任意 | r1 → r2 改訂履歴粒度 | 改訂履歴 |
 
 以上、よろしくお願いします。
+
+---
+
+# r2 再レビュー（2026-05-07）
+
+**対象**：[phase18_inquiry_management.md](phase18_inquiry_management.md) r2
+
+## サマリ
+
+r1 で挙げた RV-1 〜 RV-12 の **12 件すべてに具体的な反映**が確認できました。特に🔴必須 3 件はいずれも適切に解消されています：
+
+- **RV-1（`title` / `body` 未定義）** → §6.1 の表に列追加 + §9 の `notification-templates` / `target-labels` で config 駆動化。プレースホルダ展開と `target_label` 組み立てルールも明示。模範的な対応
+- **RV-2（`payload_hash` ユニーク化）** → §6.1 で `inquiry_replied` から `messages.id` を除去。phase17 R-10 / J-5 の意図整合と§11.1 のテストアサート修正もセット。設計意図の表（§6.1 後段）も新設されており、将来読者が判断根拠を辿れる構造になりました
+- **RV-3（phase17 r6 §3.4 凍結への後付け要請）** → §13.2 を「phase17 r7 候補への追加要請」と明確化。「本書実装は単独完結する」旨も明記され、phase17 が r7 まで進まなくても phase18 が止まらない構造に整理されました
+
+🟡推奨 5 件・🟢任意 4 件もすべて反映されており、Step 0 着手レベルとして合格水準です。
+
+ただし **r2 で新たに 1 件のブロッカー（🔴RV2-1）と 3 件の軽微な指摘（🟡 RV2-2 / 🟢 RV2-3 / 🟢 RV2-4）** が出ました。RV2-1 は §6.1 の修正と §2.2.4 の本文に**引用先のズレ**が残ってしまったケースで、Step A 実装前に必ず修正してください。
+
+---
+
+## 🔴 必須対応
+
+### RV2-1：§2.2.4「投稿後の挙動」の `payload_hash` が r1 時代のまま残存（§6.1 と矛盾）
+
+**該当**：[§2.2.4 投稿後の挙動](phase18_inquiry_management.md#L213)
+
+**現状**：
+
+```
+- 同一トランザクションで `console_notifications` に INSERT
+  （`target_subscription_tag='inquiry_alerts'`, `level='INFO'`,
+   payload_hash=SHA-256('inquiry:'+inquiry.id)）+ SES（INFO のため...）
+```
+
+**指摘**：§6.1 では RV-2 反映で `SHA-256('inquiry_created:' + inquiries.id)` に確定したのに、§2.2.4 の本文だけ古い表記 `'inquiry:'+inquiry.id` のまま残っています。実装担当者が §2.2.4 を読んで実装すると `inquiry_created:` が抜けた間違ったハッシュが投入され、§6.1 と齟齬が発生します。
+
+加えて、§2.2.4 末尾「+ SES（INFO のためメール送出は §6 に従い行わない。WARN/ERROR ではないため `console_notifications` のみ）」は、`+ SES` という記述自体が誤解を招きます。SES は呼ばないので「+ SES（INFO のため呼ばない／§6.1 参照）」の表記より「`NotificationDispatcher.dispatch(...)` を呼び出す。`level=INFO` のため SES メール送出は行われず、`console_notifications` への INSERT のみ実施される（§6.1 後段と整合）」のように `NotificationDispatcher` 呼び出し起点へ書き換える方が、§6.1 と一致します。
+
+**修正依頼**：§2.2.4 の該当 1 行を以下に置換してください。
+
+```
+- 同一トランザクションで `NotificationDispatcher.dispatch('inquiry_alerts', INFO, payload)`
+  を呼び出す。`payload` の組み立てルールは §6.1 を参照
+  （`payload_hash = SHA-256('inquiry_created:' + inquiries.id)`、
+   `title` / `body` は `config('inquiry.notification_templates').created` から組み立て）。
+```
+
+これで §6.1 に集約され、本文の重複定義による drift を排除できます。`level=INFO` のためメール送出されない件も §6.1 / §6.2 で既に説明済みなので、§2.2.4 で再掲する必要はありません。
+
+---
+
+## 🟡 推奨対応
+
+### RV2-2：phase17 r7 候補の ID 命名規則との整合（§13.2 で「R-17 / R-18 等」と書いているが、phase17 の改訂規則と異なる）
+
+**該当**：[§13.2 phase17 への要請事項](phase18_inquiry_management.md#L711)「phase17 r7 改訂時に下記 2 件を `R-17` / `R-18` 等の新規 ID で受理してもらう」
+
+**指摘**：phase17 の改訂履歴（[phase17_batch_processing.md](phase17_batch_processing.md) L11-15）を読むと、レビュー観点の prefix はリビジョンごとに切り替わっています：
+
+| 反映元 | prefix |
+|--------|--------|
+| r2 | R-1 〜 R-16 |
+| r3 | N-1 〜 N-14 |
+| r4 | M-1 〜 M-14 |
+| r5 | K-1 〜 K-14 |
+| r6 | J-1 〜 J-10 |
+
+つまり phase17 r7 で取り込まれる新規論点は **`R-17` ではなく次のアルファベット（`H-` か `I-` か、phase17 著者の選定次第）** になる見込みです。本書 §13.2 が「R-17 / R-18」と書いていると、phase17 r7 の著者が「R- は r2 で枯れている」と混乱します。
+
+**修正依頼**：§13.2 の該当箇所を以下のような表現に変更してください：
+
+```
+phase17 r7 改訂時に下記 2 件を **新規 ID（phase17 r7 の prefix 規則に従う／
+R-/N-/M-/K-/J- は既出のため、phase17 著者の選定によりアルファベット繰上げ）で
+受理**してもらうことを前提とし...
+```
+
+または phase17 §14.1 にプリエンプティブに「phase18 r2 から `InquiryArchiveJob` / `InquiryStaleAlertJob` の 2 件が追加要請されている」と申し送りを 1 行入れる対応でも可。これは phase17 著者と協議してください。
+
+### RV2-3：§14.1 「将来拡張余地」の `assigned_user_id` カラム追加 SQL のシンタックス（MySQL 互換性確認）
+
+**該当**：[§14.1 将来拡張余地](phase18_inquiry_management.md#L747)
+
+**現状**：
+
+```sql
+ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS assigned_user_id BIGINT NULL
+```
+
+**指摘**：`ADD COLUMN IF NOT EXISTS` は **MySQL 8.0.29 以降のみ対応** です。本プロジェクトの本番 MySQL バージョン（[user memory: aws_infra_facts](aws_infra_facts.md) を参照すべき）が 8.0.29 未満だと構文エラーになります。phase14 / phase15 / phase17 のマイグレーションは `CREATE TABLE IF NOT EXISTS` のみで、`ALTER TABLE ADD COLUMN IF NOT EXISTS` は前例が無いはずです。
+
+**修正依頼**：MySQL バージョンを確認のうえ、もし 8.0.29 未満なら以下のような冪等パターンに変更してください（H2 と MySQL の双方互換）：
+
+```sql
+-- 将来 phase18.5 等で本書から実施する場合の参考実装
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = 'inquiries'
+                      AND column_name = 'assigned_user_id');
+SET @sql := IF(@col_exists = 0,
+               'ALTER TABLE inquiries ADD COLUMN assigned_user_id BIGINT NULL',
+               'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+```
+
+ただし本件は **§14.1「将来拡張余地」内の参考記述**であり、r2 では実施しないため、当面は注釈として「MySQL バージョン確認のうえ実施するべし」と添える程度でも構いません。
+
+---
+
+## 🟢 任意
+
+### RV2-4：§14.1 `InquiryMutationContext` の責務範囲が `UpdateInquiryStatusService` のみに見えるが、`ReplyInquiryService` でも `assigned_user_id` 自動再割当が将来必要になるかも
+
+§14.1 は `UpdateInquiryStatusService` の入力 DTO だけ拡張余地を述べていますが、`assigned_user_id` を将来導入する場合、返信時にも「未割当ならログイン admin を担当者に自動セット」のようなフックが要ります。`ReplyInquiryService` 側の DTO（仮：`ReplyInquiryRequest`）にも同様の余地を残しておくと、将来の改修が分散しません。本件は本フェーズでは実装しないため、注釈レベルで構いません。
+
+### RV2-5：r2 で改訂履歴の `r2 | 2026-05-07` が r1 と同日になっている
+
+[§改訂履歴](phase18_inquiry_management.md#L7) の r1 と r2 がともに `2026-05-07` です。実時間としては妥当（同日に r1 → r2 が走った）ですが、phase17 など他フェーズでは「r1: 5/6 → r2: 5/6」のように同日ペアでも履歴に区別がつくよう、時刻まで含めるか、r2 を 5/8 に倒すかの判断は著者にお任せします。本書が本日中にレビュー承認されるなら現状のままで問題ありません。
+
+---
+
+## まとめ表（r2 再レビュー）
+
+| ID | 優先度 | 内容 | 修正先 |
+|----|--------|------|--------|
+| RV2-1 | 🔴 必須 | §2.2.4 の `payload_hash` が古い表記のまま残存（§6.1 と矛盾） | §2.2.4 |
+| RV2-2 | 🟡 推奨 | phase17 r7 候補の ID 命名規則整合（`R-17` ではなく次の prefix） | §13.2 |
+| RV2-3 | 🟢 任意 | `ALTER TABLE ADD COLUMN IF NOT EXISTS` の MySQL 互換性 | §14.1 |
+| RV2-4 | 🟢 任意 | `ReplyInquiryService` 側にも `assigned_user_id` 拡張余地 | §14.1 |
+| RV2-5 | 🟢 任意 | r1 / r2 同日履歴の表記方針 | 改訂履歴 |
+
+## 結論
+
+🔴 RV2-1 のみ Step A 着手前に修正必須です。本件は **§2.2.4 の 1 行を §6.1 への参照に書き換えるだけ**で済みます（5 分作業）。
+
+RV2-1 を r3 で潰せば、本書は phase18 実装着手レベル（Step 0 → A → B）として **正式承認可能**です。🟡 RV2-2 と 🟢 系は r3 と並行 / 後追いで構いません。
+
+r1 → r2 のレビュー反映品質は非常に高く、特に RV-2 / RV-3 のような構造的な指摘に対する回答は phase17 / phase15 と同等の粒度・整合性で書かれており、設計担当者の理解度の高さが伺えます。Step 0 着手まで残りわずかです。
+
