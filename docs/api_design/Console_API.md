@@ -111,6 +111,8 @@
 
 そのまま Core `POST /api/products` に中継する。
 
+**注記**: `price` / `stock` は **意図的にリクエストパラメータに含めない**。フェーズ10 で SKU 側（`product_sku_prices` / `product_sku_stocks`）に移行済みのため、商品登録 UI（[ProductForm.vue](../../amazia-console/resources/vue/src/features/products/pages/ProductForm.vue)）からは入力させず、Console Service の `buildPayload` でも明示的に除外している。SKU 価格・在庫の登録は SKU 管理画面（`/skus`）で個別に行う。詳細は [トラブル #038](../troubles/038_products_price_stock_not_null_drift.md) を参照。
+
 ---
 
 ### 商品更新

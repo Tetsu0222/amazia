@@ -214,7 +214,22 @@
 | メソッド | POST |
 | パス | `/api/customer/orders/confirm` |
 | 呼び出し先 | amazia-core `POST /api/customer/orders/confirm` |
-| 画面 | `/checkout` |
+| 画面 | `/checkout` / `/checkout?preorder=1` |
+| 実装ファイル | `src/features/checkout/api/checkout.js` の `confirmOrder()` / `src/features/checkout/pages/Checkout.jsx` |
+
+**リクエストボディ（JSON）**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| skuId | integer | ○ | 購入対象 SKU |
+| quantity | integer | ○ | 数量（予約モードでは在庫数の上限制約なし） |
+| paymentMethodId | integer | ○ | 決済方法（クレジットカード / d払い / 代引き） |
+| shippingMethodId | integer | ○ | 配送方法（宅配 / コンビニ受取 / 置き配） |
+| preorder | boolean | × | 予約フラグ（既定 `false`）。フェーズ14.5 追加。`true` のとき Core 側で在庫減算チェックをスキップし、`is_preorder=true` の sales を作成 |
+
+**予約フロー**: `ProductDetail.jsx` でステータスが `PRE_ORDER` / `BACK_ORDER` のとき「予約する」ボタンが `?preorder=1` クエリ付きで `/checkout` へ遷移する。`Checkout.jsx` は `preorder=1` を読み取って画面を予約モードに切替（タイトル「ご予約内容の確認」、数量上限なし、ボタン「予約を確定する」）し、`confirmOrder({ ..., preorder: true })` で送信する。詳細は [phase14_5_preorder_status.md](../design/phase11_20/phase14_5_preorder_status.md) §4-2 / [トラブル #039](../troubles/039_market_checkout_preorder_mode_missing.md)。
+
+**価格未定 SKU の表示**: `Checkout.jsx` の合計欄は `selectedSku.price == null` のとき「価格未定」と表示し、`¥0` 表記を出さない（UI 防御）。Core 側の `OrderConfirmationService` は SKU 価格未登録の確定を 400 で弾くため、価格未定の予約は実質的にサーバ層でブロックされる（[トラブル #040](../troubles/040_market_lists_products_without_sku_price.md)）。
 
 ---
 
@@ -242,5 +257,6 @@ Market 画面ルートと API の対応関係。
 | `/customer/mypage` | MyPage | GET `/api/customer/me` |
 | `/customer/password-reset` | PasswordResetRequest | POST `/api/customer/password/reset` |
 | `/customer/password-reset/:token` | PasswordResetConfirm | POST `/api/customer/password/reset/confirm` |
-| `/checkout` | Checkout | POST `/api/customer/orders/confirm` |
+| `/checkout` | Checkout | POST `/api/customer/orders/confirm`（通常購入） |
+| `/checkout?preorder=1` | Checkout（予約モード） | POST `/api/customer/orders/confirm`（`preorder: true` 送信。フェーズ14.5 追加） |
 | `/customer/orders` | PurchaseHistory | GET `/api/customer/orders` |
