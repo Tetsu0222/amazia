@@ -234,7 +234,7 @@ flowchart TD
 | Phase 13 | Amazia Market ログイン・会員登録機能 | ✅ 完了 | [phase13_market_auth.md](docs/design/phase11_20/phase13_market_auth.md) |
 | Phase 14 | 購入機能 | ✅ 完了 | [phase14_shipping.md](docs/design/phase11_20/phase14_shipping.md) |
 | Phase 15 | 配送管理 | ✅ 完了 | [phase15_delivery_management.md](docs/design/phase11_20/phase15_delivery_management.md) |
-| Phase 16 | UIデザイン改善 | 🔲 未着手 | [phase16_ui_ux_improvement.md](docs/design/phase11_20/phase16_ui_ux_improvement.md) |
+| Phase 16 | UIデザイン改善 | 🟡 着手 | [phase16_ui_ux_improvement.md](docs/design/phase11_20/phase16_ui_ux_improvement.md) |
 | Phase 17 | バッチ処理 | 🔲 未着手 | [phase17_batch_processing.md](docs/design/phase11_20/phase17_batch_processing.md) |
 | Phase 18 | 問い合わせ機能 | 🔲 未着手 | [phase18_inquiry_management.md](docs/design/phase11_20/phase18_inquiry_management.md) |
 | Phase 19 | お知らせ機能 | 🔲 未着手 | [phase19_notice_management.md](docs/design/phase11_20/phase19_notice_management.md) |

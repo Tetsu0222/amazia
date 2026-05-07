@@ -104,6 +104,7 @@ public class RegisterInboundService {
         inbound.setSupplierId(request.getSupplierId());
         inbound.setQuantity(request.getQuantity());
         inbound.setInboundedAt(inboundedAt);
+        inbound.setTrackingCode(request.getTrackingCode());
         Inbound saved = inboundRepository.saveAndFlush(inbound);
 
         // 3. SKU 在庫加算（既存 Service を再利用）

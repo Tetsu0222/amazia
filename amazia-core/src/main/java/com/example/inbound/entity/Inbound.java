@@ -34,6 +34,12 @@ public class Inbound {
     @Column(name = "inbounded_at", nullable = false)
     private LocalDate inboundedAt;
 
+    /**
+     * 配送追跡番号（フェーズ16 Step6-6）。Excel 一括入荷でのみ取り込み、手動入荷では null。
+     */
+    @Column(name = "tracking_code", length = 255)
+    private String trackingCode;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -63,6 +69,8 @@ public class Inbound {
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public LocalDate getInboundedAt() { return inboundedAt; }
     public void setInboundedAt(LocalDate inboundedAt) { this.inboundedAt = inboundedAt; }
+    public String getTrackingCode() { return trackingCode; }
+    public void setTrackingCode(String trackingCode) { this.trackingCode = trackingCode; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

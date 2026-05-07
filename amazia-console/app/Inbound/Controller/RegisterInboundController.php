@@ -30,12 +30,14 @@ class RegisterInboundController extends Controller
         }
 
         // phase16 Step3.1：inboundedAt は任意化。未指定時は Core 側で本日付を強制セットする。
+        // phase16 Step6-6：trackingCode は任意。Excel 一括入荷でのみ実運用利用される。
         $validated = $request->validate([
-            'productId'   => 'required|integer|min:1',
-            'skuId'       => 'required|integer|min:1',
-            'quantity'    => 'required|integer|min:1',
-            'inboundedAt' => 'nullable|date',
-            'supplierId'  => 'nullable|integer|min:1',
+            'productId'    => 'required|integer|min:1',
+            'skuId'        => 'required|integer|min:1',
+            'quantity'     => 'required|integer|min:1',
+            'inboundedAt'  => 'nullable|date',
+            'supplierId'   => 'nullable|integer|min:1',
+            'trackingCode' => 'nullable|string|max:255',
         ]);
 
         $response = $this->service->register($validated, $userId);

@@ -8,6 +8,8 @@ import com.example.sales.entity.Sales;
 import com.example.sales.repository.SalesRepository;
 import com.example.shared.config.TestAwsConfig;
 import com.example.sku.entity.ProductSku;
+import com.example.sku.entity.ProductSkuPrice;
+import com.example.sku.repository.ProductSkuPriceRepository;
 import com.example.sku.repository.ProductSkuRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +56,7 @@ class ListPreorderProductsServiceTest {
     @Autowired private ListPreorderProductsService service;
     @Autowired private ProductRepository productRepository;
     @Autowired private ProductSkuRepository skuRepository;
+    @Autowired private ProductSkuPriceRepository priceRepository;
     @Autowired private SalesRepository salesRepository;
 
     @Test
@@ -136,6 +139,33 @@ class ListPreorderProductsServiceTest {
         assertTrue(item.isActive());
     }
 
+    @Test
+    void minPriceとmaxPriceが_SKU価格の最小最大で集計される() {
+        Long pid = createPreorderProduct("予約商品", FIXED_TODAY.plusDays(7), true);
+        Long sku1 = createSku(pid);
+        Long sku2 = createSku(pid);
+        Long sku3 = createSku(pid);
+        createPrice(sku1, 1500);
+        createPrice(sku2, 3000);
+        createPrice(sku3, 2200);
+
+        List<PreorderProductItem> items = service.list();
+        assertEquals(1, items.size());
+        assertEquals(1500, items.get(0).getMinPrice());
+        assertEquals(3000, items.get(0).getMaxPrice());
+    }
+
+    @Test
+    void SKU価格未登録の予約商品はminPriceとmaxPriceがnull() {
+        Long pid = createPreorderProduct("予約商品", FIXED_TODAY.plusDays(7), true);
+        createSku(pid); // 価格は付けない
+
+        List<PreorderProductItem> items = service.list();
+        assertEquals(1, items.size());
+        assertNull(items.get(0).getMinPrice());
+        assertNull(items.get(0).getMaxPrice());
+    }
+
     // ---- helpers --------------------------------------------------------------
 
     /** PRE_ORDER ステータス相当の商品を作る（is_active 任意 / release_date 任意） */
@@ -162,6 +192,14 @@ class ListPreorderProductsServiceTest {
         sku.setSize("M");
         sku.setStatus("ACTIVE");
         return skuRepository.save(sku).getId();
+    }
+
+    private void createPrice(Long skuId, int price) {
+        ProductSkuPrice p = new ProductSkuPrice();
+        p.setSkuId(skuId);
+        p.setPrice(price);
+        p.setStartDate(FIXED_TODAY);
+        priceRepository.save(p);
     }
 
     private void createSales(Long skuId, int quantity, int amount, boolean preorder) {

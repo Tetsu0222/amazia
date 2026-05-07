@@ -153,15 +153,14 @@ class SkuTest extends TestCase
 
     public function test_Excelアップロードで複数SKUの入荷が登録できること(): void
     {
+        // フェーズ16 Step6-6 で /skus/{id}/stocks/receive 直叩きから /inbounds 経由に切替。
         Http::fake([
             "{$this->coreBaseUrl}/skus/by-code/SKU-A" => Http::response(
-                ['id' => 11, 'skuCode' => 'SKU-A'], 200),
+                ['id' => 11, 'productId' => 101, 'skuCode' => 'SKU-A'], 200),
             "{$this->coreBaseUrl}/skus/by-code/SKU-B" => Http::response(
-                ['id' => 22, 'skuCode' => 'SKU-B'], 200),
-            "{$this->coreBaseUrl}/skus/11/stocks/receive" => Http::response(
-                ['id' => 1, 'skuId' => 11, 'quantity' => 30], 201),
-            "{$this->coreBaseUrl}/skus/22/stocks/receive" => Http::response(
-                ['id' => 2, 'skuId' => 22, 'quantity' => 50], 201),
+                ['id' => 22, 'productId' => 202, 'skuCode' => 'SKU-B'], 200),
+            "{$this->coreBaseUrl}/inbounds" => Http::response(
+                ['id' => 1, 'productId' => 101, 'skuId' => 11, 'quantity' => 30], 201),
         ]);
 
         $path = $this->makeStockCsv([
@@ -177,15 +176,66 @@ class SkuTest extends TestCase
         $this->assertSame([], $result['failed']);
     }
 
+    public function test_Excel入荷でtracking_code列が_inbounds_に渡ること(): void
+    {
+        Http::fake([
+            "{$this->coreBaseUrl}/skus/by-code/SKU-A" => Http::response(
+                ['id' => 11, 'productId' => 101, 'skuCode' => 'SKU-A'], 200),
+            "{$this->coreBaseUrl}/inbounds" => Http::response(
+                ['id' => 1, 'productId' => 101, 'skuId' => 11, 'quantity' => 5,
+                 'trackingCode' => 'TRK-12345'], 201),
+        ]);
+
+        $path = $this->makeStockCsv([
+            ['sku_code', 'quantity', 'tracking_code'],
+            ['SKU-A',    5,          'TRK-12345'],
+        ]);
+
+        $service = app(\App\Sku\Service\ImportProductSkuStockService::class);
+        $result  = $service->importFromFile($path);
+
+        $this->assertSame(1, $result['succeeded']);
+        Http::assertSent(function ($request) {
+            return str_ends_with($request->url(), '/inbounds')
+                && $request['trackingCode'] === 'TRK-12345'
+                && $request['productId']    === 101
+                && $request['skuId']        === 11;
+        });
+    }
+
+    public function test_tracking_code列がない既存Excelでも互換動作すること(): void
+    {
+        Http::fake([
+            "{$this->coreBaseUrl}/skus/by-code/SKU-A" => Http::response(
+                ['id' => 11, 'productId' => 101, 'skuCode' => 'SKU-A'], 200),
+            "{$this->coreBaseUrl}/inbounds" => Http::response(
+                ['id' => 1, 'productId' => 101, 'skuId' => 11, 'quantity' => 7], 201),
+        ]);
+
+        $path = $this->makeStockCsv([
+            ['sku_code', 'quantity'],
+            ['SKU-A',    7],
+        ]);
+
+        $service = app(\App\Sku\Service\ImportProductSkuStockService::class);
+        $result  = $service->importFromFile($path);
+
+        $this->assertSame(1, $result['succeeded']);
+        Http::assertSent(function ($request) {
+            return str_ends_with($request->url(), '/inbounds')
+                && !isset($request['trackingCode']);
+        });
+    }
+
     public function test_存在しないSKUコードはエラー行として返ること(): void
     {
         Http::fake([
             "{$this->coreBaseUrl}/skus/by-code/SKU-A" => Http::response(
-                ['id' => 11, 'skuCode' => 'SKU-A'], 200),
+                ['id' => 11, 'productId' => 101, 'skuCode' => 'SKU-A'], 200),
             "{$this->coreBaseUrl}/skus/by-code/UNKNOWN" => Http::response(
                 ['message' => 'Not Found'], 404),
-            "{$this->coreBaseUrl}/skus/11/stocks/receive" => Http::response(
-                ['id' => 1, 'skuId' => 11, 'quantity' => 10], 201),
+            "{$this->coreBaseUrl}/inbounds" => Http::response(
+                ['id' => 1, 'productId' => 101, 'skuId' => 11, 'quantity' => 10], 201),
         ]);
 
         $path = $this->makeStockCsv([

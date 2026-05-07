@@ -162,6 +162,28 @@ class RegisterInboundServiceTest {
     }
 
     @Test
+    void trackingCode付きリクエストでinboundsに保存される() {
+        RegisterInboundRequest req = buildRequest(productId, skuId, 2);
+        req.setTrackingCode("TRK-20260507-001");
+
+        Inbound saved = service.register(req, actorUserId);
+
+        Inbound loaded = inboundRepository.findById(saved.getId()).orElseThrow();
+        assertEquals("TRK-20260507-001", loaded.getTrackingCode());
+    }
+
+    @Test
+    void trackingCode未指定でも従来通り保存される() {
+        RegisterInboundRequest req = buildRequest(productId, skuId, 2);
+        // trackingCode をあえてセットしない
+
+        Inbound saved = service.register(req, actorUserId);
+
+        Inbound loaded = inboundRepository.findById(saved.getId()).orElseThrow();
+        assertNull(loaded.getTrackingCode());
+    }
+
+    @Test
     void product_idと_sku_idの親子整合性が崩れる場合は400で拒否される() {
         // 別商品の SKU を指定する
         Product other = new Product();

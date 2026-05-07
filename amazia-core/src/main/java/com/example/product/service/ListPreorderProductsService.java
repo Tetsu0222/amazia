@@ -7,6 +7,8 @@ import com.example.product.repository.ProductRepository;
 import com.example.sales.entity.Sales;
 import com.example.sales.repository.SalesRepository;
 import com.example.sku.entity.ProductSku;
+import com.example.sku.entity.ProductSkuPrice;
+import com.example.sku.repository.ProductSkuPriceRepository;
 import com.example.sku.repository.ProductSkuRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,29 +27,34 @@ import java.util.stream.Collectors;
 /**
  * Console: 予約管理画面向け 予約商品一覧取得 Service。
  *
- * 設計書 phase16_ui_ux_improvement.md §2-4-3 / §2-4-4。
+ * 設計書 phase16_ui_ux_improvement.md §2-4-3 / §2-4-4 / §6-4。
  * PreorderStatusService が PRE_ORDER と判定した商品のみ抽出し、
  * sales.is_preorder = TRUE のレコードを商品単位で集計（数量・金額）して返す。
+ * §6-4 で SKU 価格の min/max（minPrice / maxPrice）も併せて返却する。
  *
  * メモリ配慮: 商品ループ内で sales を個別 SELECT せず、対象 SKU 集合で 1 回の SELECT
  * に集約してメモリ上で集計する（test_insights カテゴリ7-2 / phase15 と同方針）。
+ * 価格集計も同じく findBySkuIdIn で 1 回に集約する。
  */
 @Service
 public class ListPreorderProductsService {
 
     private final ProductRepository productRepository;
     private final ProductSkuRepository skuRepository;
+    private final ProductSkuPriceRepository priceRepository;
     private final SalesRepository salesRepository;
     private final PreorderStatusService preorderStatusService;
     private final Clock clock;
 
     public ListPreorderProductsService(ProductRepository productRepository,
                                        ProductSkuRepository skuRepository,
+                                       ProductSkuPriceRepository priceRepository,
                                        SalesRepository salesRepository,
                                        PreorderStatusService preorderStatusService,
                                        Clock clock) {
         this.productRepository = productRepository;
         this.skuRepository = skuRepository;
+        this.priceRepository = priceRepository;
         this.salesRepository = salesRepository;
         this.preorderStatusService = preorderStatusService;
         this.clock = clock;
@@ -66,6 +73,11 @@ public class ListPreorderProductsService {
         // skuId -> productId
         Map<Long, Long> skuToProduct = skus.stream()
                 .collect(Collectors.toMap(ProductSku::getId, ProductSku::getProductId));
+        // productId -> {skuId, skuId, ...}
+        Map<Long, List<Long>> skuIdsByProduct = skus.stream()
+                .collect(Collectors.groupingBy(
+                        ProductSku::getProductId,
+                        Collectors.mapping(ProductSku::getId, Collectors.toList())));
         Set<Long> skuIds = skuToProduct.keySet();
 
         // 予約 sales を 1 回でまとめて取得
@@ -81,6 +93,11 @@ public class ListPreorderProductsService {
             }
         }
 
+        // SKU 価格を 1 回でまとめて取得（skuId -> price）
+        Map<Long, Integer> priceBySkuId = skuIds.isEmpty() ? Map.of() :
+                priceRepository.findBySkuIdIn(new ArrayList<>(skuIds)).stream()
+                        .collect(Collectors.toMap(ProductSkuPrice::getSkuId, ProductSkuPrice::getPrice));
+
         LocalDate today = LocalDate.now(clock);
         List<PreorderProductItem> result = new ArrayList<>(preorderProducts.size());
         for (Product p : preorderProducts) {
@@ -88,6 +105,16 @@ public class ListPreorderProductsService {
             Long days = p.getReleaseDate() != null
                     ? ChronoUnit.DAYS.between(today, p.getReleaseDate())
                     : null;
+
+            List<Integer> prices = skuIdsByProduct.getOrDefault(p.getId(), List.of()).stream()
+                    .map(priceBySkuId::get)
+                    .filter(price -> price != null)
+                    .toList();
+            Integer minPrice = prices.stream().mapToInt(Integer::intValue).min().isPresent()
+                    ? prices.stream().mapToInt(Integer::intValue).min().getAsInt() : null;
+            Integer maxPrice = prices.stream().mapToInt(Integer::intValue).max().isPresent()
+                    ? prices.stream().mapToInt(Integer::intValue).max().getAsInt() : null;
+
             result.add(new PreorderProductItem(
                     p.getId(),
                     p.getName(),
@@ -97,7 +124,9 @@ public class ListPreorderProductsService {
                     p.isAcceptPreorder(),
                     p.isActive(),
                     agg[0],
-                    agg[1]
+                    agg[1],
+                    minPrice,
+                    maxPrice
             ));
         }
         result.sort(Comparator.comparing(

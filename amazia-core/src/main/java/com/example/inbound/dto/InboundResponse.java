@@ -16,6 +16,7 @@ public class InboundResponse {
     private final Long supplierId;
     private final Integer quantity;
     private final LocalDate inboundedAt;
+    private final String trackingCode;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
 
@@ -26,6 +27,7 @@ public class InboundResponse {
         this.supplierId = i.getSupplierId();
         this.quantity = i.getQuantity();
         this.inboundedAt = i.getInboundedAt();
+        this.trackingCode = i.getTrackingCode();
         this.createdAt = i.getCreatedAt();
         this.updatedAt = i.getUpdatedAt();
     }
@@ -36,6 +38,7 @@ public class InboundResponse {
     public Long getSupplierId() { return supplierId; }
     public Integer getQuantity() { return quantity; }
     public LocalDate getInboundedAt() { return inboundedAt; }
+    public String getTrackingCode() { return trackingCode; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

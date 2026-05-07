@@ -20,8 +20,9 @@
 | 4 | supplier_id | 仕入先ID | BIGINT | - | NULL | NULL | 将来マスタ化（本フェーズではスコープ外） |
 | 5 | quantity | 入荷数量 | INT | - | NOT NULL | - | `CHECK (quantity > 0)` で 0・負数を拒否（RRR-10） |
 | 6 | inbounded_at | 入荷日 | DATE | - | NOT NULL | - | 入荷実施日 |
-| 7 | created_at | 作成日時 | DATETIME | - | NOT NULL | - | Entity の `@PrePersist` で設定 |
-| 8 | updated_at | 更新日時 | DATETIME | - | NOT NULL | - | Entity の `@PreUpdate` で更新 |
+| 7 | tracking_code | 追跡番号 | VARCHAR | 255 | NULL | NULL | 配送追跡番号。フェーズ16 Step 6-6 で追加。Excel 一括入荷でのみ取り込み、手動入荷では NULL |
+| 8 | created_at | 作成日時 | DATETIME | - | NOT NULL | - | Entity の `@PrePersist` で設定 |
+| 9 | updated_at | 更新日時 | DATETIME | - | NOT NULL | - | Entity の `@PreUpdate` で更新 |
 
 ## インデックス
 
@@ -61,3 +62,4 @@
 ## マイグレーションファイル
 
 - `amazia-core/src/main/resources/schema.sql`（フェーズ15 / r5）
+- `amazia-core/src/main/resources/schema.sql`（フェーズ16 Step 6-6：`ALTER TABLE inbounds ADD COLUMN tracking_code VARCHAR(255) NULL`）

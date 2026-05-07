@@ -412,3 +412,11 @@ ALTER TABLE sales ADD CONSTRAINT fk_sales_shipping_method FOREIGN KEY (shipping_
 --   既存全件は TRUE 既定で挙動互換。重複実行は continue-on-error で許容。
 -- ============================================================================
 ALTER TABLE products ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- ============================================================================
+-- フェーズ16 Step6-6: 入荷の追跡番号
+--   設計書: docs/design/phase11_20/phase16_ui_ux_improvement.md §Step 6-6
+--   Excel 一括入荷で取り込んだ配送追跡番号を inbounds に保持する。
+--   手動入荷では NULL のまま。既存行は NULL で互換。重複実行は continue-on-error で許容。
+-- ============================================================================
+ALTER TABLE inbounds ADD COLUMN tracking_code VARCHAR(255) NULL;

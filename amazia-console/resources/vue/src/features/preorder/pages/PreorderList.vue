@@ -2,8 +2,72 @@
   <div style="padding: 24px; max-width: 1200px">
     <a-page-header title="予約管理" sub-title="Amazia Console" />
 
+    <a-card size="small" style="margin-bottom: 16px" :body-style="{ padding: '12px 16px' }">
+      <a-form layout="inline" :model="searchForm">
+        <a-form-item label="商品名">
+          <a-input
+            v-model:value="searchForm.name"
+            placeholder="部分一致で検索"
+            allow-clear
+            style="width: 200px"
+          />
+        </a-form-item>
+        <a-form-item label="価格">
+          <a-input-number
+            v-model:value="searchForm.minPrice"
+            placeholder="最低"
+            :min="0"
+            :step="100"
+            style="width: 110px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-input-number
+            v-model:value="searchForm.maxPrice"
+            placeholder="最高"
+            :min="0"
+            :step="100"
+            style="width: 110px"
+          />
+          <span style="margin-left: 4px">円</span>
+        </a-form-item>
+        <a-form-item label="発売日">
+          <a-date-picker
+            v-model:value="searchForm.releaseDateFrom"
+            value-format="YYYY-MM-DD"
+            placeholder="最早"
+            style="width: 140px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-date-picker
+            v-model:value="searchForm.releaseDateTo"
+            value-format="YYYY-MM-DD"
+            placeholder="最遅"
+            style="width: 140px"
+          />
+        </a-form-item>
+        <a-form-item label="予約開始日">
+          <a-date-picker
+            v-model:value="searchForm.preorderStartDateFrom"
+            value-format="YYYY-MM-DD"
+            placeholder="最早"
+            style="width: 140px"
+          />
+          <span style="margin: 0 6px">〜</span>
+          <a-date-picker
+            v-model:value="searchForm.preorderStartDateTo"
+            value-format="YYYY-MM-DD"
+            placeholder="最遅"
+            style="width: 140px"
+          />
+        </a-form-item>
+        <a-form-item>
+          <a-button @click="resetSearch">クリア</a-button>
+        </a-form-item>
+      </a-form>
+    </a-card>
+
     <a-table
-      :dataSource="preorders"
+      :dataSource="filteredPreorders"
       :columns="columns"
       :loading="loading"
       rowKey="productId"
@@ -13,6 +77,15 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'preorderStartDate'">
           {{ record.preorderStartDate ?? '公開と同時' }}
+        </template>
+        <template v-else-if="column.key === 'priceRange'">
+          <span v-if="record.minPrice == null" style="color: #aaa">未設定</span>
+          <span v-else-if="record.minPrice === record.maxPrice">
+            {{ record.minPrice.toLocaleString() }} 円
+          </span>
+          <span v-else>
+            {{ record.minPrice.toLocaleString() }} 〜 {{ record.maxPrice.toLocaleString() }} 円
+          </span>
         </template>
         <template v-else-if="column.key === 'daysUntilRelease'">
           {{ formatDaysUntilRelease(record.daysUntilRelease) }}
@@ -36,16 +109,79 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { listPreorders } from '../api/preorderApi.js';
 
 const preorders = ref([]);
 const loading = ref(false);
 
+const searchForm = ref({
+  name: '',
+  minPrice: null,
+  maxPrice: null,
+  releaseDateFrom: null,
+  releaseDateTo: null,
+  preorderStartDateFrom: null,
+  preorderStartDateTo: null,
+});
+
+const resetSearch = () => {
+  searchForm.value = {
+    name: '',
+    minPrice: null,
+    maxPrice: null,
+    releaseDateFrom: null,
+    releaseDateTo: null,
+    preorderStartDateFrom: null,
+    preorderStartDateTo: null,
+  };
+};
+
+const filteredPreorders = computed(() => {
+  const {
+    name,
+    minPrice,
+    maxPrice,
+    releaseDateFrom,
+    releaseDateTo,
+    preorderStartDateFrom,
+    preorderStartDateTo,
+  } = searchForm.value;
+  const keyword = (name || '').trim().toLowerCase();
+
+  return preorders.value.filter(p => {
+    if (keyword && !(p.productName || '').toLowerCase().includes(keyword)) return false;
+
+    if (minPrice != null) {
+      if (p.maxPrice == null || p.maxPrice < minPrice) return false;
+    }
+    if (maxPrice != null) {
+      if (p.minPrice == null || p.minPrice > maxPrice) return false;
+    }
+
+    if (releaseDateFrom) {
+      if (!p.releaseDate || p.releaseDate < releaseDateFrom) return false;
+    }
+    if (releaseDateTo) {
+      if (!p.releaseDate || p.releaseDate > releaseDateTo) return false;
+    }
+
+    if (preorderStartDateFrom) {
+      if (!p.preorderStartDate || p.preorderStartDate < preorderStartDateFrom) return false;
+    }
+    if (preorderStartDateTo) {
+      if (!p.preorderStartDate || p.preorderStartDate > preorderStartDateTo) return false;
+    }
+
+    return true;
+  });
+});
+
 const columns = [
   { title: '商品ID',       dataIndex: 'productId',         key: 'productId' },
   { title: '商品名',       dataIndex: 'productName',       key: 'productName' },
+  { title: '価格帯',       key: 'priceRange' },
   { title: '予約開始日',   dataIndex: 'preorderStartDate', key: 'preorderStartDate' },
   { title: '発売日',       dataIndex: 'releaseDate',       key: 'releaseDate' },
   { title: '発売まで',     dataIndex: 'daysUntilRelease',  key: 'daysUntilRelease' },

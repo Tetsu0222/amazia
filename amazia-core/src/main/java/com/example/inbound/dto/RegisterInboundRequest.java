@@ -36,6 +36,11 @@ public class RegisterInboundRequest {
      */
     private LocalDate inboundedAt;
 
+    /**
+     * 配送追跡番号（フェーズ16 Step6-6）。任意。Excel 一括入荷でのみ取り込み、手動入荷では null。
+     */
+    private String trackingCode;
+
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
     public Long getSkuId() { return skuId; }
@@ -46,4 +51,6 @@ public class RegisterInboundRequest {
     public void setSupplierId(Long supplierId) { this.supplierId = supplierId; }
     public LocalDate getInboundedAt() { return inboundedAt; }
     public void setInboundedAt(LocalDate inboundedAt) { this.inboundedAt = inboundedAt; }
+    public String getTrackingCode() { return trackingCode; }
+    public void setTrackingCode(String trackingCode) { this.trackingCode = trackingCode; }
 }

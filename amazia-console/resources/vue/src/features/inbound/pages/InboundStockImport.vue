@@ -11,12 +11,16 @@
         1行目をヘッダー行として読み込みます。列名は
         <a-tag>sku_code</a-tag>
         <a-tag>quantity</a-tag>
-        の順で用意してください（両方とも必須）。
+        を必須とし、任意で
+        <a-tag>tracking_code</a-tag>
+        を含められます。
       </a-typography-paragraph>
       <a-typography-paragraph type="secondary" style="font-size: 12px">
         ・同じ sku_code は quantity が加算されます<br />
         ・存在しない sku_code はエラー行として返されます<br />
-        ・quantity は 1 以上の整数のみ（減算は不可）
+        ・quantity は 1 以上の整数のみ（減算は不可）<br />
+        ・tracking_code は任意。空欄なら入荷管理画面では「—」表示<br />
+        ・各行は入荷管理画面に1件として表示されます（追跡番号で検索可能）
       </a-typography-paragraph>
 
       <a-upload-dragger
