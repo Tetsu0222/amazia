@@ -21,7 +21,9 @@ import SalesList                  from '../features/sales/pages/SalesList.vue';
 import SalesReturnList            from '../features/salesReturn/pages/SalesReturnList.vue';
 import OperationLogList           from '../features/operationLog/pages/OperationLogList.vue';
 import DeliveryList               from '../features/delivery/pages/DeliveryList.vue';
+import DeliveryDetail             from '../features/delivery/pages/DeliveryDetail.vue';
 import InboundList                from '../features/inbound/pages/InboundList.vue';
+import InboundCreate              from '../features/inbound/pages/InboundCreate.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -49,9 +51,12 @@ const routes = [
   { path: '/sales-returns',            component: SalesReturnList,     meta: { requiresAuth: true } },
   { path: '/operation-logs',           component: OperationLogList,    meta: { requiresAuth: true } },
 
-  // フェーズ15 配送管理 / 入荷管理（C-3-α は List のみ。Detail / Create は C-3-β で追加）
-  { path: '/delivery',                 component: DeliveryList,        meta: { requiresAuth: true } },
+  // フェーズ15 配送管理 / 入荷管理
+  // 静的ルート（/inbound/create）を動的ルート（/delivery/:id）より先に並べる（test_insights カテゴリ2）
   { path: '/inbound',                  component: InboundList,         meta: { requiresAuth: true } },
+  { path: '/inbound/create',           component: InboundCreate,       meta: { requiresAuth: true } },
+  { path: '/delivery',                 component: DeliveryList,        meta: { requiresAuth: true } },
+  { path: '/delivery/:id',             component: DeliveryDetail,      meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({
