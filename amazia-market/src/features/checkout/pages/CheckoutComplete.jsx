@@ -7,7 +7,10 @@ export default function CheckoutComplete() {
   const result = location.state;
 
   // 直接アクセスされた場合はトップへリダイレクト
-  if (!result || result.salesId == null) {
+  // カートモードは salesIds（配列）、単品モードは salesId（単数）で判別
+  const hasSingleResult = result?.salesId != null;
+  const hasCartResult = Array.isArray(result?.salesIds) && result.salesIds.length > 0;
+  if (!result || (!hasSingleResult && !hasCartResult)) {
     return <Navigate to="/" replace />;
   }
 
@@ -16,11 +19,27 @@ export default function CheckoutComplete() {
       <Paper sx={{ p: 4 }}>
         <Stack spacing={2}>
           <Alert severity="success">ご注文ありがとうございました。</Alert>
-          <Typography variant="h6">注文番号: #{result.salesId}</Typography>
-          <Box>
-            <Typography variant="body2" color="text.secondary">決済ID</Typography>
-            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{result.paymentId}</Typography>
-          </Box>
+          {hasCartResult ? (
+            <>
+              <Typography variant="h6">
+                {result.salesIds.length} 件の注文を承りました
+              </Typography>
+              <Box>
+                <Typography variant="body2" color="text.secondary">注文番号</Typography>
+                <Typography variant="body2">
+                  {result.salesIds.map((id) => `#${id}`).join(' / ')}
+                </Typography>
+              </Box>
+            </>
+          ) : (
+            <>
+              <Typography variant="h6">注文番号: #{result.salesId}</Typography>
+              <Box>
+                <Typography variant="body2" color="text.secondary">決済ID</Typography>
+                <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{result.paymentId}</Typography>
+              </Box>
+            </>
+          )}
           <Box>
             <Typography variant="body2" color="text.secondary">数量</Typography>
             <Typography>{result.quantity} 点</Typography>

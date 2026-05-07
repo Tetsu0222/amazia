@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import {
-  Container, Typography, Grid, Card, CardActionArea,
-  CardMedia, CardContent, CircularProgress, Alert, Box, Chip,
+  Container, Typography, Grid, CircularProgress, Alert, Box, Link,
 } from '@mui/material';
 import { getMarketProducts } from '../api/products';
-import { NOIMAGE } from '../constants';
-import { PREORDER_STATUS, getPreorderStatusMeta } from '../preorderStatus';
+import ProductCard from '../components/ProductCard';
+import SortSelect, { sortProducts } from '../components/SortSelect';
+import { searchProducts } from '../searchUtils';
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
-  const navigate = useNavigate();
+  const [sortKey, setSortKey]   = useState('recommended');
+  const [searchParams] = useSearchParams();
+  const keyword = searchParams.get('q') ?? '';
 
   useEffect(() => {
     getMarketProducts()
@@ -21,81 +23,44 @@ export default function ProductList() {
       .finally(() => setLoading(false));
   }, []);
 
+  const visibleProducts = useMemo(() => {
+    const filtered = searchProducts(products, keyword);
+    return sortProducts(filtered, sortKey);
+  }, [products, keyword, sortKey]);
+
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
   if (error)   return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
 
   return (
-    <Container sx={{ mt: 4 }}>
-      <Typography variant="h5" gutterBottom>商品一覧</Typography>
+    <Container maxWidth={false} sx={{ mt: 4 }}>
+      {keyword && (
+        <Typography variant="subtitle1" sx={{ mb: 1 }}>
+          「{keyword}」の検索結果（{visibleProducts.length}件）
+        </Typography>
+      )}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h5">商品一覧</Typography>
+        {products.length > 0 && (
+          <SortSelect value={sortKey} onChange={setSortKey} />
+        )}
+      </Box>
       {products.length === 0 && (
         <Typography color="text.secondary">現在表示できる商品がありません。</Typography>
       )}
-      <Grid container spacing={3}>
-        {products.map(p => {
-          const meta = getPreorderStatusMeta(p.preorderStatus);
-          return (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={p.productId}>
-            <Card sx={{ height: '100%' }}>
-              <CardActionArea
-                sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
-                onClick={() => navigate(`/products/${p.productId}`)}
-              >
-                <CardMedia
-                  component="img"
-                  height="200"
-                  image={p.mainImage ?? NOIMAGE}
-                  alt={p.productName}
-                  sx={{ objectFit: 'contain', bgcolor: '#f5f5f5' }}
-                  loading="lazy"
-                />
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" fontWeight="bold" noWrap>
-                    {p.productName}
-                  </Typography>
-                  {meta && (
-                    <Chip
-                      label={meta.label}
-                      color={meta.chipColor}
-                      size="small"
-                      sx={{ mt: 0.5 }}
-                    />
-                  )}
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {p.description ?? ''}
-                    </Typography>
-                    {p.minPrice != null && (
-                      <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
-                        ¥{p.minPrice.toLocaleString()} 〜
-                      </Typography>
-                    )}
-                    {p.preorderStatus === PREORDER_STATUS.ON_SALE && (
-                      <Typography variant="body2" color="text.secondary">
-                        在庫：{p.totalStock} 個
-                      </Typography>
-                    )}
-                    {p.preorderStatus === PREORDER_STATUS.PRE_ORDER && p.releaseDate && (
-                      <Typography variant="body2" color="text.secondary">
-                        発売日：{p.releaseDate}
-                      </Typography>
-                    )}
-                    {p.preorderStatus === PREORDER_STATUS.PRE_ORDER_NOT_STARTED && p.preorderStartDate && (
-                      <Typography variant="body2" color="text.secondary">
-                        予約開始：{p.preorderStartDate}
-                      </Typography>
-                    )}
-                    {p.preorderStatus === PREORDER_STATUS.BACK_ORDER && (
-                      <Typography variant="body2" color="text.secondary">
-                        在庫切れ（再入荷予約受付中）
-                      </Typography>
-                    )}
-                  </Box>
-                </CardContent>
-              </CardActionArea>
-            </Card>
+      {products.length > 0 && visibleProducts.length === 0 && (
+        <Box sx={{ py: 4 }}>
+          <Typography color="text.secondary" sx={{ mb: 1 }}>
+            該当する商品がありません
+          </Typography>
+          <Link component={RouterLink} to="/">すべての商品を見る</Link>
+        </Box>
+      )}
+      <Grid container spacing={2}>
+        {visibleProducts.map((p) => (
+          <Grid size={{ xs: 6, sm: 4, md: 3, lg: 2.4 }} key={p.productId}>
+            <ProductCard product={p} />
           </Grid>
-          );
-        })}
+        ))}
       </Grid>
     </Container>
   );

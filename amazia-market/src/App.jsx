@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { CssBaseline } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import theme from './theme';
 import ProductList from './features/products/pages/ProductList';
 import ProductDetail from './features/products/pages/ProductDetail';
 import Login from './features/customer/pages/Login';
@@ -8,11 +10,13 @@ import PasswordResetRequest from './features/customer/pages/PasswordResetRequest
 import PasswordResetConfirm from './features/customer/pages/PasswordResetConfirm';
 import MyPage from './features/customer/pages/MyPage';
 import { AuthProvider } from './features/customer/context/AuthContext';
+import { CartProvider } from './features/cart/context/CartContext';
 import ProtectedRoute from './features/customer/components/ProtectedRoute';
 import AppHeader from './components/AppHeader';
 import Checkout from './features/checkout/pages/Checkout';
 import CheckoutComplete from './features/checkout/pages/CheckoutComplete';
 import PurchaseHistory from './features/orders/pages/PurchaseHistory';
+import CartPage from './features/cart/pages/CartPage';
 
 function Layout() {
   return (
@@ -26,51 +30,63 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <CssBaseline />
-      <AuthProvider>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<ProductList />} />
-            <Route path="/products/:id" element={<ProductDetail />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/password/reset" element={<PasswordResetRequest />} />
-            <Route path="/password/reset/confirm" element={<PasswordResetConfirm />} />
-            <Route
-              path="/mypage"
-              element={
-                <ProtectedRoute>
-                  <MyPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/checkout"
-              element={
-                <ProtectedRoute>
-                  <Checkout />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/checkout/complete"
-              element={
-                <ProtectedRoute>
-                  <CheckoutComplete />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                <ProtectedRoute>
-                  <PurchaseHistory />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
-        </Routes>
-      </AuthProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          <CartProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<ProductList />} />
+              <Route path="/products/:id" element={<ProductDetail />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/password/reset" element={<PasswordResetRequest />} />
+              <Route path="/password/reset/confirm" element={<PasswordResetConfirm />} />
+              <Route
+                path="/mypage"
+                element={
+                  <ProtectedRoute>
+                    <MyPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute>
+                    <Checkout />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout/complete"
+                element={
+                  <ProtectedRoute>
+                    <CheckoutComplete />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <PurchaseHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cart"
+                element={
+                  <ProtectedRoute>
+                    <CartPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+          </Routes>
+          </CartProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

@@ -420,3 +420,34 @@ ALTER TABLE products ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;
 --   手動入荷では NULL のまま。既存行は NULL で互換。重複実行は continue-on-error で許容。
 -- ============================================================================
 ALTER TABLE inbounds ADD COLUMN tracking_code VARCHAR(255) NULL;
+
+-- ============================================================================
+-- フェーズ16.5 Step 5: カート機能（正式実装）
+--   設計書: docs/design/phase11_20/phase16_5_market_ui_improvement.md §Step 5
+--   Market が単品購入のみだった状態から、複数 SKU をまとめて Checkout する一般 EC 体験へ。
+--   - carts: 1顧客1カート（UNIQUE customer_id）
+--   - cart_items: 同一 SKU・同一 is_preorder は1行に集約（UNIQUE 制約）。数量加算で重複回避。
+--   FK 型注意: market_customers.id は BIGINT UNSIGNED、product_skus.id は BIGINT。
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS carts (
+    id          BIGINT          AUTO_INCREMENT PRIMARY KEY,
+    customer_id BIGINT UNSIGNED NOT NULL,
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_carts_customer UNIQUE (customer_id),
+    CONSTRAINT fk_carts_customer FOREIGN KEY (customer_id) REFERENCES market_customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+    id          BIGINT   AUTO_INCREMENT PRIMARY KEY,
+    cart_id     BIGINT   NOT NULL,
+    sku_id      BIGINT   NOT NULL,
+    quantity    INT      NOT NULL DEFAULT 1,
+    is_preorder BOOLEAN  NOT NULL DEFAULT FALSE,
+    added_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_cart_items_quantity_positive CHECK (quantity > 0),
+    CONSTRAINT uk_cart_items_cart_sku_preorder UNIQUE (cart_id, sku_id, is_preorder),
+    INDEX idx_cart_items_cart (cart_id),
+    CONSTRAINT fk_cart_items_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_cart_items_sku FOREIGN KEY (sku_id) REFERENCES product_skus(id)
+);

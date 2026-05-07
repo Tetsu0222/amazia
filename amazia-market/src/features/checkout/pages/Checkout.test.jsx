@@ -24,6 +24,22 @@ vi.mock('../../customer/context/useAuth', () => ({
   useAuth: () => mockAuthValue,
 }));
 
+let mockCartValue = {
+  items: [],
+  totalCount: 0,
+  totalPrice: 0,
+  cartId: null,
+  loading: false,
+  refresh: vi.fn(),
+  addToCart: vi.fn(),
+  updateQuantity: vi.fn(),
+  removeFromCart: vi.fn(),
+  clearCart: vi.fn(),
+};
+vi.mock('../../cart/context/useCart', () => ({
+  useCart: () => mockCartValue,
+}));
+
 const PRODUCT_DATA = {
   product: { name: 'テスト商品', description: '' },
   skus: [
@@ -147,6 +163,55 @@ describe('Checkout', () => {
       expect(checkoutApi.confirmOrder).toHaveBeenCalledWith(
         expect.objectContaining({ skuId: 102, quantity: 1, preorder: true })
       );
+    });
+  });
+
+  // ---- カートモード（?from=cart）フェーズ16.5 -----------------------------
+
+  describe('カートモード（?from=cart）', () => {
+    const cartItems = [
+      { itemId: 10, skuId: 101, productId: 1, productName: 'カート商品A', color: '赤', size: 'M', unitPrice: 3000, quantity: 2, subtotal: 6000, availableStock: 5, preorder: false },
+      { itemId: 11, skuId: 102, productId: 1, productName: 'カート商品B', color: '青', size: 'L', unitPrice: 4000, quantity: 1, subtotal: 4000, availableStock: 3, preorder: false },
+    ];
+
+    beforeEach(() => {
+      mockCartValue = {
+        items: cartItems,
+        totalCount: 3,
+        totalPrice: 10000,
+        cartId: 1,
+        loading: false,
+        refresh: vi.fn(),
+        addToCart: vi.fn(),
+        updateQuantity: vi.fn(),
+        removeFromCart: vi.fn(),
+        clearCart: vi.fn().mockResolvedValue(),
+      };
+    });
+
+    it('?from=cart のときカート明細が全件表示される', async () => {
+      renderCheckout('from=cart');
+      await waitFor(() => screen.getByText('ご注文内容の確認（カート）'));
+      expect(screen.getByText(/カート商品A.*× 2/)).toBeInTheDocument();
+      expect(screen.getByText(/カート商品B.*× 1/)).toBeInTheDocument();
+      expect(screen.getByText(/¥10,000（3点）/)).toBeInTheDocument();
+    });
+
+    it('?from=cart のとき確定で各 SKU が confirmOrder され clearCart が呼ばれる', async () => {
+      checkoutApi.confirmOrder
+        .mockResolvedValueOnce({ salesId: 100, amount: 6000, quantity: 2 })
+        .mockResolvedValueOnce({ salesId: 101, amount: 4000, quantity: 1 });
+
+      renderCheckout('from=cart');
+      await waitFor(() => screen.getByRole('button', { name: '注文を確定する' }));
+      await userEvent.click(screen.getByRole('button', { name: '注文を確定する' }));
+
+      await waitFor(() => expect(checkoutApi.confirmOrder).toHaveBeenCalledTimes(2));
+      expect(checkoutApi.confirmOrder).toHaveBeenNthCalledWith(1,
+        expect.objectContaining({ skuId: 101, quantity: 2, preorder: false }));
+      expect(checkoutApi.confirmOrder).toHaveBeenNthCalledWith(2,
+        expect.objectContaining({ skuId: 102, quantity: 1, preorder: false }));
+      await waitFor(() => expect(mockCartValue.clearCart).toHaveBeenCalled());
     });
   });
 });

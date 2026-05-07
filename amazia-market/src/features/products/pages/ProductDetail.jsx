@@ -2,24 +2,24 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Paper, Stack, Button,
-  CircularProgress, Alert, Divider, Box,
-  ToggleButton, ToggleButtonGroup, Chip,
+  CircularProgress, Alert, Divider, Box, Chip, Snackbar,
+  ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import { getMarketProduct } from '../api/products';
-import { NOIMAGE } from '../constants';
 import { PREORDER_STATUS, getPreorderStatusMeta } from '../preorderStatus';
-import { useAuth } from '../../customer/context/useAuth';
+import ImageGallery from '../components/ImageGallery';
+import PurchaseBox from '../components/PurchaseBox';
+import { getEstimatedDeliveryDate } from '../deliveryEstimate';
 
 export default function ProductDetail() {
   const { id }     = useParams();
   const navigate   = useNavigate();
-  const { isAuthenticated } = useAuth();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
   const [selectedSize, setSelectedSize]   = useState(null);
-  const [mainImageIdx, setMainImageIdx]   = useState(0);
+  const [snack, setSnack]                 = useState(null);
 
   useEffect(() => {
     getMarketProduct(id)
@@ -32,35 +32,27 @@ export default function ProductDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // 色の候補（重複なし）
   const colors = useMemo(() => {
     if (!data) return [];
     return [...new Set(data.skus.map(s => s.color))];
   }, [data]);
 
-  // 選択中の色に対して選べるサイズ
   const sizes = useMemo(() => {
     if (!data || !selectedColor) return [];
-    return data.skus
-      .filter(s => s.color === selectedColor)
-      .map(s => s.size);
+    return data.skus.filter(s => s.color === selectedColor).map(s => s.size);
   }, [data, selectedColor]);
 
-  // 色が変わったらサイズをリセット
   const handleColorChange = (_, newColor) => {
     if (newColor === null) return;
     setSelectedColor(newColor);
     setSelectedSize(null);
-    setMainImageIdx(0);
   };
 
   const handleSizeChange = (_, newSize) => {
     if (newSize === null) return;
     setSelectedSize(newSize);
-    setMainImageIdx(0);
   };
 
-  // 現在選択中のSKU
   const selectedSku = useMemo(() => {
     if (!data || !selectedColor || !selectedSize) return null;
     return data.skus.find(s => s.color === selectedColor && s.size === selectedSize) ?? null;
@@ -74,97 +66,51 @@ export default function ProductDetail() {
   const { product } = data;
   const preorderStatus = data.preorderStatus;
   const statusMeta = getPreorderStatusMeta(preorderStatus);
-  const isPreorderFlow = preorderStatus === PREORDER_STATUS.PRE_ORDER
-                      || preorderStatus === PREORDER_STATUS.BACK_ORDER;
+  const estimatedDelivery = getEstimatedDeliveryDate(data);
 
   return (
-    <Container sx={{ mt: 4, maxWidth: 800 }}>
+    <Container sx={{ mt: 4 }} maxWidth={false}>
       <Button onClick={() => navigate('/')} sx={{ mb: 2 }}>← 一覧へ戻る</Button>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>{product.name}</Typography>
-        {statusMeta && (
-          <Chip
-            label={statusMeta.label}
-            color={statusMeta.chipColor}
-            size="small"
-            sx={{ mb: 1 }}
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={3}
+        sx={{ alignItems: 'flex-start' }}
+      >
+        <Box sx={{ width: { xs: '100%', md: 360 }, flexShrink: 0 }}>
+          <ImageGallery
+            images={images}
+            alt={product.name}
+            placeholder={selectedSku ? null : '色とサイズを選択してください'}
           />
-        )}
-        {preorderStatus === PREORDER_STATUS.PRE_ORDER && product.releaseDate && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            発売日：{product.releaseDate}
+        </Box>
+
+        <Paper sx={{ p: 3, flexGrow: 1, minWidth: 0 }}>
+          <Typography variant="h5" gutterBottom>{product.name}</Typography>
+          {statusMeta && (
+            <Chip
+              label={statusMeta.label}
+              color={statusMeta.chipColor}
+              size="small"
+              sx={{ mb: 1 }}
+            />
+          )}
+          {preorderStatus === PREORDER_STATUS.PRE_ORDER && product.releaseDate && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              発売日：{product.releaseDate}
+            </Typography>
+          )}
+          {preorderStatus === PREORDER_STATUS.PRE_ORDER_NOT_STARTED && product.preorderStartDate && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              予約開始：{product.preorderStartDate}
+            </Typography>
+          )}
+          <Divider sx={{ mb: 2 }} />
+
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            {product.description ?? ''}
           </Typography>
-        )}
-        {preorderStatus === PREORDER_STATUS.PRE_ORDER_NOT_STARTED && product.preorderStartDate && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            予約開始：{product.preorderStartDate}
-          </Typography>
-        )}
-        <Divider sx={{ mb: 2 }} />
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
-          {/* 画像エリア */}
-          <Box sx={{ flexShrink: 0, width: { xs: '100%', sm: 300 } }}>
-            {selectedSku ? (
-              <>
-                <Box
-                  component="img"
-                  src={images[mainImageIdx] ?? NOIMAGE}
-                  alt={product.name}
-                  sx={{
-                    width: '100%',
-                    height: 280,
-                    objectFit: 'contain',
-                    bgcolor: '#f5f5f5',
-                    borderRadius: 1,
-                  }}
-                />
-                {images.length > 1 && (
-                  <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                    {images.map((img, i) => (
-                      <Box
-                        key={i}
-                        component="img"
-                        src={img}
-                        alt=""
-                        onClick={() => setMainImageIdx(i)}
-                        sx={{
-                          width: 56,
-                          height: 56,
-                          objectFit: 'contain',
-                          border: mainImageIdx === i ? '2px solid' : '1px solid #ddd',
-                          borderColor: mainImageIdx === i ? 'primary.main' : '#ddd',
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          bgcolor: '#f5f5f5',
-                        }}
-                      />
-                    ))}
-                  </Stack>
-                )}
-              </>
-            ) : (
-              <Box sx={{
-                width: '100%',
-                height: 280,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: '#f5f5f5',
-                borderRadius: 1,
-              }}>
-                <Typography color="text.secondary" variant="body2">
-                  色とサイズを選択してください
-                </Typography>
-              </Box>
-            )}
-          </Box>
-
-          {/* 選択・情報エリア */}
-          <Stack spacing={2} sx={{ flexGrow: 1 }}>
-            <Typography color="text.secondary">{product.description ?? ''}</Typography>
-
-            {/* 色選択 */}
+          <Stack spacing={2}>
             <Box>
               <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>色</Typography>
               <ToggleButtonGroup
@@ -179,7 +125,6 @@ export default function ProductDetail() {
               </ToggleButtonGroup>
             </Box>
 
-            {/* サイズ選択 */}
             {selectedColor && (
               <Box>
                 <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>サイズ</Typography>
@@ -196,57 +141,34 @@ export default function ProductDetail() {
               </Box>
             )}
 
-            {/* 価格・在庫 */}
-            {selectedSku && (
-              <Stack spacing={1}>
-                {selectedSku.price != null && (
-                  <Typography variant="h5" color="primary">
-                    ¥{selectedSku.price.toLocaleString()}
-                  </Typography>
-                )}
-                {/* ON_SALE の在庫表示は SKU 単位の数値、その他は商品ステータスに準拠 */}
-                {preorderStatus === PREORDER_STATUS.ON_SALE && (
-                  <Box>
-                    {selectedSku.stock > 0 ? (
-                      <Chip label={`在庫 ${selectedSku.stock} 個`} color="success" size="small" />
-                    ) : (
-                      <Chip label="在庫なし" color="error" size="small" />
-                    )}
-                  </Box>
-                )}
-                {preorderStatus === PREORDER_STATUS.BACK_ORDER && (
-                  <Box>
-                    <Chip label="在庫切れ（再入荷予約受付中）" color="warning" size="small" />
-                  </Box>
-                )}
-
-                {/* ボタン分岐: SOLD_OUT は非表示 / NOT_STARTED は非活性 / PRE_ORDER・BACK_ORDER は予約 / ON_SALE は購入 */}
-                {statusMeta?.buttonAction === 'hidden' ? null : (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    disabled={
-                      statusMeta?.buttonAction === 'disabled'
-                      || (preorderStatus === PREORDER_STATUS.ON_SALE && selectedSku.stock <= 0)
-                    }
-                    onClick={() => {
-                      const target = `/checkout?product_id=${id}&sku_id=${selectedSku.skuId}&quantity=1`
-                                   + (isPreorderFlow ? '&preorder=1' : '');
-                      if (!isAuthenticated) {
-                        navigate('/login', { state: { from: target } });
-                      } else {
-                        navigate(target);
-                      }
-                    }}
-                  >
-                    {statusMeta?.buttonLabel ?? '購入する'}
-                  </Button>
-                )}
-              </Stack>
-            )}
+            {/* 価格・在庫ステータスは右カラムの PurchaseBox に集約。
+                xs では Stack のレイアウトで下に縦積みされるため重複表示はしない。 */}
           </Stack>
-        </Stack>
-      </Paper>
+        </Paper>
+
+        <Box sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0 }}>
+          <PurchaseBox
+            productId={id}
+            selectedSku={selectedSku}
+            preorderStatus={preorderStatus}
+            statusMeta={statusMeta}
+            estimatedDelivery={estimatedDelivery}
+            onSnack={setSnack}
+          />
+        </Box>
+      </Stack>
+      <Snackbar
+        open={snack != null}
+        autoHideDuration={3000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {snack && (
+          <Alert severity={snack.severity} onClose={() => setSnack(null)}>
+            {snack.message}
+          </Alert>
+        )}
+      </Snackbar>
     </Container>
   );
 }

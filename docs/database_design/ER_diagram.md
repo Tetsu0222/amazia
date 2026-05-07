@@ -13,6 +13,7 @@ ER図はシステム規模が大きくなったため、フェーズごとに分
 - [§4 Core Market 認証・会員（フェーズ13）](#4-core-market-認証会員フェーズ13)
 - [§5 Core 購入・配送（フェーズ14）](#5-core-購入配送フェーズ14)
 - [§6 Core 配送管理・在庫並行運用（フェーズ15）](#6-core-配送管理在庫並行運用フェーズ15)
+- [§7 Core カート機能（フェーズ16.5）](#7-core-カート機能フェーズ165)
 - [テーブル一覧](#テーブル一覧)
 - [備考](#備考)
 
@@ -317,6 +318,40 @@ erDiagram
 
 ---
 
+## 7. Core カート機能（フェーズ16.5）
+
+```mermaid
+erDiagram
+    market_customers {
+        BIGINT id PK
+    }
+
+    product_skus {
+        BIGINT id PK
+    }
+
+    carts {
+        BIGINT id PK
+        BIGINT customer_id FK
+    }
+
+    cart_items {
+        BIGINT id PK
+        BIGINT cart_id FK
+        BIGINT sku_id FK
+    }
+
+    market_customers ||--o| carts : "1:0..1（UNIQUE customer_id）"
+    carts ||--o{ cart_items : "1:N（CASCADE DELETE）"
+    product_skus ||--o{ cart_items : "1:N"
+```
+
+> - `carts.customer_id` は UNIQUE で1顧客1カート。Checkout 完了時に `cart_items` を全削除（カート行は残す）。
+> - `cart_items` は `(cart_id, sku_id, is_preorder)` の複合 UNIQUE で、同一 SKU・同一フラグは1行に集約され `quantity` で数量加算する。
+> - `cart_items.is_preorder` は通常購入と予約購入を区別する。Checkout 時は通常購入分のみ在庫減算する（既存 sales フローと同じ判定）。
+
+---
+
 ## テーブル一覧
 
 ### Core システム（認証・認可）— フェーズ11
@@ -381,6 +416,13 @@ erDiagram
 | inventories | 商品×倉庫の現在在庫 | 並行運用書き込み正本（販売・入荷・返品復元から同期更新） | フェーズ15 |
 | inbounds | 商品入荷ヘッダ | 入荷数量・倉庫・入荷日のヘッダ管理 | フェーズ15 |
 | deliveries | 配送実体 | 注文確定と同時に sales 1:1 で生成。配送ステータス遷移・追跡番号管理 | フェーズ15 |
+
+### Core システム（カート機能）— フェーズ16.5
+
+| テーブル名 | 論理名 | 用途 | 追加フェーズ |
+|------------|--------|------|------------|
+| carts | カート | 1顧客1カート（UNIQUE customer_id）| フェーズ16.5 |
+| cart_items | カート明細 | 同一 SKU・同一 is_preorder は1行に集約（複合 UNIQUE）| フェーズ16.5 |
 
 ---
 

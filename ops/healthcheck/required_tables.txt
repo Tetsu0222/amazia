@@ -50,3 +50,7 @@ warehouses
 inventories
 inbounds
 deliveries
+
+# カート機能
+carts
+cart_items

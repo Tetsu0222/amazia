@@ -13,6 +13,17 @@ vi.mock('../../customer/context/useAuth', () => ({
   useAuth: () => mockAuthValue,
 }));
 
+vi.mock('../../cart/context/useCart', () => ({
+  useCart: () => ({
+    items: [], totalCount: 0, totalPrice: 0, cartId: null, loading: false,
+    refresh: vi.fn(),
+    addToCart: vi.fn().mockResolvedValue(),
+    updateQuantity: vi.fn(),
+    removeFromCart: vi.fn(),
+    clearCart: vi.fn(),
+  }),
+}));
+
 const PRODUCT_DATA = {
   product: { name: 'テストシャツ', description: '説明文です' },
   skus: [
@@ -86,10 +97,10 @@ describe('ProductDetail', () => {
     await userEvent.click(screen.getByText('S'));
 
     expect(screen.getByText('¥3,000')).toBeInTheDocument();
-    expect(screen.getByText('在庫 10 個')).toBeInTheDocument();
+    expect(screen.getByText(/在庫あり（残り10点）/)).toBeInTheDocument();
   });
 
-  it('在庫 0 のSKU選択時に「在庫なし」を表示する', async () => {
+  it('在庫 0 のSKU選択時に「在庫切れ」を表示する', async () => {
     api.getMarketProduct.mockResolvedValue(PRODUCT_DATA);
     renderProductDetail();
 
@@ -97,7 +108,7 @@ describe('ProductDetail', () => {
     await userEvent.click(screen.getByText('赤'));
     await userEvent.click(screen.getByText('M'));
 
-    expect(screen.getByText('在庫なし')).toBeInTheDocument();
+    expect(screen.getByText('在庫切れ')).toBeInTheDocument();
   });
 
   it('色を変えるとサイズがリセットされ価格が消える', async () => {
@@ -124,7 +135,7 @@ describe('ProductDetail', () => {
     await userEvent.click(screen.getByText('赤'));
     await userEvent.click(screen.getByText('S'));
 
-    const buyButton = screen.getByRole('button', { name: '購入する' });
+    const buyButton = screen.getByRole('button', { name: '今すぐ買う' });
     expect(buyButton).toBeEnabled();
     await userEvent.click(buyButton);
 
@@ -145,7 +156,7 @@ describe('ProductDetail', () => {
     await userEvent.click(screen.getByText('赤'));
     await userEvent.click(screen.getByText('S'));
 
-    await userEvent.click(screen.getByRole('button', { name: '購入する' }));
+    await userEvent.click(screen.getByRole('button', { name: '今すぐ買う' }));
 
     expect(screen.getByTestId('checkout-page')).toBeInTheDocument();
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
@@ -160,7 +171,7 @@ describe('ProductDetail', () => {
     await userEvent.click(screen.getByText('赤'));
     await userEvent.click(screen.getByText('M')); // 在庫 0
 
-    expect(screen.getByRole('button', { name: '購入する' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '今すぐ買う' })).toBeDisabled();
   });
 
   // フェーズ14.5 §4-2: ステータス別ボタン分岐
@@ -179,7 +190,7 @@ describe('ProductDetail', () => {
 
       expect(screen.getByText('予約受付中')).toBeInTheDocument();
       expect(screen.getByText('発売日：2026-08-01')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '予約する' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: '今すぐ予約' })).toBeEnabled();
     });
 
     it('PRE_ORDER_NOT_STARTED は「予約する」ボタンが非活性で予約開始日を表示する', async () => {
@@ -196,7 +207,7 @@ describe('ProductDetail', () => {
 
       expect(screen.getByText('予約開始前')).toBeInTheDocument();
       expect(screen.getByText('予約開始：2026-09-01')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '予約する' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '今すぐ予約' })).toBeDisabled();
     });
 
     it('BACK_ORDER は「予約する」ボタンと「在庫切れ（再入荷予約受付中）」が出る', async () => {
@@ -213,7 +224,7 @@ describe('ProductDetail', () => {
 
       expect(screen.getByText('再入荷予約受付中')).toBeInTheDocument();
       expect(screen.getByText('在庫切れ（再入荷予約受付中）')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '予約する' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: '今すぐ予約' })).toBeEnabled();
     });
 
     it('SKU 価格が null のときは ¥ 表記ごと非表示にする', async () => {
@@ -245,8 +256,8 @@ describe('ProductDetail', () => {
       await userEvent.click(screen.getByText('M'));
 
       expect(screen.getByText('完売')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: '購入する' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: '予約する' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '今すぐ買う' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '今すぐ予約' })).not.toBeInTheDocument();
     });
 
     it('PRE_ORDER で予約ボタンを押すと checkout に preorder=1 付きで遷移する', async () => {
@@ -263,7 +274,7 @@ describe('ProductDetail', () => {
       await waitFor(() => screen.getByText('黒'));
       await userEvent.click(screen.getByText('黒'));
       await userEvent.click(screen.getByText('L'));
-      await userEvent.click(screen.getByRole('button', { name: '予約する' }));
+      await userEvent.click(screen.getByRole('button', { name: '今すぐ予約' }));
 
       expect(screen.getByTestId('checkout-page')).toBeInTheDocument();
       // navigateSpy は使わないが、未使用変数警告を避けるためアサーションだけ書いておく

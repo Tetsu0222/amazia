@@ -102,7 +102,8 @@ describe('Market 認証フロー E2E', () => {
     await waitFor(() => expect(customerApi.getMyPage).toHaveBeenCalled());
 
     const header = await screen.findByRole('banner');
-    await userEvent.click(within(header).getByRole('link', { name: 'ログイン' }));
+    await userEvent.click(within(header).getByRole('button', { name: 'アカウント＆リスト' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'ログイン' }));
     expect(await screen.findByRole('heading', { name: 'ログイン' })).toBeInTheDocument();
   });
 
@@ -176,16 +177,19 @@ describe('Market 認証フロー E2E', () => {
     expect(screen.getByText('クレジットカード')).toBeInTheDocument();
 
     // --- ログアウト ---
-    await userEvent.click(screen.getByTestId('logout-button'));
+    await userEvent.click(screen.getByRole('button', { name: 'アカウント＆リスト' }));
+    await userEvent.click(await screen.findByTestId('logout-button'));
     await waitFor(() => expect(customerApi.logoutCustomer).toHaveBeenCalled());
     // ログアウト後は CSRF クリア（customer null 化はヘッダの再描画で確認）
     expect(customerApi.setCsrfToken).toHaveBeenLastCalledWith(null);
-    // ヘッダがゲスト表示（「ログイン」リンク + 「会員登録」ボタン）に戻っている
+    // ヘッダがゲスト表示（メニューを開くと「ログイン」「会員登録」が見える）に戻っている
     await waitFor(() => {
       const header = screen.getByRole('banner');
-      expect(within(header).getByRole('link', { name: 'ログイン' })).toBeInTheDocument();
-      expect(within(header).getByRole('link', { name: '会員登録' })).toBeInTheDocument();
+      expect(within(header).getByRole('button', { name: 'アカウント＆リスト' })).toBeInTheDocument();
     });
+    await userEvent.click(screen.getByRole('button', { name: 'アカウント＆リスト' }));
+    expect(await screen.findByRole('menuitem', { name: 'ログイン' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '会員登録' })).toBeInTheDocument();
     // 認証必須のマイページ画面は閉じている
     expect(screen.queryByRole('heading', { name: 'マイページ' })).not.toBeInTheDocument();
   });

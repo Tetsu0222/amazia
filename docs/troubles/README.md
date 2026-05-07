@@ -7,6 +7,16 @@
 - [20260506_trouble_analysis.md](../analysis/20260506_trouble_analysis.md)（021〜030）
 - [20260507_trouble_analysis.md](../analysis/20260507_trouble_analysis.md)（031〜040 + 次フェーズへの再発防止策）
 
+## 横断的な知見
+
+個別トラブルから抽出した横断的な知見は以下に集約：
+
+- [docs/ai_context/ai_collaboration_antipatterns.md](../ai_context/ai_collaboration_antipatterns.md) — AI 協働で踏みやすい落とし穴（AP-001〜008）
+- [docs/ai_context/test_insights.md](../ai_context/test_insights.md) — テスト観点の知見
+- [docs/ai_context/operational_insights.md](../ai_context/operational_insights.md) — 実装・運用パターンの落とし穴
+
+新規トラブル記録時は [CLAUDE.md](../../CLAUDE.md) のテンプレに従い、`## AI協働観点` セクションも併せて埋めること。
+
 ## 一覧
 
 | # | ドキュメント | 概要 | ステータス | 優先順位 | 分析状況 |

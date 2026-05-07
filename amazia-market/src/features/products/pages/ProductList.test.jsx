@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ProductList from './ProductList';
 import * as api from '../api/products';
 
 vi.mock('../api/products');
 
-function renderProductList() {
+vi.mock('../../customer/context/useAuth', () => ({
+  useAuth: () => ({ isAuthenticated: false, customer: null, logout: vi.fn() }),
+}));
+
+function renderProductList(initialPath = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <ProductList />
     </MemoryRouter>
   );
@@ -56,14 +61,28 @@ describe('ProductList', () => {
     });
   });
 
-  it('価格を ¥1,000 〜 の形式で表示する', async () => {
+  it('ON_SALE 商品の価格を ¥1,000 形式で表示する（「〜」なし）', async () => {
     api.getMarketProducts.mockResolvedValue([
       { productId: 1, productName: '価格テスト', minPrice: 1000, totalStock: 1, preorderStatus: 'ON_SALE' },
     ]);
     renderProductList();
 
     await waitFor(() => {
-      expect(screen.getByText('¥1,000 〜')).toBeInTheDocument();
+      expect(screen.getByText('¥1,000')).toBeInTheDocument();
+    });
+  });
+
+  it('PRE_ORDER 商品の価格は ¥X,XXX 〜 形式で表示する', async () => {
+    api.getMarketProducts.mockResolvedValue([
+      {
+        productId: 9, productName: '予約価格テスト', minPrice: 1500, totalStock: 0,
+        preorderStatus: 'PRE_ORDER', releaseDate: '2026-08-01',
+      },
+    ]);
+    renderProductList();
+
+    await waitFor(() => {
+      expect(screen.getByText(/¥1,500\s*〜/)).toBeInTheDocument();
     });
   });
 
@@ -82,14 +101,14 @@ describe('ProductList', () => {
   });
 
   // フェーズ14.5 §4-2: ステータス別ラベルと補足表示
-  it('ON_SALE は「通常販売」ラベルと在庫数を表示する', async () => {
+  it('ON_SALE は「通常販売」ラベルと「残りN点」を表示する', async () => {
     api.getMarketProducts.mockResolvedValue([
       { productId: 1, productName: '通常商品', minPrice: 1000, totalStock: 7, preorderStatus: 'ON_SALE' },
     ]);
     renderProductList();
     await waitFor(() => {
       expect(screen.getByText('通常販売')).toBeInTheDocument();
-      expect(screen.getByText('在庫：7 個')).toBeInTheDocument();
+      expect(screen.getByText('残り7点')).toBeInTheDocument();
     });
   });
 
@@ -104,8 +123,8 @@ describe('ProductList', () => {
     await waitFor(() => {
       expect(screen.getByText('予約受付中')).toBeInTheDocument();
       expect(screen.getByText('発売日：2026-08-01')).toBeInTheDocument();
-      // ON_SALE 以外は在庫数（「在庫：N 個」）を表示しない
-      expect(screen.queryByText(/在庫：\d+ 個/)).not.toBeInTheDocument();
+      // ON_SALE 以外は在庫数（「残りN点」）を表示しない
+      expect(screen.queryByText(/残り\d+点/)).not.toBeInTheDocument();
     });
   });
 
@@ -144,6 +163,54 @@ describe('ProductList', () => {
     renderProductList();
     await waitFor(() => {
       expect(screen.getByText('完売')).toBeInTheDocument();
+    });
+  });
+
+  it('?q=テスト 付きでアクセスするとキーワードを含む商品だけ表示される', async () => {
+    api.getMarketProducts.mockResolvedValue([
+      { productId: 1, productName: 'テスト商品A', minPrice: 1000, totalStock: 1, preorderStatus: 'ON_SALE' },
+      { productId: 2, productName: 'りんご', minPrice: 200, totalStock: 1, preorderStatus: 'ON_SALE' },
+      { productId: 3, productName: 'テスト商品B', minPrice: 3000, totalStock: 1, preorderStatus: 'ON_SALE' },
+    ]);
+    renderProductList('/?q=' + encodeURIComponent('テスト'));
+
+    await waitFor(() => {
+      expect(screen.getByText('テスト商品A')).toBeInTheDocument();
+      expect(screen.getByText('テスト商品B')).toBeInTheDocument();
+      expect(screen.queryByText('りんご')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/「テスト」の検索結果（2件）/)).toBeInTheDocument();
+  });
+
+  it('検索ヒット0件時は「該当する商品がありません」と「すべての商品を見る」リンクを表示する', async () => {
+    api.getMarketProducts.mockResolvedValue([
+      { productId: 1, productName: 'りんご', minPrice: 200, totalStock: 1, preorderStatus: 'ON_SALE' },
+    ]);
+    renderProductList('/?q=' + encodeURIComponent('みかん'));
+
+    await waitFor(() => {
+      expect(screen.getByText('該当する商品がありません')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'すべての商品を見る' })).toHaveAttribute('href', '/');
+  });
+
+  it('「価格の安い順」を選ぶと minPrice 昇順で並ぶ', async () => {
+    api.getMarketProducts.mockResolvedValue([
+      { productId: 1, productName: '商品B', minPrice: 3000, totalStock: 1, preorderStatus: 'ON_SALE' },
+      { productId: 2, productName: '商品A', minPrice: 1000, totalStock: 1, preorderStatus: 'ON_SALE' },
+      { productId: 3, productName: '商品C', minPrice: 2000, totalStock: 1, preorderStatus: 'ON_SALE' },
+    ]);
+    const user = userEvent.setup();
+    renderProductList();
+    await waitFor(() => screen.getByText('商品A'));
+
+    await user.click(screen.getByLabelText('並び替え'));
+    await user.click(await screen.findByRole('option', { name: '価格の安い順' }));
+
+    await waitFor(() => {
+      const headings = within(document.body).getAllByText(/^商品[ABC]$/);
+      const order = headings.map((el) => el.textContent);
+      expect(order).toEqual(['商品A', '商品C', '商品B']);
     });
   });
 });

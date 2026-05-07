@@ -5,6 +5,7 @@ import {
   CircularProgress, Divider, Box, MenuItem, TextField,
 } from '@mui/material';
 import { useAuth } from '../../customer/context/useAuth';
+import { useCart } from '../../cart/context/useCart';
 import { getMarketProduct } from '../../products/api/products';
 import { confirmOrder } from '../api/checkout';
 
@@ -31,7 +32,9 @@ export default function Checkout() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { customer } = useAuth();
+  const { items: cartItems, totalCount: cartTotalCount, totalPrice: cartTotalPrice, clearCart } = useCart();
 
+  const fromCart = searchParams.get('from') === 'cart';
   const productIdParam = searchParams.get('product_id');
   const skuIdParam = searchParams.get('sku_id');
   const quantityParam = searchParams.get('quantity');
@@ -55,6 +58,11 @@ export default function Checkout() {
   // 旧実装は SKU から逆引きするため全商品取得していたが、Summary に skus が含まれず破綻していた（036 関連）。
 
   useEffect(() => {
+    if (fromCart) {
+      // カートモードでは商品 API を呼ばない（カート明細をそのまま使う）
+      setLoading(false);
+      return;
+    }
     let canceled = false;
     if (productId == null || skuId == null) {
       setError('購入対象の商品または SKU が指定されていません。');
@@ -76,7 +84,7 @@ export default function Checkout() {
       }
     })();
     return () => { canceled = true; };
-  }, [productId, skuId]);
+  }, [productId, skuId, fromCart]);
 
   const selectedSku = useMemo(() => {
     if (!productData) return null;
@@ -93,6 +101,30 @@ export default function Checkout() {
     setSubmitError(null);
     setSubmitting(true);
     try {
+      if (fromCart) {
+        // カートモード：各 cart_item を逐次 confirm。1件失敗しても以降は止める
+        const results = [];
+        for (const item of cartItems) {
+          const r = await confirmOrder({
+            skuId: item.skuId,
+            quantity: item.quantity,
+            paymentMethodId,
+            shippingMethodId,
+            preorder: item.preorder,
+          });
+          results.push(r);
+        }
+        await clearCart();
+        navigate('/checkout/complete', {
+          state: {
+            salesIds: results.map((r) => r.salesId),
+            amount: results.reduce((acc, r) => acc + (r.amount ?? 0), 0),
+            quantity: results.reduce((acc, r) => acc + (r.quantity ?? 0), 0),
+            fromCart: true,
+          },
+        });
+        return;
+      }
       const result = await confirmOrder({
         skuId: selectedSku.skuId,
         quantity,
@@ -126,38 +158,58 @@ export default function Checkout() {
 
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
   if (error) return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
-  if (!selectedSku) return <Alert severity="error" sx={{ m: 4 }}>SKU が見つかりません。</Alert>;
+  if (fromCart && cartItems.length === 0) {
+    return <Alert severity="error" sx={{ m: 4 }}>カートが空のため Checkout できません。</Alert>;
+  }
+  if (!fromCart && !selectedSku) {
+    return <Alert severity="error" sx={{ m: 4 }}>SKU が見つかりません。</Alert>;
+  }
 
   // 予約モードでは在庫数バリデーションを行わない（発売前 / 在庫切れの予約継続が前提）
-  const stockShortage = !isPreorder && selectedSku.stock != null && quantity > selectedSku.stock;
+  const stockShortage = !fromCart && !isPreorder && selectedSku?.stock != null && quantity > selectedSku.stock;
 
   return (
     <Container sx={{ mt: 4 }} maxWidth="sm">
       <Typography variant="h5" gutterBottom>
-        {isPreorder ? 'ご予約内容の確認' : 'ご注文内容の確認'}
+        {fromCart ? 'ご注文内容の確認（カート）' : isPreorder ? 'ご予約内容の確認' : 'ご注文内容の確認'}
       </Typography>
       <Paper sx={{ p: 3 }}>
         <Stack spacing={2}>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">商品</Typography>
-            <Typography>{productData.product.name}（{selectedSku.color} / {selectedSku.size}）</Typography>
-          </Box>
+          {fromCart ? (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">注文内容</Typography>
+              {cartItems.map((item) => (
+                <Typography key={item.itemId} variant="body2">
+                  {item.productName}（{item.color} / {item.size}）× {item.quantity} … ¥{item.subtotal.toLocaleString()}
+                </Typography>
+              ))}
+            </Box>
+          ) : (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">商品</Typography>
+              <Typography>{productData.product.name}（{selectedSku.color} / {selectedSku.size}）</Typography>
+            </Box>
+          )}
 
           <Divider />
 
-          <TextField
-            label={isPreorder ? '予約数' : '数量'}
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-            slotProps={{
-              htmlInput: isPreorder
-                ? { min: 1 }
-                : { min: 1, max: selectedSku.stock ?? 99 },
-            }}
-          />
-          {stockShortage && (
-            <Alert severity="warning">在庫数({selectedSku.stock})を超えています。</Alert>
+          {!fromCart && (
+            <>
+              <TextField
+                label={isPreorder ? '予約数' : '数量'}
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+                slotProps={{
+                  htmlInput: isPreorder
+                    ? { min: 1 }
+                    : { min: 1, max: selectedSku.stock ?? 99 },
+                }}
+              />
+              {stockShortage && (
+                <Alert severity="warning">在庫数({selectedSku.stock})を超えています。</Alert>
+              )}
+            </>
           )}
 
           <TextField
@@ -202,20 +254,25 @@ export default function Checkout() {
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Typography variant="subtitle1">合計</Typography>
             <Typography variant="h5" color="primary">
-              {totalAmount != null ? `¥${totalAmount.toLocaleString()}` : '価格未定'}
+              {fromCart
+                ? `¥${cartTotalPrice.toLocaleString()}（${cartTotalCount}点）`
+                : totalAmount != null ? `¥${totalAmount.toLocaleString()}` : '価格未定'}
             </Typography>
           </Stack>
 
           {submitError && <Alert severity="error">{submitError}</Alert>}
 
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-            <Button onClick={() => navigate(`/products/${productId}`)} disabled={submitting}>
+            <Button
+              onClick={() => navigate(fromCart ? '/cart' : `/products/${productId}`)}
+              disabled={submitting}
+            >
               戻る
             </Button>
             <Button
               variant="contained"
               onClick={handleSubmit}
-              disabled={submitting || stockShortage || !customer}
+              disabled={submitting || stockShortage || !customer || (fromCart && cartItems.length === 0)}
             >
               {submitting
                 ? '送信中…'

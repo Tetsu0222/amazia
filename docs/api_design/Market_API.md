@@ -27,6 +27,7 @@
 - フェーズ16 Step1: 商品マスタの `is_active = FALSE`（Console 商品マスタの「Market 公開」スイッチ OFF）の商品は Core 側で `NOT_PUBLIC` 扱いとなり一覧から除外される
 - `mainImage` が null の場合はフロントで NOIMAGE 表示
 - `preorderStatus` に応じて `ProductList.jsx` がラベル（通常販売 / 予約受付中 / 完売 等）と補足表示（在庫数 / 発売日 / 予約開始日）を切り替える
+- フェーズ16.5 Step3: キーワード検索はクライアントサイドフィルタ（`features/products/searchUtils.js`）で実装。商品数 100 を超えた段階でサーバーサイド検索（`?keyword=` クエリ）への移行を予定（後続フェーズ）
 
 **レスポンス例**
 ```json
@@ -201,6 +202,35 @@
 
 ---
 
+## カート API（フェーズ16.5実装済 / Core 呼び出し）
+
+会員ログイン済セッションでカートを操作する。Core 側 `/api/customer/carts/*` を直接呼び出し（Console Pass-through なし。設計書 [phase16_5 §5-4](../design/phase11_20/phase16_5_market_ui_improvement.md) 参照）。
+
+| 共通仕様 | 内容 |
+|---------|------|
+| 実装ファイル | `src/features/cart/api/cart.js`（`withCredentials: true` / X-CSRF-Token を `customer.js` から流用） |
+| baseURL | `/api/customer/carts` |
+
+| メソッド | パス | 関数 | 概要 |
+|----------|------|------|------|
+| GET | `/api/customer/carts/me` | `getMyCart()` | 自分のカート取得（未ログイン 401） |
+| POST | `/api/customer/carts/me/items` | `addToCart(skuId, quantity, preorder)` | カート追加（既存なら数量加算） |
+| PUT | `/api/customer/carts/me/items/{itemId}` | `updateQuantity(itemId, quantity)` | 数量変更 |
+| DELETE | `/api/customer/carts/me/items/{itemId}` | `removeFromCart(itemId)` | アイテム削除 |
+| DELETE | `/api/customer/carts/me` | `clearCart()` | カート全削除（Checkout 完了時に呼ぶ） |
+
+**仕様**：
+- 1顧客1カート（`carts.customer_id` UNIQUE）。初回 POST で遅延作成
+- 同一 SKU・同一 `is_preorder` フラグは1行に集約（数量加算）
+- 状態管理は `features/cart/context/CartContext.jsx`（`useCart()` hook）。AppHeader バッジ・ProductCard / ProductDetail のカート追加・CartPage / Checkout `?from=cart` で参照
+- レスポンス DTO は Core の `CartResponse`（`docs/api_design/Core_API.md` §Market カート API 参照）。`mainImage` は別経路（`getMarketProduct(productId)` のメイン画像）を流用するため Cart レスポンスには含まれない
+
+**Checkout 連携**：
+- `/checkout?from=cart` モードでは `useCart().items` を逐次 `POST /api/customer/orders/confirm` し、全件成功後に `clearCart()` を呼ぶ（`features/checkout/pages/Checkout.jsx`）
+- 単品 Checkout（`?product_id=&sku_id=&quantity=`）は引き続き動作（後方互換）
+
+---
+
 ## 注文 API（フェーズ14実装済 / Core 呼び出し）
 
 会員ログイン済セッションで注文確定・購入履歴を扱う。
@@ -289,4 +319,6 @@ Market 画面ルートと API の対応関係。
 | `/customer/password-reset/:token` | PasswordResetConfirm | POST `/api/customer/password/reset/confirm` |
 | `/checkout` | Checkout | POST `/api/customer/orders/confirm`（通常購入） |
 | `/checkout?preorder=1` | Checkout（予約モード） | POST `/api/customer/orders/confirm`（`preorder: true` 送信。フェーズ14.5 追加） |
+| `/checkout?from=cart` | Checkout（カートモード） | カート明細を逐次 POST `/api/customer/orders/confirm`、完了後 DELETE `/api/customer/carts/me`（フェーズ16.5 追加） |
+| `/cart` | CartPage | GET / PUT / DELETE `/api/customer/carts/me/*`（フェーズ16.5 追加） |
 | `/customer/orders` | PurchaseHistory | GET `/api/customer/orders` |

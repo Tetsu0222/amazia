@@ -69,6 +69,13 @@
 | [TBL_inbounds.md](TBL_inbounds.md) | inbounds | 商品入荷ヘッダ | Core |
 | [TBL_deliveries.md](TBL_deliveries.md) | deliveries | 配送実体（注文確定と同時に sales 1:1 で生成） | Core |
 
+### Core システム（カート機能）※フェーズ16.5追加
+
+| ファイル名 | テーブル名 | 論理名 | 所属システム |
+|------------|------------|--------|------------|
+| [TBL_carts.md](TBL_carts.md) | carts | Market 顧客のカート（1顧客1カート） | Core |
+| [TBL_cart_items.md](TBL_cart_items.md) | cart_items | カート明細（同一 SKU・同一 is_preorder は1行に集約） | Core |
+
 ### Console システム（Laravel 標準）
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |
