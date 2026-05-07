@@ -1,18 +1,16 @@
 # Amazia — フルスタック実運用シミュレーション
 
-> 個人開発で「業務レベルの EC 基盤」を設計・実装・デプロイ・運用まで一貫して作り切る挑戦。
-> 3 システム連携・自前 CI/CD・AWS 本番運用・AI 協働開発を、ひとつのリポジトリに統合しています。
+> 個人開発で「業務レベルの EC 基盤」を設計・実装・デプロイ・運用まで一貫して作り切る挑戦をしています。
+> 3 システム連携・自前 CI/CD・AWS 本番運用・AI 協働開発を統合しています。
 
 <p align="center">
   <img src="docs/images/hero_market.png" alt="Amazia Market 商品詳細画面" width="48%" />
   <img src="docs/images/hero_console.png" alt="Amazia Console 管理画面" width="48%" />
 </p>
 
-<!-- スクショ未配置のため、`docs/images/hero_market.png` と `docs/images/hero_console.png` に画像を置いてください。 -->
-
 ---
 
-## 5 秒で伝わる 3 本柱
+## Amazia 3 本柱
 
 - **マルチシステム連携** — React（Market）+ Vue/PHP（Console）+ Java/Spring Boot（Core）+ MySQL の 3 アプリを 1 つの EC 基盤として連動
 - **完全自動 CI/CD** — GitHub Actions → ECR → S3 → SSM → ヘルスチェックを自前構築。ゾンビコンテナ・SSM 不達など実運用の落とし穴を踏み抜きながら強化
