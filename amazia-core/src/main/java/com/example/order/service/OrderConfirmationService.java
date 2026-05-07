@@ -2,6 +2,7 @@ package com.example.order.service;
 
 import com.example.address.entity.Address;
 import com.example.address.repository.AddressRepository;
+import com.example.delivery.service.DeliveryCreationService;
 import com.example.market.customer.entity.Customer;
 import com.example.market.customer.repository.CustomerRepository;
 import com.example.order.dto.ConfirmOrderRequest;
@@ -62,6 +63,7 @@ public class OrderConfirmationService {
     private final SalesRepository salesRepository;
     private final PaymentService paymentService;
     private final PreorderStatusService preorderStatusService;
+    private final DeliveryCreationService deliveryCreationService;
 
     private final long pendingStatusId;
     private final String txTypeSale;
@@ -78,6 +80,7 @@ public class OrderConfirmationService {
             SalesRepository salesRepository,
             PaymentService paymentService,
             PreorderStatusService preorderStatusService,
+            DeliveryCreationService deliveryCreationService,
             @Value("${amazia.sales.shipping-statuses.pending-id}") long pendingStatusId,
             @Value("${amazia.sales.sku-stock-tx-types.sale}") String txTypeSale) {
         this.customerRepository = customerRepository;
@@ -91,6 +94,7 @@ public class OrderConfirmationService {
         this.salesRepository = salesRepository;
         this.paymentService = paymentService;
         this.preorderStatusService = preorderStatusService;
+        this.deliveryCreationService = deliveryCreationService;
         this.pendingStatusId = pendingStatusId;
         this.txTypeSale = txTypeSale;
     }
@@ -162,8 +166,9 @@ public class OrderConfirmationService {
                     savedSales.getId(), customer.getId());
         }
 
-        // 6. phase15 で DeliveryCreationService.createForSales(savedSales.getId()) を呼び出す
-        //    本フェーズでは sales.shipping_status_id = PENDING のみで完結。
+        // 6. phase15 r5 連携：deliveries 生成（過渡期シグネチャ / RRRR-3）
+        //    phase14 r2 で sales.shipping_method_id 追加後は createForSales(savedSales.getId()) 単引数に移行。
+        deliveryCreationService.createForSales(savedSales.getId(), request.getShippingMethodId());
 
         return savedSales;
     }

@@ -1,6 +1,8 @@
 package com.example.order;
 
 import com.example.address.repository.AddressRepository;
+import com.example.delivery.entity.Delivery;
+import com.example.delivery.repository.DeliveryRepository;
 import com.example.market.customer.entity.Customer;
 import com.example.market.customer.repository.CustomerRepository;
 import com.example.order.dto.ConfirmOrderRequest;
@@ -57,12 +59,16 @@ class OrderConfirmationServiceTest {
     @Autowired private ProductSkuStockTransactionRepository skuStockTransactionRepository;
     @Autowired private SalesRepository salesRepository;
     @Autowired private AddressRepository addressRepository;
+    @Autowired private DeliveryRepository deliveryRepository;
 
     @Value("${amazia.sales.payment-methods.credit-card-id}")
     private long creditCardId;
 
     @Value("${amazia.sales.shipping-statuses.pending-id}")
     private long pendingStatusId;
+
+    @Value("${amazia.delivery.shipping-methods.home-delivery-id}")
+    private long homeDeliveryMethodId;
 
     private Long customerId;
     private Long productId;
@@ -112,6 +118,16 @@ class OrderConfirmationServiceTest {
         assertEquals("sales", tx.getReferenceType());
         assertEquals(sales.getId(), tx.getReferenceId());
         assertEquals(customerId, tx.getCreatedByUserId());
+
+        // phase15 r5: deliveries が PENDING で生成され、scheduled_date が NOT NULL
+        Delivery delivery = deliveryRepository.findBySalesId(sales.getId()).orElseThrow();
+        assertEquals(pendingStatusId, delivery.getShippingStatusId());
+        assertEquals(homeDeliveryMethodId, delivery.getShippingMethodId());
+        assertEquals(sales.getShippingAddressId(), delivery.getShippingAddressId());
+        assertNotNull(delivery.getScheduledDate(), "通常購入では scheduled_date が算出される");
+        assertNull(delivery.getShippedDate());
+        assertNull(delivery.getDeliveredDate());
+        assertNull(delivery.getTrackingCode());
     }
 
     @Test
@@ -129,6 +145,11 @@ class OrderConfirmationServiceTest {
                 .filter(t -> t.getSkuId().equals(skuId) && "sale".equals(t.getType()))
                 .count();
         assertEquals(0, saleCount);
+
+        // phase15 r5: 予約購入も deliveries は生成されるが、scheduled_date は NULL
+        Delivery delivery = deliveryRepository.findBySalesId(sales.getId()).orElseThrow();
+        assertEquals(pendingStatusId, delivery.getShippingStatusId());
+        assertNull(delivery.getScheduledDate(), "予約購入では scheduled_date は入荷時に再計算するため初回は NULL");
     }
 
     @Test
@@ -203,7 +224,7 @@ class OrderConfirmationServiceTest {
         dup.setQuantity(1);
         dup.setAmount(3000);
         dup.setPaymentMethodId(creditCardId);
-        dup.setShippingMethodId(1L);
+        dup.setShippingMethodId(homeDeliveryMethodId);
         dup.setShippingAddressId(existing.getShippingAddressId());
         dup.setShippingStatusId(pendingStatusId);
         dup.setPaymentId(existing.getPaymentId());
@@ -220,7 +241,7 @@ class OrderConfirmationServiceTest {
         r.setSkuId(skuId);
         r.setQuantity(quantity);
         r.setPaymentMethodId(creditCardId);
-        r.setShippingMethodId(1L);
+        r.setShippingMethodId(homeDeliveryMethodId);
         r.setPreorder(preorder);
         return r;
     }
