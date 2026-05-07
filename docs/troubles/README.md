@@ -53,6 +53,7 @@
 | 041 | [公開期間判定の二重基準（秒単位 vs JST 0:00）で予約商品の注文確定が 400](041_publish_judgement_dual_basis_secs_vs_jst_zero.md) | `Product#isPublished()`（秒単位 LocalDateTime）と C-2 で追加した `PreorderStatusService`（JST 0:00 基準 LocalDate）の判定基準が食い違い、同日 17 時公開予定の商品が Market では PRE_ORDER として表示されるが Checkout では「非公開」で 400。公開判定を PreorderStatusService に統一して解消 | ✅ 解決済 | - | - |
 | 042 | [EC2ディスクフル起因のゾンビOnline・カナリア配信失敗](042_disk_full_zombie_online_docker_image_pile.md) | 旧 Docker イメージが `/var/lib/docker` に蓄積（33個・3.08GB）してルートボリューム 8GB を枯渇。systemd-journald がジャーナルを書けず無限エラー、SSM Agent も `echo canary-ok` を実行できず CD の `canary_check` が `Failed` で停止。EBSを16GBに拡張＋`docker system prune -af`で復旧、deploy.ymlに `docker image prune -af` 自動化と canary_check 失敗時の3点セットログ出力を追加 | ✅ 解決済 | - | - |
 | 043 | [Market 購入履歴の配送状況が Console の更新を反映しない](043_market_purchase_history_shipping_status_not_synced.md) | 配送ステータスが `sales.shipping_status_id` と `deliveries.shipping_status_id` の二重ソースになっており、Console の状態遷移は `deliveries` のみ更新する一方で Market 購入履歴 API は `sales` 側を読んでいたため、Console で「配送済」にしても Market 購入履歴は永続的に「配送準備中」表示。読み出し側を deliveries 優先（旧 sales のみフォールバック）に修正 | ✅ 解決済 | - | - |
+| 044 | [operation_logs テーブル不在 + users.id UNSIGNED ドリフトで操作履歴が500](044_operation_logs_table_missing_users_id_unsigned_drift.md) | schema.sql の `operation_logs.user_id BIGINT` が本番 `users.id BIGINT UNSIGNED` と FK 型互換せず Core 起動時の DDL が `continue-on-error` で潰されてテーブル未作成。呼び出された瞬間 1146 で 500。本番ホットフィックス＋schema.sql を UNSIGNED に修正。027・038 に続く H2／本番 MySQL 乖離系の3例目（メタ評価対象） | ✅ 解決済 | - | - |
 
 ## 再発防止アクション（未対応）
 

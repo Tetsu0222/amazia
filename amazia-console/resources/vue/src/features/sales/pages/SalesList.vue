@@ -4,8 +4,11 @@
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="list" tab="一覧">
+        <div style="margin-bottom: 12px">
+          <a-checkbox v-model:checked="excludePreorderInList">予約を除外</a-checkbox>
+        </div>
         <a-table
-          :dataSource="sales"
+          :dataSource="filteredSalesForList"
           :columns="listColumns"
           :loading="loading"
           rowKey="salesId"
@@ -15,6 +18,17 @@
       </a-tab-pane>
 
       <a-tab-pane key="summary" tab="集計">
+        <div style="margin-bottom: 12px">
+          <a-button
+            :type="includePreorderInSummary ? 'primary' : 'default'"
+            @click="includePreorderInSummary = !includePreorderInSummary"
+          >
+            {{ includePreorderInSummary ? '見込み表示中（予約含む）' : '見込み表示' }}
+          </a-button>
+          <span v-if="includePreorderInSummary" style="margin-left: 12px; color: #faad14">
+            ※ 予約購入を含む見込み値です
+          </span>
+        </div>
         <a-row :gutter="16">
           <a-col :span="12">
             <a-card title="月別売上" size="small">
@@ -93,6 +107,20 @@ const sales = ref([]);
 const loading = ref(false);
 const activeTab = ref('list');
 
+// フェーズ16 Step2: 一覧タブの予約除外フィルタ
+const excludePreorderInList = ref(false);
+// フェーズ16 Step2: 集計タブの「見込み表示」トグル（既定 OFF＝予約除外）
+const includePreorderInSummary = ref(false);
+
+const filteredSalesForList = computed(() =>
+  excludePreorderInList.value ? sales.value.filter(s => !s.preorder) : sales.value
+);
+
+// 集計タブの元データ：見込み表示中なら全件、通常時は予約除外
+const salesForSummary = computed(() =>
+  includePreorderInSummary.value ? sales.value : sales.value.filter(s => !s.preorder)
+);
+
 const listColumns = [
   { title: '売上日',     dataIndex: 'salesDate',    key: 'salesDate' },
   { title: '配送日',     dataIndex: 'shippingDate', key: 'shippingDate',
@@ -144,7 +172,7 @@ const summaryPreorderColumns = [
 
 const summaryByMonth = computed(() => {
   const map = new Map();
-  for (const s of sales.value) {
+  for (const s of salesForSummary.value) {
     const month = (s.salesDate ?? '').slice(0, 7);
     if (!month) continue;
     const cur = map.get(month) ?? { month, count: 0, quantity: 0, amount: 0 };
@@ -158,7 +186,7 @@ const summaryByMonth = computed(() => {
 
 const summaryBySku = computed(() => {
   const map = new Map();
-  for (const s of sales.value) {
+  for (const s of salesForSummary.value) {
     const key = `${s.skuId}`;
     const cur = map.get(key) ?? {
       key,
@@ -179,7 +207,7 @@ const summaryBySku = computed(() => {
 
 const summaryByPayment = computed(() => {
   const map = new Map();
-  for (const s of sales.value) {
+  for (const s of salesForSummary.value) {
     const key = s.paymentMethodName ?? '不明';
     const cur = map.get(key) ?? { paymentMethodName: key, count: 0, amount: 0 };
     cur.count += 1;

@@ -242,9 +242,10 @@ CREATE TABLE IF NOT EXISTS sales_return (
 );
 
 -- 操作履歴（V6 + V10 相当：screen_name / api_name 含む）
+-- user_id は users.id（BIGINT UNSIGNED）と型を揃える必要がある（trouble 044）
 CREATE TABLE IF NOT EXISTS operation_logs (
-    id          BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    user_id     BIGINT       NOT NULL,
+    id          BIGINT          AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT UNSIGNED NOT NULL,
     action      VARCHAR(100) NOT NULL,
     target_type VARCHAR(50)  NULL,
     target_id   BIGINT       NULL,

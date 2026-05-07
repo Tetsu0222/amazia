@@ -1054,6 +1054,57 @@ Console 管理画面向けの売上・在庫一覧 API。
 
 ---
 
+## 予約商品一覧 API（フェーズ16 Step2追加）
+
+設計書: [phase16_ui_ux_improvement.md](../design/phase11_20/phase16_ui_ux_improvement.md) §2-4-4
+
+### 予約商品一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/products/preorders` |
+| コントローラー | `ListPreorderProductsController` |
+| サービス | `ListPreorderProductsService` |
+
+**仕様**
+- `PreorderStatusService#judge()` が `PRE_ORDER` を返す商品のみ抽出（`is_active = TRUE` / 公開期間内 / 予約開始日到来済み / 発売日未到来）
+- 各商品について `sales.is_preorder = TRUE` のレコードを商品単位で集計（数量・金額）
+- 発売日昇順（`null` は末尾）で返却
+
+**レスポンス例**
+```json
+[
+  {
+    "productId": 12,
+    "productName": "Tシャツ夏モデル",
+    "preorderStartDate": "2026-04-01",
+    "releaseDate": "2026-08-01",
+    "daysUntilRelease": 86,
+    "acceptPreorder": true,
+    "isActive": true,
+    "preorderQuantity": 47,
+    "preorderAmount": 235000
+  }
+]
+```
+
+**レスポンス項目**
+
+| 項目 | 型 | 説明 |
+|------|-----|------|
+| productId | integer | 商品 ID |
+| productName | string | 商品名 |
+| preorderStartDate | date \| null | 予約開始日（NULL なら公開と同時） |
+| releaseDate | date \| null | 発売日 |
+| daysUntilRelease | integer \| null | 当日基準で発売日までの日数（負値は経過日数） |
+| acceptPreorder | boolean | 予約受付フラグ |
+| isActive | boolean | Market 露出 ON/OFF |
+| preorderQuantity | long | 予約数量合計（`is_preorder = TRUE` のみ） |
+| preorderAmount | long | 予約金額合計（円） |
+
+---
+
 ## 商品登録・更新リクエスト拡張（フェーズ14.5追記）
 
 `POST /api/products` / `PUT /api/products/{id}` に予約・発売関連 4 カラムを追加。

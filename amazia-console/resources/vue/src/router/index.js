@@ -18,6 +18,7 @@ import WorkflowList               from '../features/workflows/pages/WorkflowList
 import WorkflowDetail             from '../features/workflows/pages/WorkflowDetail.vue';
 import WorkflowRequestForm        from '../features/workflows/pages/WorkflowRequestForm.vue';
 import SalesList                  from '../features/sales/pages/SalesList.vue';
+import PreorderList               from '../features/preorder/pages/PreorderList.vue';
 import SalesReturnList            from '../features/salesReturn/pages/SalesReturnList.vue';
 import OperationLogList           from '../features/operationLog/pages/OperationLogList.vue';
 import DeliveryList               from '../features/delivery/pages/DeliveryList.vue';
@@ -48,6 +49,7 @@ const routes = [
   { path: '/workflows/:id',            component: WorkflowDetail,      meta: { requiresAuth: true } },
 
   { path: '/sales',                    component: SalesList,           meta: { requiresAuth: true } },
+  { path: '/preorders',                component: PreorderList,        meta: { requiresAuth: true } },
   { path: '/sales-returns',            component: SalesReturnList,     meta: { requiresAuth: true } },
   { path: '/operation-logs',           component: OperationLogList,    meta: { requiresAuth: true } },
 

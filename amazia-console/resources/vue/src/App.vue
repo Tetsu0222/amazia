@@ -18,6 +18,7 @@
           <a-menu-item key="/skus">SKU管理</a-menu-item>
           <a-menu-item key="/products/market-view">商品一覧（SKU集約版）</a-menu-item>
           <a-menu-item key="/sales">売上管理</a-menu-item>
+          <a-menu-item key="/preorders">予約管理</a-menu-item>
           <a-menu-item key="/sales-returns">返品管理</a-menu-item>
           <a-menu-item key="/delivery">配送管理</a-menu-item>
           <a-menu-item key="/inbound">入荷管理</a-menu-item>

@@ -226,6 +226,27 @@
 
 ---
 
+## 予約管理 API（フェーズ16 Step2追加）
+
+設計書: [phase16_ui_ux_improvement.md](../design/phase11_20/phase16_ui_ux_improvement.md) §2-4-5
+
+### 予約商品一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/preorders` |
+| 認証 | 要 |
+| コントローラー | `App\Preorder\Controller\ListPreorderController` |
+| サービス | `App\Preorder\Service\ListPreorderService` |
+
+**仕様**
+- Core の `GET /api/products/preorders` を中継する Pass-through
+- レスポンスは Core 側スキーマと同一（Core_API.md「予約商品一覧 API」を参照）
+- Core が 5xx を返した場合はそのままステータスコードを透過
+
+---
+
 ## 認証 API（フェーズ11追加）
 
 > Console は認証リクエストを amazia-core にプロキシする。JWT の検証は Console 側の `AuthenticateJwt` ミドルウェアで実施。

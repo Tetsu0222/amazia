@@ -2,7 +2,7 @@
 # フェーズ16：UIデザイン改善
 
 ## ステータス
-🟡 着手中（Step 1 のうち「商品有効/無効スイッチ」実装完了 / 予約管理画面・UI 全般改善は未着手）
+🟡 着手中（Step 1 完了 / Step 2 実装完了・2026-05-07）
 
 ## 範囲
 - Amazia Console  
@@ -16,16 +16,7 @@
 
 ---
 
-# Step 1：予約管理画面の追加と商品有効/無効スイッチ
-
-## 1-1. 予約管理画面（Console）
-
-- 予約状態の商品だけを表示する画面を新設する
-- 売上管理から予約中の商品をフィルタリングで除外できるようにする
-- 売上分析は予約商品を除外する
-  - 「見込み表示」ボタン押下で予約も含めた集計に切り替える
-
-## 1-2. 商品有効/無効スイッチ（Console 商品マスタ） ✅ 実装完了（2026-05-07）
+# Step 1：商品有効/無効スイッチ（Console 商品マスタ） ✅ 実装完了（2026-05-07）
 
 ### 背景・目的
 現状、商品を Market から非表示にするには `publish_start` / `publish_end`（公開期間）を設定する必要がある。  
@@ -69,6 +60,199 @@
   - 一覧フィルタが正しく機能する
 - Market
   - 無効化された商品は商品詳細 URL を直叩きしても 404 / 一覧から消える
+
+---
+
+# Step 2：予約管理画面と売上の予約除外フィルタ ✅ 実装完了（2026-05-07）
+
+> 実装計画書: [phase16_step2_implementation_plan.md](../../implementation/phase16_step2_implementation_plan.md)
+
+## 2-1. 背景・目的
+
+フェーズ12〜14.5 で予約販売の仕組みは整ったが、Console 側には以下のギャップが残っている。
+
+1. **予約状態の商品を一覧で把握する画面がない**
+   - 商品マスタ画面では `release_date` / `preorder_start_date` を個別に確認するしかなく、「いま何が予約受付中か」が一目で分からない。
+   - 予約数・予約者・発売日までの残日数といった運用判断材料を集約する場所が必要。
+2. **売上管理画面で予約と通常購入が同居している**
+   - `sales.is_preorder` カラムと「区分」表示は phase14 r4 で導入済み（[SalesList.vue:112](../../amazia-console/resources/vue/src/features/sales/pages/SalesList.vue#L112)）だが、フィルタや集計時の除外機構はない。
+   - 予約は「売上が立っているが商品はまだ手元にない（発売前）」という性質上、月次の売上分析・在庫回転の集計に混ぜると誤読される。デフォルトで除外し、必要時のみ「見込み表示」として含める運用にしたい。
+
+## 2-2. スコープ
+
+| # | 対応 | 対象 |
+|---|------|------|
+| A | 予約管理画面（Console）の新設 | Console UI / Core API |
+| B | 売上管理画面の一覧フィルタ「予約除外」 | Console UI のみ（クライアント側フィルタ） |
+| C | 売上集計（月別 / SKU別 / 決済方法別）の予約除外既定化 | Console UI のみ（クライアント側計算） |
+| D | 「見込み表示」トグルによる予約込み集計への切替 | Console UI のみ |
+
+**スコープ外**：
+- Market 側の予約商品表示変更（フェーズ16後段の Market UI 改善で扱う）
+- 予約注文のキャンセル / 発売日変更フロー（既に phase14_5 で確定済み・本ステップでは触らない）
+- ページング / サーバーサイドフィルタ化（売上件数が現状規模では不要・将来課題）
+
+## 2-3. 「予約商品」「予約売上」の定義
+
+| 用語 | 定義 | 判定根拠 |
+|------|------|---------|
+| 予約状態の商品 | `PreorderStatusService#judge()` が `PRE_ORDER` を返す商品 | `release_date` 未到来かつ `preorder_start_date` 到来済み・`is_active = TRUE`・公開期間内 |
+| 予約注文（売上） | `sales.is_preorder = TRUE` のレコード | 注文確定時点で `release_date` 未到来 → phase14 既存ロジックで TRUE 設定 |
+
+「予約商品」は `products` 視点、「予約売上」は `sales` 視点で別軸。Step 2 では両軸を別画面で扱う。
+
+## 2-4. 予約管理画面（Console）
+
+### 2-4-1. 画面位置
+
+- サイドバー：「売上管理」と「返品管理」の間に **「予約管理」** を追加（[App.vue:20-21](../../amazia-console/resources/vue/src/App.vue#L20-L21)）
+- ルート：`/preorders`（[router/index.js](../../amazia-console/resources/vue/src/router/index.js)）
+
+### 2-4-2. 表示内容
+
+| 列 | データソース | 備考 |
+|----|------------|------|
+| 商品ID | `products.id` | テキスト表示のみ（商品マスタへの遷移はさせない） |
+| 商品名 | `products.name` | テキスト表示のみ（商品マスタへの遷移はさせない） |
+| 予約開始日 | `products.preorder_start_date` | NULL 時は「公開と同時」 |
+| 発売日 | `products.release_date` | |
+| 発売まで | `release_date - today` の日数 | 当日は「本日発売」、過ぎていれば一覧から除外 |
+| 予約受付 | `products.accept_preorder` | バッジ「受付中／停止中」 |
+| 予約数（数量合計） | `sales` を `is_preorder = TRUE` AND `sku.product_id = products.id` で SUM(`quantity`) | Core で集計して返却 |
+| 予約金額（合計） | 同上を SUM(`amount`) | 円表示 |
+| Market 公開 | `products.is_active` | バッジ |
+
+並び順：発売日昇順（直近の発売予定を先頭）。
+
+### 2-4-3. 取得元データ
+
+予約管理画面のデータは **Core 側の新規エンドポイント `GET /api/products/preorders`** から取得する。
+
+理由：
+- 既存の `GET /api/products`（商品一覧）は予約数・予約金額の集計を返さない
+- 既存の `GET /api/sales` は売上一覧でありステータス情報を持たない
+- 商品単位 × 売上集計の JOIN を Service 層に集約することで Console を薄く保つ（規約 1-1）
+
+### 2-4-4. Core API 仕様
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/products/preorders` |
+| 認証 | Console JWT（既存ミドルウェア） |
+| コントローラー | `ListPreorderProductsController`（新設） |
+| サービス | `ListPreorderProductsService`（新設） |
+
+**仕様**
+- `is_active = TRUE` かつ `PreorderStatusService#judge() = PRE_ORDER` の商品を抽出
+- 各商品について `sales` から `is_preorder = TRUE` のレコードを集計（数量・金額）
+- 発売日昇順で返却
+
+**レスポンス例**
+```json
+[
+  {
+    "productId": 12,
+    "productName": "Tシャツ夏モデル",
+    "preorderStartDate": "2026-04-01",
+    "releaseDate": "2026-08-01",
+    "daysUntilRelease": 86,
+    "acceptPreorder": true,
+    "isActive": true,
+    "preorderQuantity": 47,
+    "preorderAmount": 235000
+  }
+]
+```
+
+### 2-4-5. Console Pass-through
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/preorders`（Console ローカル） |
+| 認証 | 要 |
+| コントローラー | `App\Preorder\Controller\ListPreorderController`（新設） |
+| サービス | `App\Preorder\Service\ListPreorderService`（新設） |
+
+Core の `/api/products/preorders` を Pass-through。ルート定義は新規 `routes/api/Preorder.php` に分離（規約 2-1 補足4）。
+
+### 2-4-6. UI コンポーネント
+
+- 新規ファイル：`amazia-console/resources/vue/src/features/preorder/pages/PreorderList.vue`
+- 新規ファイル：`amazia-console/resources/vue/src/features/preorder/api/preorderApi.js`
+- ant-design-vue の `a-table` を使用（既存の SalesList.vue と同様のスタイル）
+
+## 2-5. 売上管理画面の改修（Console）
+
+### 2-5-1. 「一覧」タブ
+
+- ヘッダー右側に **フィルタチェックボックス「予約を除外」** を追加（既定：OFF＝全件表示）
+- 既存の「区分」列はそのまま残す
+
+### 2-5-2. 「集計」タブ
+
+設計書の以下の指示に従う：
+- **売上分析は予約商品を除外する（既定）**
+  - 月別売上 / SKU別売上 / 決済方法別売上：`is_preorder = TRUE` の sales を集計対象から除外
+- **「見込み表示」ボタン押下で予約も含めた集計に切り替える**
+  - トグル：押下後はラベルを「見込み表示中（予約含む）」に変更し、再押下で通常表示に戻る
+  - 押下中はカード上部に「※ 予約購入を含む見込み値です」の注意書きを表示
+- 既存の「購入区分別売上」カードはトグル状態に関わらず常に通常／予約の両方を表示（区分の意味そのもの）
+
+### 2-5-3. 実装方針（Console UI 内で完結）
+
+- 売上一覧 API（`GET /api/sales`）はサーバー側フィルタを追加せず、Vue の `computed` で `is_preorder` を見て除外／包含を切り替える
+- 理由：
+  - Core 側の API スキーマを変えずに済み、規約・他画面に副作用を出さない
+  - 売上件数規模では現状クライアント側フィルタで十分（将来ページング化時にサーバー側フィルタへ移行する余地）
+  - 「見込み表示」トグルが UI 状態として完結し、リクエスト往復が発生しない
+
+## 2-6. DB 変更
+
+**なし**（既存の `products.release_date` / `products.preorder_start_date` / `products.is_active` / `sales.is_preorder` をそのまま利用）。
+
+## 2-7. API 変更まとめ
+
+| 区分 | エンドポイント | 種別 |
+|------|---------------|------|
+| Core | `GET /api/products/preorders` | 新設 |
+| Console | `GET /api/preorders` | 新設（Core Pass-through） |
+| Core | `GET /api/sales` | 変更なし |
+| Console | `GET /api/sales` | 変更なし |
+
+設計書 `docs/api_design/Core_API.md` / `Console_API.md` に新設エンドポイントを追記する（CLAUDE.md「DB / API 設計書のメンテナンスルール」遵守）。
+
+## 2-8. UI 変更まとめ（Console）
+
+| 画面 | 変更内容 |
+|------|---------|
+| `App.vue` | サイドバーに「予約管理」メニューを追加 |
+| `router/index.js` | `/preorders` ルートを追加 |
+| `features/preorder/pages/PreorderList.vue` | 新規作成 |
+| `features/preorder/api/preorderApi.js` | 新規作成 |
+| `features/sales/pages/SalesList.vue` | 一覧タブに「予約を除外」フィルタ・集計タブに「見込み表示」トグル追加 |
+
+## 2-9. TDD テストケース
+
+### Core
+- 予約商品（PRE_ORDER）一覧取得：`is_active = FALSE` の商品は除外される
+- 予約商品（PRE_ORDER）一覧取得：`release_date` を過ぎた商品は除外される（PreorderStatus が変わるため）
+- 予約商品（PRE_ORDER）一覧取得：予約数量・金額が `sales.is_preorder = TRUE` のみで集計される
+- 予約商品（PRE_ORDER）一覧取得：発売日昇順で返却される
+- 予約商品が 0 件のとき空配列を返す
+
+### Console（Laravel Feature テスト）
+- `GET /api/preorders` が認証なしで 401 を返す
+- 認証済みリクエストで Core レスポンスが透過的に返る
+- Core が 5xx を返した時のステータス透過
+
+### Console（Vue / vitest）
+- SalesList の「予約を除外」フィルタ ON で `is_preorder = TRUE` の行が一覧から消える
+- 集計タブの初期状態で月別/SKU別/決済方法別から予約売上が除外されている
+- 「見込み表示」トグルで集計が予約込みに切り替わる
+- 「見込み表示」中は注意書きが表示される
+- 購入区分別売上は常に通常／予約の両方を表示する
 
 ---
 
