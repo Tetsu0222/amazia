@@ -30,6 +30,15 @@ const baseItem = {
   shippingMethodId: 1,
   paymentMethodId: 1,
   preorder: false,
+  // フェーズ15 r5 / Step D：deliveries 由来情報
+  delivery: {
+    scheduledDate: '2026-05-09',
+    shippedDate: null,
+    deliveredDate: null,
+    trackingCode: null,
+    shippingStatusId: 1,
+    shippingMethodId: 1,
+  },
 };
 
 describe('PurchaseHistory', () => {
@@ -153,6 +162,60 @@ describe('PurchaseHistory', () => {
 
     await waitFor(() => {
       expect(screen.getByText('既に返品申請が進行中です。')).toBeInTheDocument();
+    });
+  });
+
+  // ---- フェーズ15 r5 / Step D：deliveries 由来表示 -------------------
+
+  it('delivery.scheduledDate が表示される', async () => {
+    api.getMyPurchaseHistory.mockResolvedValue([baseItem]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('2026-05-09')).toBeInTheDocument();
+    });
+  });
+
+  it('delivery.scheduledDate が null のときは「入荷待ち」と表示される', async () => {
+    api.getMyPurchaseHistory.mockResolvedValue([{
+      ...baseItem,
+      preorder: true,
+      delivery: { ...baseItem.delivery, scheduledDate: null },
+    }]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('入荷待ち')).toBeInTheDocument();
+    });
+  });
+
+  it('追跡番号が表示される', async () => {
+    api.getMyPurchaseHistory.mockResolvedValue([{
+      ...baseItem,
+      shippingStatusCode: 'SHIPPED',
+      delivery: {
+        ...baseItem.delivery,
+        shippedDate: '2026-05-08',
+        trackingCode: 'YMT-1234-5678',
+      },
+    }]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('YMT-1234-5678')).toBeInTheDocument();
+      expect(screen.getByText('2026-05-08')).toBeInTheDocument();
+    });
+  });
+
+  it('delivery が null（フェーズ15以前の旧 sales）でも画面が落ちない', async () => {
+    api.getMyPurchaseHistory.mockResolvedValue([{
+      ...baseItem,
+      delivery: null,
+    }]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('テストTシャツ')).toBeInTheDocument();
     });
   });
 });

@@ -1,5 +1,7 @@
 package com.example.order.service;
 
+import com.example.delivery.entity.Delivery;
+import com.example.delivery.repository.DeliveryRepository;
 import com.example.order.dto.PurchaseHistoryItem;
 import com.example.product.entity.Product;
 import com.example.product.repository.ProductRepository;
@@ -34,15 +36,18 @@ public class GetMyPurchaseHistoryService {
     private final ProductSkuRepository skuRepository;
     private final ProductRepository productRepository;
     private final ShippingStatusRepository shippingStatusRepository;
+    private final DeliveryRepository deliveryRepository;
 
     public GetMyPurchaseHistoryService(SalesRepository salesRepository,
                                        ProductSkuRepository skuRepository,
                                        ProductRepository productRepository,
-                                       ShippingStatusRepository shippingStatusRepository) {
+                                       ShippingStatusRepository shippingStatusRepository,
+                                       DeliveryRepository deliveryRepository) {
         this.salesRepository = salesRepository;
         this.skuRepository = skuRepository;
         this.productRepository = productRepository;
         this.shippingStatusRepository = shippingStatusRepository;
+        this.deliveryRepository = deliveryRepository;
     }
 
     @Transactional(readOnly = true)
@@ -64,10 +69,27 @@ public class GetMyPurchaseHistoryService {
         Map<Long, ShippingStatus> statusMap = new HashMap<>();
         shippingStatusRepository.findAllById(statusIds).forEach(s -> statusMap.put(s.getId(), s));
 
+        // フェーズ15 r5：sales 1 件ごとに対応する delivery を取得（sales:deliveries=1:1 / RR-3）
+        // 旧 sales（フェーズ15 以前）には delivery が無いため null 許容で扱う。
+        Map<Long, Delivery> deliveryMap = new HashMap<>();
+        for (Sales s : salesList) {
+            deliveryRepository.findBySalesId(s.getId())
+                    .ifPresent(d -> deliveryMap.put(s.getId(), d));
+        }
+
         return salesList.stream().map(s -> {
             ProductSku sku = skuMap.get(s.getSkuId());
             Product product = sku != null ? productMap.get(sku.getProductId()) : null;
             ShippingStatus status = statusMap.get(s.getShippingStatusId());
+            Delivery d = deliveryMap.get(s.getId());
+            PurchaseHistoryItem.DeliveryInfo info = (d == null) ? null : new PurchaseHistoryItem.DeliveryInfo(
+                    d.getScheduledDate(),
+                    d.getShippedDate(),
+                    d.getDeliveredDate(),
+                    d.getTrackingCode(),
+                    d.getShippingStatusId(),
+                    d.getShippingMethodId()
+            );
             return new PurchaseHistoryItem(
                     s.getId(),
                     s.getSalesDate(),
@@ -81,7 +103,8 @@ public class GetMyPurchaseHistoryService {
                     status != null ? status.getCode() : null,
                     s.getShippingMethodId(),
                     s.getPaymentMethodId(),
-                    s.isPreorder()
+                    s.isPreorder(),
+                    info
             );
         }).toList();
     }

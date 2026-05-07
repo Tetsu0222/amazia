@@ -81,6 +81,14 @@ class GetMyPurchaseHistoryServiceTest {
         assertEquals(1L, first.getShippingMethodId());
         assertEquals(creditCardId, first.getPaymentMethodId());
         assertFalse(first.isPreorder());
+
+        // フェーズ15 r5 / Step D：deliveries 由来情報がネストして含まれる
+        assertNotNull(first.getDelivery(), "deliveries が同時生成されるため delivery は非 null");
+        assertNotNull(first.getDelivery().getScheduledDate(),
+                "通常購入では scheduled_date が算出される");
+        assertNull(first.getDelivery().getShippedDate());
+        assertNull(first.getDelivery().getDeliveredDate());
+        assertNull(first.getDelivery().getTrackingCode());
     }
 
     @Test
@@ -109,6 +117,11 @@ class GetMyPurchaseHistoryServiceTest {
         List<PurchaseHistoryItem> mine = service.list(me);
         assertEquals(1, mine.size());
         assertTrue(mine.get(0).isPreorder());
+
+        // 予約購入では delivery.scheduledDate は NULL（入荷時に再計算 / RR-4 / RRR-4）
+        assertNotNull(mine.get(0).getDelivery());
+        assertNull(mine.get(0).getDelivery().getScheduledDate(),
+                "予約購入では入荷待ちのため scheduled_date は NULL");
     }
 
     // ---- helpers -------------------------------------------------------

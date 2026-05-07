@@ -135,13 +135,22 @@ export default function PurchaseHistory() {
                 <TableCell>支払方法</TableCell>
                 <TableCell>区分</TableCell>
                 <TableCell>配送状況</TableCell>
-                <TableCell>配送日</TableCell>
+                <TableCell>配送予定日</TableCell>
+                <TableCell>発送日</TableCell>
+                <TableCell>配達完了日</TableCell>
+                <TableCell>追跡番号</TableCell>
                 <TableCell>返品</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {items.map((it) => {
                 const statusInfo = SHIPPING_STATUS_LABEL[it.shippingStatusCode] ?? { text: it.shippingStatusCode, color: 'default' };
+                // フェーズ15 r5 / Step D：deliveries 由来のネスト情報。
+                // フェーズ15以前の sales には it.delivery=null（過去データ）。
+                const d = it.delivery;
+                const scheduledLabel = d
+                  ? (d.scheduledDate ?? '入荷待ち')
+                  : '—';
                 return (
                   <TableRow key={it.salesId}>
                     <TableCell>{it.salesDate}</TableCell>
@@ -167,7 +176,16 @@ export default function PurchaseHistory() {
                     <TableCell>
                       <Chip size="small" label={statusInfo.text} color={statusInfo.color} />
                     </TableCell>
-                    <TableCell>{it.shippingDate ?? '—'}</TableCell>
+                    <TableCell>{scheduledLabel}</TableCell>
+                    <TableCell>{d?.shippedDate ?? '—'}</TableCell>
+                    <TableCell>{d?.deliveredDate ?? '—'}</TableCell>
+                    <TableCell>
+                      {d?.trackingCode ? (
+                        <Typography variant="body2">{d.trackingCode}</Typography>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">—</Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {it.shippingStatusCode === 'DELIVERED' ? (
                         <Button size="small" variant="outlined" onClick={() => openReturnDialog(it)}>
