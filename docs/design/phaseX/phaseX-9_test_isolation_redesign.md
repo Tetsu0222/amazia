@@ -1,9 +1,21 @@
 # フェーズX-9：テスト分離設計の体系化と H2 共有問題の抹本対策
 
 ## ステータス
-🟡 実装フェーズ移行確定（2026-05-08）
+✅ 完了（2026-05-09）
 
-スコープ定義レビュー完了。**案 B（PoC → 全件適用）+ 規約化 + CI random 順序ジョブ追加** で実装に進む。**案 C（Testcontainers）は Phase 21 として分離**。
+Step 0〜6 すべて完了。成果物:
+- [`docs/implementation/phaseX-9_concession_inventory.md`](../../implementation/phaseX-9_concession_inventory.md) — Step 0 棚卸し表（17 クラスを「@Sql 適用 / Phase 21 申送り / 対応不要」で分類）
+- [`docs/ai_context/ai_collaboration_antipatterns.md`](../../ai_context/ai_collaboration_antipatterns.md) — AP-009「テスト分離不足 + 単発 PR で類似クラス見落とし」追加
+- [`docs/ai_context/prompt_templates.md`](../../ai_context/prompt_templates.md) — TPL-009「件数アサーションを伴うテスト追加・改修時」追加（AP-009 と双方向リンク）
+- [`docs/ai_context/test_insights.md`](../../ai_context/test_insights.md) カテゴリ 7-2 — テスト分離規約（@Transactional / 件数アサーション / スナップショット差分）+ cleanup.sql 運用規約 5 項目を追記
+- [`docs/implementation/phaseX-9_poc_findings.md`](../../implementation/phaseX-9_poc_findings.md) — Step 2 PoC 知見ドキュメント
+- `amazia-core/src/test/resources/cleanup/*.sql` — cleanup.sql 9 ファイル新規作成
+- 12 クラスへの `@Sql(BEFORE_TEST_METHOD)` 適用 + 自衛コード 3 件削除（ローカル random 5 回 PASS / CI deploy.yml PASS）
+- [`.github/workflows/weekly-test-random-order.yml`](../../../.github/workflows/weekly-test-random-order.yml) — 週次 cron + workflow_dispatch + 失敗時 Issue 自動起票（重複防止つき）
+- [`docs/implementation/phaseX-9_step5_user_actions.md`](../../implementation/phaseX-9_step5_user_actions.md) — Step 5 ユーザー側手動作業手順
+- [`docs/design/phaseX/phaseX-21_testcontainers_migration.md`](phaseX-21_testcontainers_migration.md) — Phase 21 設計書（スコープ定義段階・着手未確定）
+
+採用方針: **案 B（cleanup.sql + クラスレベル `@Sql`）+ 規約化 + 週次 random 順序 CI ジョブ**。**案 C（Testcontainers）は Phase 21 として分離**。
 
 ## 位置付け
 時系列フェーズ（1〜20）に依存しない横断的品質改善フェーズ。phaseX-6（スキーマ層の構造的盲点対策）・phaseX-7（AI協働の構造的盲点対策）と同系列で、**テスト層の構造的盲点**に対する対策として位置付ける。
@@ -154,16 +166,16 @@ H2 in-memory DB を @SpringBootTest 全クラスで共有（DB_CLOSE_DELAY=-1）
 - [x] **ユーザー判断**：実装フェーズに進む（案 B + 規約化 + 週次 random CI、案 C は Phase 21 へ分離）
 
 ### 実装フェーズ完了の定義
-- [ ] Step 0：妥協点棚卸し完了（`@Transactional` 不在 6 クラス + scheduler-enabled 13 クラスの分類表作成）
-- [ ] Step 1：AP-009 / TPL-009 を `ai_collaboration_antipatterns.md` / `prompt_templates.md` に双方向リンクで追加
-- [ ] Step 1：`test_insights.md` カテゴリ 7-2 に PoC 非依存規約を追記
-- [ ] Step 2：`FaultInjectionLogRepositoryTest` で案 B PoC 完了（自衛コード削除可否を判定・ローカル random 5 回 PASS）
-- [ ] Step 3：`test_insights.md` カテゴリ 7-2 に cleanup.sql 規約を追記
-- [ ] Step 4：案 B 全件適用（自衛コード除去・必要なクラスへの `@Sql` 適用）
-- [ ] Step 4：ローカル `mvn test -Dsurefire.runOrder=random` ×5 連続 PASS
-- [ ] Step 5：`weekly-test-random-order.yml` 新設・失敗時 Issue 自動起票確認
-- [ ] Step 6：Phase 21 設計書スコープ定義作成（残妥協点の引継ぎ事項を明記）
-- [ ] CI 本番デプロイで一連のワークフローが PASS
+- [x] Step 0：妥協点棚卸し完了（`@Transactional` 不在 6 クラス + scheduler-enabled 13 クラスの分類表作成）
+- [x] Step 1：AP-009 / TPL-009 を `ai_collaboration_antipatterns.md` / `prompt_templates.md` に双方向リンクで追加
+- [x] Step 1：`test_insights.md` カテゴリ 7-2 に PoC 非依存規約を追記
+- [x] Step 2：`FaultInjectionLogRepositoryTest` で案 B PoC 完了（自衛コード削除可否を判定・ローカル random 5 回 PASS）
+- [x] Step 3：`test_insights.md` カテゴリ 7-2 に cleanup.sql 規約を追記
+- [x] Step 4：案 B 全件適用（自衛コード除去・必要なクラスへの `@Sql` 適用）
+- [x] Step 4：ローカル `mvn test -Dsurefire.runOrder=random` ×5 連続 PASS
+- [x] Step 5：`weekly-test-random-order.yml` 新設・失敗時 Issue 自動起票確認
+- [x] Step 6：Phase 21 設計書スコープ定義作成（残妥協点の引継ぎ事項を明記）
+- [x] CI 本番デプロイで一連のワークフローが PASS（2026-05-09 amazia-core テスト 3m 44s）
 
 ---
 
@@ -174,3 +186,5 @@ H2 in-memory DB を @SpringBootTest 全クラスで共有（DB_CLOSE_DELAY=-1）
 - [ai_collaboration_antipatterns.md](../../ai_context/ai_collaboration_antipatterns.md) — AP-009 候補の追加対象
 - [phaseX-6_post_deploy_schema_healthcheck.md](phaseX-6_post_deploy_schema_healthcheck.md) — 同系列のメタ品質フェーズ（スキーマ層）
 - [phaseX-7_ai_collaboration_antipatterns.md](phaseX-7_ai_collaboration_antipatterns.md) — 同系列のメタ品質フェーズ（AI 協働層）
+- [phaseX-21_testcontainers_migration.md](phaseX-21_testcontainers_migration.md) — 後続フェーズ（本フェーズ Step 6 で作成・スコープ定義段階）。本フェーズで残った妥協点（テーブル間アーカイブ系 2 + マルチスレッド検証 1 + cleanup.sql の MySQL 互換性）の構造的解決
+- [phaseX-9_concession_inventory.md](../../implementation/phaseX-9_concession_inventory.md) — Step 0 棚卸しと Phase 21 引継ぎ事項

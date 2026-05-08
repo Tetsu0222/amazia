@@ -1,7 +1,24 @@
 # 051: CI 失敗 — `ApplyScheduledPricesJobTest` の H2 テスト分離不足 + Market E2E のタイムアウト張り付き
 
 ## ステータス
-✅ 解決済（2026-05-08）
+✅ 解決済（2026-05-08）／✅ phaseX-9 で抹本対策実施済み（2026-05-09）
+
+派生①〜③の即時対応で 2026-05-08 解決。
+**派生①〜③の症状療法（`@Transactional` 一括付与・自衛コード追加・アサーション設計変更）が積み上がったことを契機に、phaseX-9 で構造的対策を実施。**
+
+phaseX-9 成果物:
+- AP-009「テスト分離不足 + 単発 PR で類似クラス見落とし」を [`ai_collaboration_antipatterns.md`](../ai_context/ai_collaboration_antipatterns.md#ap-009-テスト分離不足--単発-pr-で類似クラス見落とし) に追加
+- TPL-009「件数アサーションを伴うテスト追加・改修時」を [`prompt_templates.md`](../ai_context/prompt_templates.md#tpl-009-件数アサーションを伴うテスト追加改修時) に追加（AP-009 と双方向リンク）
+- [`test_insights.md`](../ai_context/test_insights.md) カテゴリ 7-2 に「テスト分離規約」「cleanup.sql + `@Sql` 運用規約」5 項目を追記
+- 案 B（cleanup.sql + クラスレベル `@Sql(BEFORE_TEST_METHOD)`）を 12 クラスへ全件適用（自衛コード 3 件除去・cleanup.sql 9 ファイル新設）
+- [`weekly-test-random-order.yml`](../../.github/workflows/weekly-test-random-order.yml) で週次 random 順序 CI ジョブ稼働開始（失敗時 Issue 自動起票・重複防止）
+- 残った妥協点（テーブル間アーカイブ系 2 + マルチスレッド検証 1 + cleanup.sql の MySQL 互換性）は [Phase 21 設計書](../design/phaseX/phaseX-21_testcontainers_migration.md) に申送り
+
+詳細:
+- 設計書: [`phaseX-9_test_isolation_redesign.md`](../design/phaseX/phaseX-9_test_isolation_redesign.md)
+- 実装計画: [`phaseX-9_implementation_plan.md`](../implementation/phaseX-9_implementation_plan.md)
+- Step 0 棚卸し: [`phaseX-9_concession_inventory.md`](../implementation/phaseX-9_concession_inventory.md)
+- Step 2 PoC 知見: [`phaseX-9_poc_findings.md`](../implementation/phaseX-9_poc_findings.md)
 
 ## 発症箇所
 - CI: GitHub Actions `Deploy to EC2` ワークフロー / Run [#25548702763](https://github.com/Tetsu0222/amazia/actions/runs/25548702763)

@@ -11,6 +11,7 @@ import com.example.shared.mail.MailTemplateLoader;
 import com.example.shared.mail.SesMailSender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +58,9 @@ public class BatchAlertNotifier {
     private final SesMailSender sesMailSender;
     private final MailTemplateLoader templateLoader;
 
+    @Value("${amazia.batch.rate-limit.suppression-minutes}")
+    private long suppressionMinutes;
+
     public BatchAlertNotifier(ConsoleNotificationRepository repository,
                               NotificationSubscriptionRepository subscriptionRepository,
                               UserRepository userRepository,
@@ -86,9 +90,14 @@ public class BatchAlertNotifier {
                                         String payloadIdentity,
                                         String sourceJob,
                                         Long sourceBatchExecutionId) {
+        String payloadHash = buildPayloadHash(subscriptionTag, payloadIdentity, sourceJob);
+        boolean suppressed = isWithinSuppressionWindow(payloadHash, sourceJob);
         ConsoleNotification saved = persistNotification(
-                level, subscriptionTag, title, body, payloadIdentity, sourceJob, sourceBatchExecutionId);
-        sendEmailToSubscribers(level, subscriptionTag, title, body);
+                level, subscriptionTag, title, body, payloadHash, sourceJob,
+                sourceBatchExecutionId, suppressed);
+        if (!suppressed) {
+            sendEmailToSubscribers(level, subscriptionTag, title, body);
+        }
         return saved;
     }
 
@@ -122,19 +131,35 @@ public class BatchAlertNotifier {
 
     private ConsoleNotification persistNotification(String level, String subscriptionTag,
                                                     String title, String body,
-                                                    String payloadIdentity,
+                                                    String payloadHash,
                                                     String sourceJob,
-                                                    Long sourceBatchExecutionId) {
+                                                    Long sourceBatchExecutionId,
+                                                    boolean suppressed) {
         ConsoleNotification n = new ConsoleNotification();
         n.setLevel(level);
         n.setTargetSubscriptionTag(subscriptionTag);
         n.setTitle(title);
         n.setBody(body);
-        n.setPayloadHash(buildPayloadHash(subscriptionTag, payloadIdentity, sourceJob));
+        n.setPayloadHash(payloadHash);
         n.setSourceJob(sourceJob);
         n.setSourceBatchExecutionId(sourceBatchExecutionId);
+        n.setSuppressed(suppressed);
         n.setCreatedAt(LocalDateTime.now());
         return repository.save(n);
+    }
+
+    /**
+     * §6.4.1：直近 {@code suppressionMinutes} 分以内に同 {@code (sourceJob, payloadHash)} の
+     * 通知が存在すれば抑制対象。ダイジェスト用に行は残し、SES だけ送らない。
+     * 過去レコードが {@code suppressed=true} だったとしても判定上は同等に扱う（連続抑制が成立する）。
+     */
+    private boolean isWithinSuppressionWindow(String payloadHash, String sourceJob) {
+        if (suppressionMinutes <= 0) return false;
+        Optional<ConsoleNotification> latest =
+                repository.findFirstByPayloadHashAndSourceJobOrderByCreatedAtDesc(payloadHash, sourceJob);
+        if (latest.isEmpty()) return false;
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(suppressionMinutes);
+        return latest.get().getCreatedAt() != null && latest.get().getCreatedAt().isAfter(threshold);
     }
 
     /**

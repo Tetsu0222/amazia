@@ -2,6 +2,7 @@ package com.example.notification;
 
 import com.example.auth.entity.User;
 import com.example.auth.repository.UserRepository;
+import com.example.notification.entity.ConsoleNotification;
 import com.example.notification.entity.NotificationSubscription;
 import com.example.notification.repository.ConsoleNotificationRepository;
 import com.example.notification.repository.NotificationSubscriptionRepository;
@@ -11,6 +12,8 @@ import com.example.shared.mail.SesMailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -107,6 +110,48 @@ class BatchAlertNotifierSesIntegrationTest {
                 .thenReturn(List.of());
         notifier.dispatch("WARN", "sales_alerts", "t", "b", null, "Job", 1L);
         verifyNoInteractions(sesMailSender);
+    }
+
+    @Test
+    void BAN_8_直近に同_payload_hash_の通知があれば_SES_を送らず_suppressed_true_で残す() throws Exception {
+        // §6.4.1 / §6.4.2：suppression-minutes 以内に同 (sourceJob, payload_hash) があれば
+        // 行は console_notifications に suppressed=true で残し、SES は飛ばさない（ダイジェスト経路に回す）。
+        setSuppressionMinutes(60L);
+
+        ConsoleNotification existing = new ConsoleNotification();
+        existing.setCreatedAt(LocalDateTime.now().minusMinutes(5));
+        when(consoleRepo.findFirstByPayloadHashAndSourceJobOrderByCreatedAtDesc(
+                anyString(), eq("InventoryConsistencyCheckJob")))
+                .thenReturn(Optional.of(existing));
+
+        notifier.dispatch("WARN", "inventory_alerts", "title", "body",
+                "product_id=42", "InventoryConsistencyCheckJob", 100L);
+
+        verifyNoInteractions(sesMailSender);
+        verify(consoleRepo).save(argThat(n -> Boolean.TRUE.equals(n.getSuppressed())));
+    }
+
+    @Test
+    void BAN_9_直近に同_payload_hash_が無ければ_SES_を送り_suppressed_false_で残す() throws Exception {
+        setSuppressionMinutes(60L);
+        when(consoleRepo.findFirstByPayloadHashAndSourceJobOrderByCreatedAtDesc(
+                anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(subscriptionRepo.findBySubscriptionTagAndEmailEnabledTrue("inventory_alerts"))
+                .thenReturn(List.of(sub(11L)));
+        when(userRepo.findById(11L)).thenReturn(Optional.of(user(11L, "a@example.com")));
+
+        notifier.dispatch("WARN", "inventory_alerts", "title", "body",
+                "product_id=42", "InventoryConsistencyCheckJob", 100L);
+
+        verify(sesMailSender, times(1)).sendRaw(anyString(), anyString(), anyString(), anyString());
+        verify(consoleRepo).save(argThat(n -> Boolean.FALSE.equals(n.getSuppressed())));
+    }
+
+    private void setSuppressionMinutes(long minutes) throws Exception {
+        Field f = BatchAlertNotifier.class.getDeclaredField("suppressionMinutes");
+        f.setAccessible(true);
+        f.set(notifier, minutes);
     }
 
     @Test
