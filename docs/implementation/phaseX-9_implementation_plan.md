@@ -397,7 +397,7 @@ GitHub リポジトリ設定で以下ラベルを事前作成（手動 or `gh la
 
 ### 7-1. 新規作成
 
-**新規作成**: `docs/design/phaseX/phaseX-21_testcontainers_migration.md`（Phase 21 暫定。正式番号は時系列フェーズ進行で確定）
+**新規作成**: `docs/design/phaseX/phaseX-10_testcontainers_migration.md`（Phase 21 暫定。正式番号は時系列フェーズ進行で確定）
 
 ステータスは **🟡 スコープ定義（着手未確定）** で開始。phaseX-9 設計書と同フォーマットで以下を含む:
 

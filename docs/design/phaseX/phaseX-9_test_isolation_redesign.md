@@ -13,7 +13,7 @@ Step 0〜6 すべて完了。成果物:
 - 12 クラスへの `@Sql(BEFORE_TEST_METHOD)` 適用 + 自衛コード 3 件削除（ローカル random 5 回 PASS / CI deploy.yml PASS）
 - [`.github/workflows/weekly-test-random-order.yml`](../../../.github/workflows/weekly-test-random-order.yml) — 週次 cron + workflow_dispatch + 失敗時 Issue 自動起票（重複防止つき）
 - [`docs/implementation/phaseX-9_step5_user_actions.md`](../../implementation/phaseX-9_step5_user_actions.md) — Step 5 ユーザー側手動作業手順
-- [`docs/design/phaseX/phaseX-21_testcontainers_migration.md`](phaseX-21_testcontainers_migration.md) — Phase 21 設計書（スコープ定義段階・着手未確定）
+- [`docs/design/phaseX/phaseX-10_testcontainers_migration.md`](phaseX-10_testcontainers_migration.md) — Phase 21 設計書（スコープ定義段階・着手未確定）
 
 採用方針: **案 B（cleanup.sql + クラスレベル `@Sql`）+ 規約化 + 週次 random 順序 CI ジョブ**。**案 C（Testcontainers）は Phase 21 として分離**。
 
@@ -186,5 +186,5 @@ H2 in-memory DB を @SpringBootTest 全クラスで共有（DB_CLOSE_DELAY=-1）
 - [ai_collaboration_antipatterns.md](../../ai_context/ai_collaboration_antipatterns.md) — AP-009 候補の追加対象
 - [phaseX-6_post_deploy_schema_healthcheck.md](phaseX-6_post_deploy_schema_healthcheck.md) — 同系列のメタ品質フェーズ（スキーマ層）
 - [phaseX-7_ai_collaboration_antipatterns.md](phaseX-7_ai_collaboration_antipatterns.md) — 同系列のメタ品質フェーズ（AI 協働層）
-- [phaseX-21_testcontainers_migration.md](phaseX-21_testcontainers_migration.md) — 後続フェーズ（本フェーズ Step 6 で作成・スコープ定義段階）。本フェーズで残った妥協点（テーブル間アーカイブ系 2 + マルチスレッド検証 1 + cleanup.sql の MySQL 互換性）の構造的解決
+- [phaseX-10_testcontainers_migration.md](phaseX-10_testcontainers_migration.md) — 後続フェーズ（本フェーズ Step 6 で作成・スコープ定義段階）。本フェーズで残った妥協点（テーブル間アーカイブ系 2 + マルチスレッド検証 1 + cleanup.sql の MySQL 互換性）の構造的解決
 - [phaseX-9_concession_inventory.md](../../implementation/phaseX-9_concession_inventory.md) — Step 0 棚卸しと Phase 21 引継ぎ事項

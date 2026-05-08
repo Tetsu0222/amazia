@@ -12,7 +12,7 @@ phaseX-9 成果物:
 - [`test_insights.md`](../ai_context/test_insights.md) カテゴリ 7-2 に「テスト分離規約」「cleanup.sql + `@Sql` 運用規約」5 項目を追記
 - 案 B（cleanup.sql + クラスレベル `@Sql(BEFORE_TEST_METHOD)`）を 12 クラスへ全件適用（自衛コード 3 件除去・cleanup.sql 9 ファイル新設）
 - [`weekly-test-random-order.yml`](../../.github/workflows/weekly-test-random-order.yml) で週次 random 順序 CI ジョブ稼働開始（失敗時 Issue 自動起票・重複防止）
-- 残った妥協点（テーブル間アーカイブ系 2 + マルチスレッド検証 1 + cleanup.sql の MySQL 互換性）は [Phase 21 設計書](../design/phaseX/phaseX-21_testcontainers_migration.md) に申送り
+- 残った妥協点（テーブル間アーカイブ系 2 + マルチスレッド検証 1 + cleanup.sql の MySQL 互換性）は [Phase 21 設計書](../design/phaseX/phaseX-10_testcontainers_migration.md) に申送り
 
 詳細:
 - 設計書: [`phaseX-9_test_isolation_redesign.md`](../design/phaseX/phaseX-9_test_isolation_redesign.md)

@@ -108,7 +108,7 @@
 
 ## Phase 21 引継ぎ事項
 
-Step 6 で作成する Phase 21 設計書（`phaseX-21_testcontainers_migration.md`）の「phaseX-9 からの引継ぎ事項」節に以下を記載すること:
+Step 6 で作成する Phase 21 設計書（`phaseX-10_testcontainers_migration.md`）の「phaseX-9 からの引継ぎ事項」節に以下を記載すること:
 
 1. **テーブル間アーカイブ系 2 クラス**（ConsoleNotificationsArchiveJobTest / OperationLogArchiveJobTest）
    - `@Transactional` 不在 + 2 テーブル間の移送を検証 → ロールバックで ARCHIVE 側観測不可
