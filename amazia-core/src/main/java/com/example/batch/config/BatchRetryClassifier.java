@@ -23,6 +23,8 @@ public class BatchRetryClassifier {
      */
     /** spring-context-support 依存を本フェーズで増やさないため、クラス名文字列で判定する。 */
     private static final String MAIL_SEND_EXCEPTION_FQCN = "org.springframework.mail.MailSendException";
+    /** フェーズ17 Step 7：自前 SES 送出ラッパー（{@code com.example.shared.mail.BatchMailSendException}）。 */
+    private static final String BATCH_MAIL_SEND_EXCEPTION_FQCN = "com.example.shared.mail.BatchMailSendException";
 
     public boolean shouldRetry(Throwable error) {
         for (Throwable t = error; t != null; t = t.getCause()) {
@@ -31,6 +33,7 @@ public class BatchRetryClassifier {
             if (t instanceof TransientDataAccessException) return true;
             if (t instanceof CannotAcquireLockException) return true;
             if (MAIL_SEND_EXCEPTION_FQCN.equals(t.getClass().getName())) return true;
+            if (BATCH_MAIL_SEND_EXCEPTION_FQCN.equals(t.getClass().getName())) return true;
             if (t instanceof RestClientResponseException rcre) {
                 int status = rcre.getStatusCode().value();
                 if (status >= 500 && status < 600) return true;

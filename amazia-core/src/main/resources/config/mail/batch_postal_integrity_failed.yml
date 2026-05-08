@@ -1,0 +1,21 @@
+# フェーズ17 Step 7 / 設計書 §3.2 / §6.1
+# PostalAddressIntegrityCheckJob が郵便番号サンプル一致 / 件数中央値レンジ外を検知した時の WARN 通知。
+template:
+  id: batch_postal_integrity_failed
+  level: WARN
+  subscription-tag: postal_alerts
+  subject: "[Amazia] 郵便番号データの整合性検査が失敗しました"
+  body: |
+    郵便番号整合性チェックが失敗しました。
+
+    検査内容       : {{checkType}}
+    NG サンプル    : {{failedSampleCodes}}
+    総件数         : {{totalCount}}
+    直近 12 ヶ月中央値 : {{medianCount}}
+    許容レンジ     : {{allowedRange}}
+
+    実行日時  : {{executedAt}}
+    ジョブ    : {{jobName}}
+    実行ID    : {{batchExecutionId}}
+
+    通知センター: {{consoleUrl}}

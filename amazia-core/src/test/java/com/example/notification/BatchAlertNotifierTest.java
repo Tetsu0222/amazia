@@ -1,7 +1,11 @@
 package com.example.notification;
 
+import com.example.auth.repository.UserRepository;
 import com.example.notification.repository.ConsoleNotificationRepository;
+import com.example.notification.repository.NotificationSubscriptionRepository;
 import com.example.notification.service.BatchAlertNotifier;
+import com.example.shared.mail.MailTemplateLoader;
+import com.example.shared.mail.SesMailSender;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,7 +17,12 @@ import static org.mockito.Mockito.mock;
 class BatchAlertNotifierTest {
 
     private final BatchAlertNotifier notifier =
-            new BatchAlertNotifier(mock(ConsoleNotificationRepository.class));
+            new BatchAlertNotifier(
+                    mock(ConsoleNotificationRepository.class),
+                    mock(NotificationSubscriptionRepository.class),
+                    mock(UserRepository.class),
+                    mock(SesMailSender.class),
+                    mock(MailTemplateLoader.class));
 
     @Test
     void BAN_1_payloadIdentity_があれば_tag_と_identity_の_SHA256_になる() {

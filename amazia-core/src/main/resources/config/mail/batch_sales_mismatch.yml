@@ -1,0 +1,21 @@
+# フェーズ17 Step 7 / 設計書 §3.1 ② / §6.1
+# SalesReconciliationJob が日次の売上と在庫減算の食い違いを検知した時の WARN 通知。
+template:
+  id: batch_sales_mismatch
+  level: WARN
+  subscription-tag: sales_alerts
+  subject: "[Amazia] 売上整合性に差異を検知しました（{{targetDate}}）"
+  body: |
+    売上再計算で在庫減算と売上の整合性差異を検知しました。
+
+    対象日    : {{targetDate}}
+    対象倉庫  : {{warehouseIds}}
+    期待数量  : {{expectedQty}}
+    実数量    : {{actualQty}}
+    差分      : {{diffQty}}
+
+    実行日時  : {{executedAt}}
+    ジョブ    : {{jobName}}
+    実行ID    : {{batchExecutionId}}
+
+    通知センター: {{consoleUrl}}

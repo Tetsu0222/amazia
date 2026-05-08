@@ -1,0 +1,23 @@
+# フェーズ17 Step 7 / 設計書 §3.1 ① / §6.1
+# InventoryConsistencyCheckJob が在庫不整合を検知したときに送る WARN 通知。
+# プレースホルダは {{key}} 形式で MailTemplateLoader が単純置換する。
+template:
+  id: batch_inventory_inconsistency
+  level: WARN
+  subscription-tag: inventory_alerts
+  subject: "[Amazia] 在庫不整合を検知しました（商品ID={{productId}}）"
+  body: |
+    在庫整合性チェックで不整合を検知しました。
+
+    商品ID    : {{productId}}
+    商品名    : {{productName}}
+    倉庫      : {{warehouseId}}
+    在庫数    : {{inventoryQty}}
+    SKU 集計  : {{skuTotalQty}}
+    差分      : {{diffQty}}
+
+    実行日時  : {{executedAt}}
+    ジョブ    : {{jobName}}
+    実行ID    : {{batchExecutionId}}
+
+    通知センター: {{consoleUrl}}

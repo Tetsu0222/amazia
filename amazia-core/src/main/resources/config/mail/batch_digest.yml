@@ -1,0 +1,17 @@
+# フェーズ17 Step 7 / 設計書 §6.4.2 / M-6
+# DigestNotificationDispatchJob が抑制中レコードをタグ単位で集計して送るダイジェスト用テンプレ。
+# 「タグ集計→そのタグの購読者全員に個別 to で送信」の 2 重ループで使う（BCC 集約しない）。
+template:
+  id: batch_digest
+  level: WARN
+  subscription-tag: "{{subscriptionTag}}"
+  subject: "[Amazia] 通知ダイジェスト：{{subscriptionTag}}（{{suppressedCount}}件）"
+  body: |
+    {{windowStart}} 〜 {{windowEnd}} の間に、購読タグ「{{subscriptionTag}}」で
+    {{suppressedCount}} 件の通知がレートリミットにより抑制されました。
+
+    代表通知:
+    {{representativeTitles}}
+
+    詳細は通知センターで確認できます。
+    通知センター: {{consoleUrl}}

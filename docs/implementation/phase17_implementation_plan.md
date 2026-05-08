@@ -1251,6 +1251,8 @@ phase11 の `CreateUserService` / `UpdateUserService` から `SyncNotificationSu
 
 ## 10. Step 7 — SES テンプレート
 
+**ステータス：** ✅ 完了（2026-05-08）
+
 ### 10-1. テンプレート YAML 配置
 
 `amazia-core/src/main/resources/config/mail/`：
@@ -1261,13 +1263,27 @@ phase11 の `CreateUserService` / `UpdateUserService` から `SyncNotificationSu
 - `batch_job_failed.yml`（汎用）
 - `batch_digest.yml`（M-6 ダイジェスト用）
 
-### 10-2. 既存 SES 統合（phase13）の流用
+各 YAML は `template.{id, level, subscription-tag, subject, body}` の 5 フィールド固定で、本文・件名は `{{key}}` 形式のプレースホルダを保持。
 
-`com.example.shared.mail.SesMailSender` を再利用。リトライは `BatchRetryClassifier` の `MailSendException` 経路と整合。
+### 10-2. SES 統合（phase17 で新設）
+
+phase13 の `PasswordResetRequestService` は `SesClient` を直接使う最小実装で、共有ラッパー `com.example.shared.mail.SesMailSender` は未存在だったため、本フェーズで以下を新設：
+
+- `com.example.shared.mail.MailTemplate`（YAML から読み込んだ 1 テンプレを表す record）
+- `com.example.shared.mail.MailTemplateLoader`（`config/mail/*.yml` を classpath からロードし、`{{key}}` 置換ユーティリティを提供）
+- `com.example.shared.mail.SesMailSender`（テンプレ展開＋WARN/ERROR 限定送出。INFO は送らない／§6.2.2）
+- `com.example.shared.mail.BatchMailSendException`（spring-context-support を依存に追加せず、SES 送信失敗をリトライ可能例外として上位に伝える）
+- `BatchRetryClassifier` を拡張：`com.example.shared.mail.BatchMailSendException` を `MailSendException` と同様にリトライ対象に分類（FQCN 文字列判定で既存の依存最小ポリシーを維持）
+- `BatchAlertNotifier` を拡張：従来の `dispatch(...)`（console_notifications INSERT のみ）に加えて、購読タグから購読者を解決し WARN/ERROR 時に **個別 to で SES 送信**（M-6 / BCC 集約しない）。新規メソッド `dispatchTemplate(templateId, payloadIdentity, sourceJob, batchExecutionId, values)` でテンプレ ID 経由の送信経路も提供
 
 ### 10-3. テスト
-- 各テンプレートのプレースホルダ展開
-- WARN 以上で SES 送信、INFO は SES 送信されないことを mock で確認
+
+- `MailTemplateLoaderTest`：6 テンプレが全て読み込めること・`{{key}}` 置換・NULL 値の空文字置換・未差込プレースホルダの保持・全テンプレが WARN または ERROR
+- `SesMailSenderTest`：WARN テンプレで subject / body が差込済で SES に渡ること・INFO レベルは送出されず `false` を返すこと・SES 例外が `BatchMailSendException` に整形されること・`sendRaw` 経路の確認
+- `BatchAlertNotifierSesIntegrationTest`：WARN dispatch で購読者全員に個別 to で SES が呼ばれること（BCC 集約されないこと）・INFO では SES が呼ばれず購読者解決もスキップされること・`dispatchTemplate` でテンプレ展開後の subject / body が SES に渡ること・`email_enabled=false` 購読者の除外
+- 既存の `BatchAlertNotifierTest`（payload_hash 生成）は新コンストラクタ署名に追従して継続緑
+
+合計 17 テストが緑。関連 Job テスト（`InventoryConsistencyCheckJobTest` 他 8 件）にもリグレッションなし。
 
 ---
 

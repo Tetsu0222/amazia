@@ -1,0 +1,21 @@
+# フェーズ17 Step 7 / 設計書 §3.1 ③ / §6.1
+# DeliveryStatusAdvanceJob が配送遅延候補（予定日経過 / 滞留）を検知した時の WARN 通知。
+template:
+  id: batch_delivery_delay
+  level: WARN
+  subscription-tag: delivery_alerts
+  subject: "[Amazia] 配送遅延の可能性を検知しました（注文ID={{salesId}}）"
+  body: |
+    配送ステータス更新で遅延候補を検知しました。
+
+    注文ID         : {{salesId}}
+    顧客ID         : {{customerId}}
+    現在ステータス : {{currentStatus}}
+    予定日         : {{scheduledDate}}
+    経過日数       : {{overdueDays}}
+
+    実行日時  : {{executedAt}}
+    ジョブ    : {{jobName}}
+    実行ID    : {{batchExecutionId}}
+
+    通知センター: {{consoleUrl}}

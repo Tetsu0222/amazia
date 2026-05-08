@@ -1,0 +1,21 @@
+# フェーズ17 Step 7 / 設計書 §3 共通制御 / §6.1
+# 任意のバッチジョブが 3 回リトライ後に FAILED で確定したときの汎用 ERROR 通知。
+# 業務エラーコードを持たない一般的失敗・I/O 例外などはこのテンプレで配信する。
+template:
+  id: batch_job_failed
+  level: ERROR
+  subscription-tag: batch_failure
+  subject: "[Amazia][ERROR] バッチが失敗しました（{{jobName}}）"
+  body: |
+    バッチが 3 回リトライ後に失敗しました。
+
+    ジョブ        : {{jobName}}
+    実行ID        : {{batchExecutionId}}
+    ステータス    : {{status}}
+    開始時刻      : {{startedAt}}
+    終了時刻      : {{finishedAt}}
+    エラー種別    : {{exceptionClass}}
+    エラーメッセージ:
+    {{errorMessage}}
+
+    通知センター: {{consoleUrl}}
