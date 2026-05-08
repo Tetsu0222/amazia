@@ -1,7 +1,7 @@
-# Amazia — フルスタック実運用シミュレーション
+# Amazia — フルスタック EC 基盤の実運用シミュレーション
 
-> 個人開発で「業務レベルの EC 基盤」を設計・実装・デプロイ・運用まで一貫して作り切る挑戦をしています。
-> 3 システム連携・自前 CI/CD・AWS 本番運用・AI 協働開発を統合しています。
+React / Vue / PHP / Java / MySQL / AWS / GitHub Actions / AI 協働開発  
+個人開発で「業務レベルの EC プラットフォーム」を 設計 → 実装 → デプロイ → 運用 まで一貫して構築するプロジェクトです。
 
 <p align="center">
   <img src="docs/images/hero_market.png" alt="Amazia Market 商品詳細画面" width="48%" />
@@ -10,11 +10,18 @@
 
 ---
 
-## Amazia 3 本柱
+## プロジェクトの特徴（3 本柱）
 
-- **マルチシステム連携** — React（Market）+ Vue/PHP（Console）+ Java/Spring Boot（Core）+ MySQL の 3 アプリを 1 つの EC 基盤として連動
-- **完全自動 CI/CD** — GitHub Actions → ECR → S3 → SSM → ヘルスチェックを自前構築。ゾンビコンテナ・SSM 不達など実運用の落とし穴を踏み抜きながら強化
-- **AI 協働開発の制度化** — Claude Code を中核に、コンテキスト設計（CLAUDE.md → `docs/ai_context/` → `docs/troubles/`）でリポジトリ自体を「AI が学習し続ける資産」として運用
+**1. マルチシステム連携**
+React（Market）・Vue/PHP（Console）・Spring Boot（Core）・MySQL を連動させた 3 システム構成の EC 基盤。
+
+**2. 完全自動 CI/CD** 
+GitHub Actions → ECR → S3 → SSM → nginx reload までを自前構築。
+ゾンビコンテナ・SSM 不達・DDL 失敗など実運用の落とし穴を踏み抜きながら改善。
+
+**3. AI 協働開発の制度化** 
+AI に渡すコンテキストを 資産として設計・蓄積。
+CLAUDE.md → `docs/ai_context/` → `docs/troubles/`の 3 層構造で、AI が継続学習する仕組みを構築。
 
 ---
 
@@ -22,7 +29,7 @@
 
 ### 1. AI 協働開発の資産化
 
-「ChatGPT で作りました」ではなく、**AI に渡すコンテキストそのものを設計・蓄積**しているのがこのプロジェクトの最大の特徴です。
+**AI に渡すコンテキストそのものを設計・蓄積**しているのがこのプロジェクトの最大の特徴です。
 
 ```mermaid
 flowchart TB
