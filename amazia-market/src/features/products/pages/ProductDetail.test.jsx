@@ -111,18 +111,27 @@ describe('ProductDetail', () => {
     expect(screen.getByText('在庫切れ')).toBeInTheDocument();
   });
 
-  it('色を変えるとサイズがリセットされ価格が消える', async () => {
+  it('色を変えるとその色の先頭サイズが自動選択され価格も切り替わる', async () => {
     api.getMarketProduct.mockResolvedValue(PRODUCT_DATA);
     renderProductDetail();
 
-    await waitFor(() => screen.getByText('赤'));
-    await userEvent.click(screen.getByText('赤'));
-    await userEvent.click(screen.getByText('S'));
-    expect(screen.getByText('¥3,000')).toBeInTheDocument();
+    // 初期表示で先頭SKU（赤・S・¥3,000）が自動選択されている
+    await waitFor(() => expect(screen.getByText('¥3,000')).toBeInTheDocument());
 
     await userEvent.click(screen.getByText('青'));
+    // 青の先頭サイズ（S）が自動選択され、青Sの価格 ¥2,800 が表示される
     expect(screen.queryByText('¥3,000')).not.toBeInTheDocument();
-    expect(screen.getByText('色とサイズを選択してください')).toBeInTheDocument();
+    expect(screen.getByText('¥2,800')).toBeInTheDocument();
+  });
+
+  it('初期表示で先頭SKU（先頭色×先頭サイズ）が選択されている', async () => {
+    api.getMarketProduct.mockResolvedValue(PRODUCT_DATA);
+    renderProductDetail();
+
+    // プレースホルダは出ず、いきなり価格・在庫が見える
+    await waitFor(() => expect(screen.getByText('¥3,000')).toBeInTheDocument());
+    expect(screen.queryByText('色とサイズを選択してください')).not.toBeInTheDocument();
+    expect(screen.getByText(/在庫あり（残り10点）/)).toBeInTheDocument();
   });
 
   // フェーズ14 r4: 購入導線（ユーザー指示の核心「購入ボタン押下⇒未ログイン⇒ログイン画面」）

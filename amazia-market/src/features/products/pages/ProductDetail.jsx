@@ -25,8 +25,9 @@ export default function ProductDetail() {
     getMarketProduct(id)
       .then(d => {
         setData(d);
-        const firstColor = d.skus[0]?.color ?? null;
-        setSelectedColor(firstColor);
+        const firstSku = d.skus[0];
+        setSelectedColor(firstSku?.color ?? null);
+        setSelectedSize(firstSku?.size ?? null);
       })
       .catch(() => setError('商品データの取得に失敗しました'))
       .finally(() => setLoading(false));
@@ -45,7 +46,8 @@ export default function ProductDetail() {
   const handleColorChange = (_, newColor) => {
     if (newColor === null) return;
     setSelectedColor(newColor);
-    setSelectedSize(null);
+    const firstSizeOfColor = data?.skus.find(s => s.color === newColor)?.size ?? null;
+    setSelectedSize(firstSizeOfColor);
   };
 
   const handleSizeChange = (_, newSize) => {
