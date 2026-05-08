@@ -3,6 +3,7 @@ package com.example.faultinjection;
 import com.example.faultinjection.entity.FaultInjectionLog;
 import com.example.faultinjection.repository.FaultInjectionLogRepository;
 import com.example.shared.config.TestAwsConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +29,19 @@ class FaultInjectionLogRepositoryTest {
 
     @Autowired
     private FaultInjectionLogRepository repository;
+
+    @BeforeEach
+    void cleanupPriorLogs() {
+        // FaultInjectionLogger は REQUIRES_NEW で独立コミットするため、
+        // 他テスト（TriggerFaultInjectionJobTest / SalesMismatchInjectorTest 等）の
+        // injector 発火がテストロールバックを貫通して fault_injection_logs に残る。
+        // 件数アサーションを行う本テストの直前に「SalesMismatchInjector」「InventoryMismatchInjector」名の
+        // 残置を掃除する自衛コード（051 派生②の続き）。クラス @Transactional 内なので
+        // ロールバック対象だが、auto-flush 後の find クエリには反映されるので件数検証は安定する。
+        repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("SalesMismatchInjector"));
+        repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("InventoryMismatchInjector"));
+        repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("DeliveryTroubleInjector"));
+    }
 
     @Test
     void dev_および_staging_は_保存できる() {

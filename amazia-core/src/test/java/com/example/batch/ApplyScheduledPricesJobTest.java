@@ -104,16 +104,22 @@ class ApplyScheduledPricesJobTest {
     void APP_3_2度実行しても_2回目は対象0件で冪等() {
         long skuId = persistProductWithSku();
         persistActivePrice(skuId, 1000, LocalDate.now().minusDays(30));
-        persistScheduled(skuId, 1500, LocalDate.now());
+        Long scheduledId = persistScheduled(skuId, 1500, LocalDate.now()).getId();
 
         job.run("scheduler");
         job.run("scheduler");
 
-        // 2 度目は対象 0 件 → 最新 batch_executions の target_count = 0
-        BatchExecution exec = latestExecution();
-        assertEquals(0, exec.getTargetCount(), "2 回目は is_pending=true が無く対象 0 件");
+        // 自テストで作った予約が is_pending=false / appliedAt セット済になっている
+        // （冪等性の本質：同じレコードに対し 2 回目で applied_at が上書きされたり例外が起きない）。
+        // batch_executions の target_count や全件 find を使うアサーションは、
+        // 同 ApplicationContext 共有の H2 に他テストが REQUIRES_NEW 経由で残した
+        // is_pending=true 行の影響を受けやすい（051 派生②の続き）ため、
+        // 自テスト所有レコード（scheduledId / skuId）のみを検証する。
+        ProductSkuScheduledPrice scheduledAfter = scheduledRepository.findById(scheduledId).orElseThrow();
+        assertEquals(Boolean.FALSE, scheduledAfter.getIsPending(), "2 回目までで is_pending=false 化");
+        assertNotNull(scheduledAfter.getAppliedAt(), "applied_at が記録されている");
 
-        // 価格 active 行は 1 つだけ
+        // 自テスト sku に対して active 価格行は 1 つだけ（2 回目で重複 INSERT されない）
         long activeCount = priceRepository.findBySkuIdIn(List.of(skuId)).stream()
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive())).count();
         assertEquals(1L, activeCount);

@@ -56,11 +56,20 @@ class InventoryConsistencyCheckJobTest {
         long productId = persistProductWithSku(10);
         persistInventories(productId, 11);
 
+        // before スナップショットは「自テスト productId に絞った件数」「自テスト body 部分一致件数」で取る。
+        // 全件 size() をスナップショットしてから productId フィルタ後と比較すると、
+        // 他テストが REQUIRES_NEW で残した同 action / 同 tag のレコードがあると assertEquals が崩れる（051 派生③）。
         long opLogsBefore = operationLogRepository
-                .findByActionOrderByCreatedAtDesc(InventoryConsistencyCheckJob.OPERATION_ACTION).size();
+                .findByActionOrderByCreatedAtDesc(InventoryConsistencyCheckJob.OPERATION_ACTION)
+                .stream()
+                .filter(l -> l.getTargetId() != null && l.getTargetId() == productId)
+                .count();
         long notificationsBefore = consoleNotificationRepository
                 .findByTargetSubscriptionTagAndReadByUserIdIsNullOrderByCreatedAtDesc(
-                        InventoryConsistencyCheckJob.SUBSCRIPTION_TAG).size();
+                        InventoryConsistencyCheckJob.SUBSCRIPTION_TAG)
+                .stream()
+                .filter(n -> n.getBody() != null && n.getBody().contains("商品 ID " + productId))
+                .count();
 
         job.run("scheduler");
 
@@ -83,7 +92,11 @@ class InventoryConsistencyCheckJobTest {
         List<ConsoleNotification> notifications = consoleNotificationRepository
                 .findByTargetSubscriptionTagAndReadByUserIdIsNullOrderByCreatedAtDesc(
                         InventoryConsistencyCheckJob.SUBSCRIPTION_TAG);
-        assertTrue(notifications.size() >= notificationsBefore + 1L);
+        long myNotificationCount = notifications.stream()
+                .filter(n -> n.getBody() != null && n.getBody().contains("商品 ID " + productId))
+                .count();
+        assertEquals(notificationsBefore + 1L, myNotificationCount,
+                "本 product 起因の console_notifications が 1 件追加されている");
         ConsoleNotification myNotice = notifications.stream()
                 .filter(n -> n.getBody() != null && n.getBody().contains("商品 ID " + productId))
                 .findFirst().orElseThrow();

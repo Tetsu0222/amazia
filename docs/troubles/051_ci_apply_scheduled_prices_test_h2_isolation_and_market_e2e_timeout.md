@@ -251,7 +251,81 @@ void cleanupPendingSchedulesForToday() {
 ### 検証
 - ✅ ローカル `mvn test`（524件）が `BUILD SUCCESS`
 - ✅ ローカル `mvn test -Dsurefire.runOrder=random` を **5 回連続** で全て `BUILD SUCCESS`（再現性のあった APP_3 が再度落ちないことを確認）
+- ❌ push 後 CI で再失敗：`FaultInjectionLogRepositoryTest:62 expected: <1> but was: <3>` → **派生③で対応**
+
+---
+
+## 派生不具合③: REQUIRES_NEW 由来の永続化を `@Transactional` テストでは防げない（自衛コード追加 + アサーション設計の見直し）
+
+### ステータス
+✅ 解決済（2026-05-08）
+
+### 発症箇所
+- 派生②修正後 push でも CI が再失敗：`FaultInjectionLogRepositoryTest:62 expected: <1> but was: <3>`
+- ローカル random 検証では 5 回連続 PASS だったため見逃していた
+
+### 根本原因
+[FaultInjectionLogger.java:35](../../amazia-core/src/main/java/com/example/faultinjection/service/FaultInjectionLogger.java#L35) は **`@Transactional(propagation = Propagation.REQUIRES_NEW)`** で独立コミットする設計。これは設計意図（フォールト注入の記録は呼び出し元のロールバックに巻き込まれず必ず残す）であり、変更してはいけない。
+
+派生②で faultinjection 系テストにクラスレベル `@Transactional` を付与したが、**`SalesMismatchInjector.injectOnce` / `shouldInject` 経由で `FaultInjectionLogger.log` が呼ばれると REQUIRES_NEW で別 TX コミットされ、テストロールバックを貫通して `fault_injection_logs` に残る**。`SalesMismatchInjectorTest` 自身は `@BeforeEach cleanupPriorLogs` で自衛していたが、**`TriggerFaultInjectionJobTest` / `FaultInjectionLoggerTest` / `SalesReconciliationJobTest`** は同型の自衛コードがなく、これらが `SalesMismatchInjector` 名のレコードを残置していた。
+
+CI Linux 順序ではこれら複数の汚染源が連続で動いて 2 件残置 → `FaultInjectionLogRepositoryTest` が 2 件 + 自テスト 1 件 = 3 件で `expected: <1> but was: <3>`。
+
+加えて `ApplyScheduledPricesJobTest.APP_3` の `assertEquals(0, exec.getTargetCount())` も**「H2 全体に他テスト由来の `is_pending=true && apply_date<=today` 行が無い」**という強い前提に依存していた。`product_sku_scheduled_prices` を REQUIRES_NEW で書く本番コードは存在しないが、**スケジューラ発火（`@Scheduled`）や surefire 並列実行など外乱要因**で同型の不安定性が出る構造だった。
+
+### 修正内容
+
+#### ① `FaultInjectionLogRepositoryTest` に自衛クリーンアップ追加
+他テストが REQUIRES_NEW 経由で `fault_injection_logs` に残した行を、`@BeforeEach` で 3 つの injector 名すべてについて掃除：
+
+```java
+@BeforeEach
+void cleanupPriorLogs() {
+    repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("SalesMismatchInjector"));
+    repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("InventoryMismatchInjector"));
+    repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("DeliveryTroubleInjector"));
+}
+```
+
+クラス `@Transactional` 内なのでロールバック対象だが、auto-flush 後の find クエリには反映されるため件数検証は安定する。
+
+#### ② `ApplyScheduledPricesJobTest.APP_3` のアサーションを「自テスト所有レコード」ベースに変更
+`exec.getTargetCount() == 0`（H2 全体の状態に依存）から、**`scheduledRepository.findById(scheduledId)` が `is_pending=false` && `appliedAt != null`** + 自テスト `sku` の `active 価格行 == 1` という、**自テストで作ったレコードのみ**を検証する形に変更。冪等性の本質（同じレコードに対し 2 回目で例外も重複 INSERT も起きない）は保ちつつ、他テストの残置に耐性を持たせた。
+
+### 検証
+- ✅ ローカル `mvn test`（524件）が `BUILD SUCCESS`
+- ✅ ローカル `mvn test -Dsurefire.runOrder=random` ×5 連続検証で 全 PASS（最終修正後）
 - ⏳ push 後 CI で test-core 緑を確認
+
+### 派生③で踏んだ追加修正の経緯
+本派生③の検証中、ローカル random 順序で**新たな failing が 2 件**追加で顕在化した：
+
+#### 追加修正 A: `InventoryConsistencyCheckJobTest.INV_2` のスナップショット差分の取り方ミス
+`opLogsBefore = repository.findByAction(...).size()`（全件 size）と
+`logs.stream().filter(targetId == productId).count()`（productId フィルタ後）を `opLogsBefore + 1L` で比較していた。
+他テスト残置で `opLogsBefore` だけ嵩上げされ `expected: <2> but was: <1>` となる**設計上のミスマッチ**。
+両 before スナップショットを「自テスト productId / body 部分一致」でフィルタ後の件数に揃えて修正。
+
+#### 追加修正 B: `ConsoleNotificationRepositoryTest` への自衛コード
+`BatchAlertNotifier.notify`（`@Transactional(REQUIRES_NEW)`）で書き込む `console_notifications` が、
+`InventoryConsistencyCheckJobTest` 等の `@Transactional` 不在テストの `job.run` で
+テストロールバックを貫通して残置 → `ConsoleNotificationRepositoryTest.findByTargetSubscriptionTagAndReadByUserIdIsNull` が
+`expected: <1> but was: <2>` で失敗。`@BeforeEach` で `inventory_alerts` タグの未読レコードを掃除する自衛コードを追加。
+
+両修正後、ローカル random 5 回連続 PASS を確認。
+
+### 学び（決定的な気付き）
+- **`@Transactional` テストは万能ではない**。`REQUIRES_NEW` を持つ Service を経由する書き込みは**テストロールバックを貫通する**。これを防ぐには：
+  1. 当該 Service を呼ぶテスト側で `@BeforeEach cleanupPriorLogs` を入れる（汚染源側の自衛）
+  2. 件数アサーションを行うテスト側でも自衛コードを入れる（汚染受けて側の自衛）
+  3. アサーションを「全件 find」ではなく**「自テスト所有 ID で findById」**に変更する（最も堅牢）
+- 本件では ① と ③ を併用。`@Transactional` だけで解決すると思い込んだのが派生①〜②の原因
+- **ローカル random 5 回 PASS は CI 緑保証にならない**ことを再実証。CI の Linux ランナーでは特定順序で踏みやすいパターンがある
+
+### AI協働観点（派生③）
+- **AI の判断ミス**：派生②で「faultinjection 系テスト全部に `@Transactional` を付ければ汚染源は塞がる」と判断したが、`FaultInjectionLogger` の `REQUIRES_NEW` を見落とした。**Service の transactional 属性を確認する観点が抜けていた**
+- **人間が止めるべきだった点**：派生②修正時に「`REQUIRES_NEW` を grep で網羅確認したか」を問えば早期に気付けた。実際は CI で踏んで初めて発覚
+- **該当アンチパターン**：AP-009 候補（テスト分離不足）の **「Service の transactional 属性を読まずにテスト側だけで分離しようとする」** サブパターン。設計意図上 REQUIRES_NEW でコミット済みになるレコードに対しては「アサーション設計の見直し」または「自衛クリーンアップ」が**必須**であることが明確になった事例
 
 ### 学び
 - **「CI で実際に踏んだものだけ修正」はモグラ叩きを生む**。同型問題（H2 共有 + テスト分離不足）は**潜在クラスを一括棚卸しすべき**だった

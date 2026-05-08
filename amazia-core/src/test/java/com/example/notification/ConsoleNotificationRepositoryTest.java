@@ -3,6 +3,7 @@ package com.example.notification;
 import com.example.notification.entity.ConsoleNotification;
 import com.example.notification.repository.ConsoleNotificationRepository;
 import com.example.shared.config.TestAwsConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +27,16 @@ class ConsoleNotificationRepositoryTest {
 
     @Autowired
     private ConsoleNotificationRepository repository;
+
+    @BeforeEach
+    void cleanupPriorNotifications() {
+        // BatchAlertNotifier は REQUIRES_NEW で console_notifications に書き込むため、
+        // 他テスト（InventoryConsistencyCheckJobTest 等）の job.run が
+        // テストロールバックを貫通して同 tag のレコードを残す（051 派生③の続き）。
+        // 件数アサーションを行う本テストの直前に inventory_alerts タグの残置を掃除する。
+        repository.deleteAll(repository
+                .findByTargetSubscriptionTagAndReadByUserIdIsNullOrderByCreatedAtDesc("inventory_alerts"));
+    }
 
     @Test
     void save_すると_id_created_at_suppressed_既定値が設定される() {
