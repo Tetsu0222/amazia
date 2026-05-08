@@ -202,6 +202,67 @@ class SyncNotificationSubscriptionsServiceTest { ... }
 ### 残課題
 本派生で踏んだ 2 件の汚染源は塞いだが、`amazia-core` 内の `@SpringBootTest` テストには `@Transactional` 不在のクラスが他にも多数存在する（grep で 30+ クラス）。**次のコミットで surefire 順序が再変動すると別の同型バグが顕在化する可能性**は残る。本来は test_insights.md カテゴリ 7-2「`@SpringBootTest` のクラスライフサイクル分離」のチェックリスト運用で全クラスを棚卸しすべきだが、過剰修正回避の観点から**今回 CI で実際に踏んだ 2 件のみ修正**に留めた。次フェーズで `@SpringBootTest` 全クラスの `@Transactional` 棚卸しを別タスクで実施することを推奨。
 
+---
+
+## 派生不具合②: `expected: <1> but was: <3>` 型の連鎖と一括 `@Transactional` 棚卸し
+
+### ステータス
+✅ 解決済（2026-05-08）
+
+### 発症箇所
+- 派生①の修正後 push でも CI が再失敗：`FaultInjectionLogRepositoryTest:62 expected: <1> but was: <3>`
+- 続いて random 順序ローカル検証で `ApplyScheduledPricesJobTest.APP_3:104 expected: <0> but was: <1>` が再現
+
+### 根本原因
+派生①では「CI で実際に踏んだ 2 件」のみ `@Transactional` を追加したが、`SalesMismatchInjector` 名のレコードを書きうる**他の faultinjection 系テスト（`TriggerFaultInjectionJobTest` / `FaultInjectionLoggerTest` など）も `@Transactional` 不在**で、CI Linux 順序の変動でこれらが先に動くと残置が**さらに増える**（2 件残置 → expected: 1 but was: 3）。
+
+加えて `ApplyScheduledPricesJobTest.APP_3` の再失敗は、`@Transactional` 付き同士のテストでも特定の random 順序で**別経由（スケジューラ発火等）の残置**を完全には防げない場合があり、テスト側に**自衛コード**が必要だったため。
+
+### 修正内容
+
+#### ① `@SpringBootTest` テストへの `@Transactional` 一括棚卸し
+`amazia-core/src/test` 配下の `@SpringBootTest` を使う `@Transactional` 不在テスト 46 クラスのうち、Spring Boot Test を実際には使わない 2 クラス（`BatchProductionValidatorTest` / `BatchProductionValidatorContextLoadTest` — 直接 `new` または `AnnotationConfigApplicationContext` 使用）を除く 44 クラスに `@Transactional` を一括付与。
+
+うち 6 クラスは `@Transactional` 付与で逆効果（**outer TX 内の変更を別 TX や別スレッドから検証する設計**）になり revert：
+- `SessionAndTokenSweepJobTest` — sweep ジョブの削除を後段で `findById` 検証（outer TX 内の delete は flush タイミングが読みにくい）
+- `BatchJobLockRegistryTest` — マルチスレッド検証（別スレッドは outer TX に参加しない）
+- `ConsoleNotificationsArchiveJobTest` / `OperationLogArchiveJobTest` — テーブル間移動（outer TX 内のアーカイブ動作を `findById` 系で検証）
+- `PostalCsvImportJobTest` — `batch_executions` の REQUIRES_NEW 記録を `target_count` で件数検証
+- `PasswordResetCustomerControllerTest` — token invalidate の同期確認
+
+最終的に **38 クラスに `@Transactional` 付与** + **6 クラスは設計上の理由で不在を維持**。
+
+#### ② `ApplyScheduledPricesJobTest` に自衛クリーンアップ追加
+[ApplyScheduledPricesJobTest.java](../../amazia-core/src/test/java/com/example/batch/ApplyScheduledPricesJobTest.java) に `@BeforeEach` を追加し、テスト開始時に `is_pending=true && apply_date<=today` の既存レコードを削除：
+
+```java
+@BeforeEach
+void cleanupPendingSchedulesForToday() {
+    // 同 ApplicationContext 共有の H2（DB_CLOSE_DELAY=-1）に他テストが残した
+    // is_pending=true && apply_date<=today レコードを掃除する自衛コード（051 派生②）。
+    // クラス @Transactional 内でロールバック対象なので他テストへの副作用はない。
+    scheduledRepository.deleteAll(
+            scheduledRepository.findByApplyDateLessThanEqualAndIsPendingTrue(LocalDate.now()));
+}
+```
+
+**`SalesMismatchInjectorTest.cleanupPriorLogs`（既存）と同型のパターン**。`@Transactional` 付与による分離だけでは防げない外乱（スケジューラ発火・REQUIRES_NEW 由来の残置等）に対する二重防御。
+
+### 検証
+- ✅ ローカル `mvn test`（524件）が `BUILD SUCCESS`
+- ✅ ローカル `mvn test -Dsurefire.runOrder=random` を **5 回連続** で全て `BUILD SUCCESS`（再現性のあった APP_3 が再度落ちないことを確認）
+- ⏳ push 後 CI で test-core 緑を確認
+
+### 学び
+- **「CI で実際に踏んだものだけ修正」はモグラ叩きを生む**。同型問題（H2 共有 + テスト分離不足）は**潜在クラスを一括棚卸しすべき**だった
+- **`@Transactional` 付与は万能ではない**。outer TX 内の変更を別 TX/別スレッドから検証する設計、`@Modifying` クエリの flush タイミング、テーブル間アーカイブなどでは**逆に失敗する**ため、設計意図を読んで個別判断が必要
+- **random 順序での複数回ローカル検証** は CI Linux 順序での再現性をある程度保証する補助手段になる（決定的ではないが、デフォルト順序のみの PASS よりは堅い）
+
+### AI協働観点（派生②）
+- **AI の判断ミス**：派生①修正時に「他にも同型 `@Transactional` 不在テストはないか」を **`grep -L "@Transactional"`** で機械的に網羅すべきだった。CI で踏んだ 2 件のみで満足したのは「最小スコープ」と「網羅予防」の判断軸を取り違えた
+- **人間が止めるべきだった点**：派生①修正後の CI 緑待機時に「他にも踏みうるか」をユーザー側で問えば早期に網羅修正に切り替えられた。実際は 2 回 push を経てユーザー判断で抹本対策に切り替えた
+- **該当アンチパターン**：AP-009 候補（テスト分離不足）に**「単発バグの修正で類似クラスを見落とす」横断観点**（既存）を組み合わせた事例。横断観点節「単発バグ修正で類似クラスを見落とす共通根」が、**「テスト分離」というメタな観点でも適用される**ことを示した
+
 ### AI協働観点
 - **AI の判断ミス**：親修正（051）の検証で「ローカル `mvn test` 524件 PASS」をもって CI 緑を予測したが、**surefire の実行順序差を考慮していなかった**。Linux と Windows の filesystem 順序差は典型的な落とし穴で、「ローカル全件 PASS = CI 緑保証」ではないことを認識しておくべきだった
 - **人間が止めるべきだった点**：親修正時点で「他テストにも同じ問題が潜在する可能性」を network 的に確認するレビュー観点があれば、`grep -L "@Transactional"` で潜在汚染源を一覧化して事前修正できた

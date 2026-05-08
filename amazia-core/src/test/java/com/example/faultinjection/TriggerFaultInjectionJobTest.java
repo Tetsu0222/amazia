@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -50,6 +51,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class TriggerFaultInjectionJobTest {
 
     @Autowired private TriggerFaultInjectionJob job;

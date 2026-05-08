@@ -26,6 +26,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -47,6 +48,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class DeliveryTroubleInjectorTest {
 
     @Autowired private DeliveryTroubleInjector injector;

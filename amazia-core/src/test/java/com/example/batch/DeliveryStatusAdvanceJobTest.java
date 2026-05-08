@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class DeliveryStatusAdvanceJobTest {
 
     @Autowired private DeliveryStatusAdvanceJob job;

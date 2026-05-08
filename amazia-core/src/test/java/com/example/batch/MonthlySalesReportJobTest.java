@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class MonthlySalesReportJobTest {
 
     @Autowired private MonthlySalesReportJob job;

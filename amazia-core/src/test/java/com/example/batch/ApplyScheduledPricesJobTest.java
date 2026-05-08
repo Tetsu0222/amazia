@@ -12,6 +12,7 @@ import com.example.sku.entity.ProductSku;
 import com.example.sku.entity.ProductSkuPrice;
 import com.example.sku.repository.ProductSkuPriceRepository;
 import com.example.sku.repository.ProductSkuRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,6 +47,15 @@ class ApplyScheduledPricesJobTest {
     @Autowired private ProductSkuRepository skuRepository;
     @Autowired private ProductSkuPriceRepository priceRepository;
     @Autowired private ProductSkuScheduledPriceRepository scheduledRepository;
+
+    @BeforeEach
+    void cleanupPendingSchedulesForToday() {
+        // 同 ApplicationContext 共有の H2（DB_CLOSE_DELAY=-1）に他テストが残した
+        // is_pending=true && apply_date<=today レコードを掃除する自衛コード（051 派生②）。
+        // クラス @Transactional 内でロールバック対象なので他テストへの副作用はない。
+        scheduledRepository.deleteAll(
+                scheduledRepository.findByApplyDateLessThanEqualAndIsPendingTrue(LocalDate.now()));
+    }
 
     @Test
     void APP_1_apply_date_today_の予約は適用され_現行価格は非アクティブ化される() {

@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.util.List;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Import({TestAwsConfig.class, AbstractBatchJobTest.JobBeans.class})
 @ActiveProfiles("test")
+@Transactional
 class AbstractBatchJobTest {
 
     @Autowired private SuccessJob successJob;

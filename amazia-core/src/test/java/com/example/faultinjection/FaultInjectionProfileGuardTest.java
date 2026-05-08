@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -51,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Import({TestAwsConfig.class, FaultInjectionProfileGuardTest.ProductionOnlyMarker.class})
 @ActiveProfiles("test")
+@Transactional
 class FaultInjectionProfileGuardTest {
 
     @Autowired private ApplicationContext context;

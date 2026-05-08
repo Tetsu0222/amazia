@@ -12,6 +12,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class FaultInjectionLoggerTest {
 
     @Autowired private FaultInjectionLogger logger;
