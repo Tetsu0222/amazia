@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.when;
 })
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class SalesMismatchInjectorTest {
 
     @Autowired private SalesMismatchInjector injector;
