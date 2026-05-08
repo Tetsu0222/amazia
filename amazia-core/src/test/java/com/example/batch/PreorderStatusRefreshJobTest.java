@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -20,11 +21,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * フェーズ17 Step 3-2: PreorderStatusRefreshJob の TDD（設計書 §3.1 ② / 計画書 §4-2）。
+ *
+ * <p>phaseX-9 Step 4: cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * batch_executions の他テスト残置を除去する。products は他テスト fixture と共存するため対象外
+ * （@Transactional ロールバックで自テスト fixture の他クラスへの汚染は防がれる）。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/batch_executions.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class PreorderStatusRefreshJobTest {
 
     @Autowired private PreorderStatusRefreshJob job;

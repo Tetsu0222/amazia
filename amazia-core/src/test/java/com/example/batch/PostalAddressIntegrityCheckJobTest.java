@@ -8,12 +8,12 @@ import com.example.market.postal.repository.PostalAddressRepository;
 import com.example.notification.entity.ConsoleNotification;
 import com.example.notification.repository.ConsoleNotificationRepository;
 import com.example.shared.config.TestAwsConfig;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,27 +26,24 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>テスト用 {@code postal_addresses} は空に近い状態（H2 / test-data.sql）のため、
  * 件数下限（120,000）に対しては必ず NG になる。3 観点（件数下限 / 鮮度 / サンプル）が
  * 通知件数に反映されることを確認する。
+ *
+ * <p>phaseX-9 Step 4: 自衛コード（@AfterEach cleanup）を cleanup.sql + クラスレベル
+ * @Sql(BEFORE_TEST_METHOD) 方式へ置換（test_insights.md カテゴリ 7-2 規約準拠）。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/postal_addresses.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class PostalAddressIntegrityCheckJobTest {
 
     @Autowired private PostalAddressIntegrityCheckJob job;
     @Autowired private BatchExecutionRepository batchExecutionRepository;
     @Autowired private PostalAddressRepository postalAddressRepository;
     @Autowired private ConsoleNotificationRepository consoleNotificationRepository;
-
-    @AfterEach
-    void cleanup() {
-        // 後続テストへの汚染を避けるため、本テストで投入した postal_addresses を消す。
-        postalAddressRepository.findByPostalCode("100-0001").forEach(postalAddressRepository::delete);
-        postalAddressRepository.findByPostalCode("530-0001").forEach(postalAddressRepository::delete);
-        postalAddressRepository.findByPostalCode("060-0001").forEach(postalAddressRepository::delete);
-        postalAddressRepository.findByPostalCode("810-0001").forEach(postalAddressRepository::delete);
-        postalAddressRepository.findByPostalCode("980-0001").forEach(postalAddressRepository::delete);
-    }
 
     @Test
     void POS_1_件数下限未満ならpostal_alertsへ_WARN通知が出る() {

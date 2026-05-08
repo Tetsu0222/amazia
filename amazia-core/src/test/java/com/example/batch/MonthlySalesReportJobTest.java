@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -29,11 +30,19 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>{@code aggregateAndPersist(YearMonth)} を直接呼んで対象月を固定し、4 軸 + 総合計が
  * UPSERT されることを検証する。R-15 の冪等性（再実行で行数が増えない）も併せて検証。
+ *
+ * <p>phaseX-9 Step 4: cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * monthly_sales_reports / yearly_sales_reports の他テスト残置を除去する。
+ * YearlySalesReportJobTest と sales_reports.sql を共有。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/sales_reports.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class MonthlySalesReportJobTest {
 
     @Autowired private MonthlySalesReportJob job;

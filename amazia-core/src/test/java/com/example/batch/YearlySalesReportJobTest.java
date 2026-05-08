@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -23,11 +24,19 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>{@code aggregateAndPersist(short)} を直接呼び、月次レポートが年単位で
  * 集約されることを検証する。
+ *
+ * <p>phaseX-9 Step 4: cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * monthly_sales_reports / yearly_sales_reports の他テスト残置を除去する。
+ * MonthlySalesReportJobTest と sales_reports.sql を共有。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/sales_reports.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class YearlySalesReportJobTest {
 
     @Autowired private YearlySalesReportJob job;

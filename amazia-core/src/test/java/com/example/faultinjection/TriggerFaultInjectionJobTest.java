@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -47,11 +48,18 @@ import static org.mockito.Mockito.when;
  *
  * <p>本番プロファイルでの Bean 不在検証は
  * {@link TriggerFaultInjectionJobProductionProfileTest} で別ファイルに分離。
+ *
+ * <p>phaseX-9 Step 4: cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * fault_injection_logs の他テスト残置を除去する（FaultInjectionLogRepositoryTest と共有）。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/fault_injection_logs.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class TriggerFaultInjectionJobTest {
 
     @Autowired private TriggerFaultInjectionJob job;

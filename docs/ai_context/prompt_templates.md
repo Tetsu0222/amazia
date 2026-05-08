@@ -35,6 +35,7 @@ AP-* に該当する典型的な落とし穴を着手前に予防できる。
 | [TPL-006](#tpl-006-バグ修正時の横展開確認) | バグ修正時の横展開確認 | AP-006 |
 | [TPL-007](#tpl-007-フェーズ完了確認時) | フェーズ完了確認時 | AP-007 |
 | [TPL-008](#tpl-008-cicd運用機構導入時) | CI/CD・運用機構導入時 | AP-008 |
+| [TPL-009](#tpl-009-件数アサーションを伴うテスト追加改修時) | 件数アサーションを伴うテスト追加・改修時 | AP-009 |
 
 ---
 
@@ -238,11 +239,52 @@ AP-* に該当する典型的な落とし穴を着手前に予防できる。
 
 ---
 
+### TPL-009: 件数アサーションを伴うテスト追加・改修時
+
+**予防する AP：** [AP-009 テスト分離不足 + 単発 PR で類似クラス見落とし](ai_collaboration_antipatterns.md#ap-009-テスト分離不足--単発-pr-で類似クラス見落とし)
+
+**いつ使うか：** Amazia Core で `@SpringBootTest` を使う Repository テスト・Service テスト・Job テストを追加・改修する前。`count()` / `size() == N` / `findAll().size()` 等の件数アサーションを書く場合は必須。`@Transactional` を「敢えて付けない」と判断する場合も必須。
+
+**テンプレ：**
+
+> これから `<対象クラス>` に件数アサーションを伴うテストを追加・改修します。
+> 着手前に以下を確認・報告してください：
+>
+> 1. このテストは `@SpringBootTest` を使うか
+>    - Yes → H2 共有 DB に乗る（他テストの残置を受ける可能性）
+>    - No（`@DataJpaTest` / 純粋単体）→ 以下チェック対象外
+> 2. 検証対象テーブルへ書き込む他テストが他に何件あるか grep で列挙
+>    - 特に `@Transactional(propagation = Propagation.REQUIRES_NEW)` 経由の書き込み
+>    - 既知の REQUIRES_NEW 経由クラス：`FaultInjectionLogger` / `BatchAlertNotifier` / `BatchExecutionRecorder`
+> 3. それらの残置がロールバックを貫通するか
+>    - 貫通する場合 → クラスレベル `@Transactional` だけでは分離不十分
+>    - cleanup.sql + クラスレベル `@Sql(BEFORE_TEST_METHOD)` を検討（[test_insights.md カテゴリ 7-2](test_insights.md) の規約参照）
+> 4. 件数アサーションの書き方
+>    - 全件カウント（`repository.count()`）は他テスト残置で破綻する → **自テスト所有 ID（fixture id / setUp で発番した ID）でフィルタしたカウント**を使う
+>    - `findByInjectorName` のような自衛フィルタを使う場合は、フィルタ条件と「なぜ全件で見られないのか」をコメントで明記
+> 5. before/after スナップショット差分の計算
+>    - 「自テスト対象データのみ」で計算する。`productId` / `marketCustomerId` 等のフィルタを before/after の両方に適用
+>    - 全件スナップショットは random 順序実行で初めて顕在化するバグの温床（051 派生③ INV_2 起因）
+> 6. 「`@Transactional` を付けない」と判断する場合
+>    - 検証意図カテゴリを明示（マルチスレッド検証 / REQUIRES_NEW 検証 / テーブル間アーカイブ / context-load 検証 / その他）
+>    - クラス Javadoc 冒頭に理由を必ず明記（一括付与の踏み潰し防止）
+>    - 既存実装例：`com.example.batch.BatchProductionValidatorContextLoadTest`（context-load 検証）
+> 7. push 前検証
+>    - 単体実行 / パッケージ単体実行で PASS は分離されている証明にならない
+>    - `mvn test -Dsurefire.runOrder=random` を必ずローカルで通してから push
+>
+> 上記を踏まえて、テストクラスのアノテーション構成（`@Transactional` の有無 / `@Sql` の有無 / cleanup.sql の対象テーブル）を提示してから実装に入ってください。
+>
+> 関連 AP: AP-009
+> 関連規約: [docs/ai_context/test_insights.md カテゴリ 7-2](test_insights.md) — 「`@SpringBootTest` のクラスライフサイクル分離」「件数アサーション規約」
+
+---
+
 ## 運用ルール
 
 ### 新規 TPL の追加基準
 
-- 既存 TPL-001〜008 でカバーできない作業種別が現れたとき
+- 既存 TPL-001〜009 でカバーできない作業種別が現れたとき
 - 対応する AP が `ai_collaboration_antipatterns.md` に存在することが前提
 - AP と TPL は 1 対 1 ではなく N 対 N でよい（1 つの作業種別が複数 AP を予防することがある）
 

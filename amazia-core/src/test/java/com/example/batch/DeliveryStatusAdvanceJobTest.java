@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -23,11 +24,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * フェーズ17 Step 3-4: DeliveryStatusAdvanceJob の TDD（設計書 §3.1 ④ / 計画書 §4-4）。
  *
  * <p>**遷移しない**ことの確認が主目的。delivery 行を作成しても shipping_status_id は変わらない。
+ *
+ * <p>phaseX-9 Step 4: cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * console_notifications の他テスト残置を除去する（SalesReconciliationJobTest と共有）。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/console_notifications.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class DeliveryStatusAdvanceJobTest {
 
     @Autowired private DeliveryStatusAdvanceJob job;

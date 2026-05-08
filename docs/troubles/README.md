@@ -11,7 +11,7 @@
 
 個別トラブルから抽出した横断的な知見は以下に集約：
 
-- [docs/ai_context/ai_collaboration_antipatterns.md](../ai_context/ai_collaboration_antipatterns.md) — AI 協働で踏みやすい落とし穴（AP-001〜008）
+- [docs/ai_context/ai_collaboration_antipatterns.md](../ai_context/ai_collaboration_antipatterns.md) — AI 協働で踏みやすい落とし穴（AP-001〜009）
 - [docs/ai_context/test_insights.md](../ai_context/test_insights.md) — テスト観点の知見
 - [docs/ai_context/operational_insights.md](../ai_context/operational_insights.md) — 実装・運用パターンの落とし穴
 

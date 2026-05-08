@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -23,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>振込確認は本テストでは {@code mode=disabled}（既定）でスキップ。
  * mock-match / mock-mismatch-rate の検証は {@link BankTransferMockClientTest} に集約。
+ *
+ * <p>phaseX-9 Step 4: cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * console_notifications の他テスト残置を除去する（DeliveryStatusAdvanceJobTest と共有）。
  */
 @SpringBootTest(properties = {
         "amazia.batch.scheduler-enabled=true",
@@ -31,6 +35,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/console_notifications.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class SalesReconciliationJobTest {
 
     @Autowired private SalesReconciliationJob job;

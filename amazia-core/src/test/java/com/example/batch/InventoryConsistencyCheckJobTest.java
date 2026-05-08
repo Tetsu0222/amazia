@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 
 import java.util.List;
 
@@ -34,10 +35,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * クラスレベル {@code @Transactional} を付けない（テスト TX 内では Recorder が見えない）。
  * 共有データの汚染を避けるため「自分が作った product 起因の検知件数」を最新 batch_execution の
  * 前後差分で観測する。
+ *
+ * <p>phaseX-9 Step 4: 規約統一のため cleanup.sql + クラスレベル @Sql(BEFORE_TEST_METHOD) で
+ * operation_logs / console_notifications の他テスト残置を除去する（前後差分設計済みのため副作用なし）。
  */
 @SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
+@Sql(
+        scripts = "/cleanup/inventory_consistency.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class InventoryConsistencyCheckJobTest {
 
     @Autowired private InventoryConsistencyCheckJob job;

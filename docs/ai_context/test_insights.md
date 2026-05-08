@@ -208,6 +208,158 @@ H2 + `ddl-auto=create-drop` は Entity の `@UniqueConstraint` を忠実に DDL 
 - [ ] テストクラス内で DB に書き込む処理がある場合、`@Transactional` 不在を意識的に選択した理由が JavaDoc に書かれているか
 - [ ] push 前に `mvn test` 全体で `BUILD SUCCESS` を確認したか（パッケージ単体だけで PASS を確認して push しない）
 
+### テスト分離規約：`@Transactional` / 件数アサーション / スナップショット差分（phaseX-9 / 051 派生①〜③ 起因）
+
+`@SpringBootTest` のクラスライフサイクル分離節の上位規約として、phaseX-9 で確定した 4 項目を成文化。
+**該当 AP：[AP-009 テスト分離不足 + 単発 PR で類似クラス見落とし](ai_collaboration_antipatterns.md#ap-009-テスト分離不足--単発-pr-で類似クラス見落とし) / 該当 TPL：[TPL-009](prompt_templates.md#tpl-009-件数アサーションを伴うテスト追加改修時)**
+
+#### 1. `@Transactional` 付ける/付けない判断軸
+
+**付ける条件（クラスレベルで `@Transactional` を付与する）：**
+- クラスのすべてのテストが書き込みを伴う
+- かつ、書き込みが `@Transactional(propagation = Propagation.REQUIRES_NEW)` を経由しない
+- かつ、検証の正しさが「outer TX のロールバックで観測が消える」前提と矛盾しない
+
+**付けない条件（クラスレベルでは付けない）：**
+- マルチスレッド検証（`CountDownLatch` 等で複数スレッド同時実行する）
+- `@Transactional(REQUIRES_NEW)` 経由検証（独立コミットそのものをアサートする）
+- トランザクション境界の検証（`@Transactional` の伝播・ロールバック挙動を見るテスト）
+- バッチアーカイブ等のテーブル間移動検証（移送先テーブルの確定状態を観測する）
+- context-load 検証（DB アクセスを伴わず Bean 起動可否のみを見る）
+
+**「付けない」と判断した場合の必須ルール：**
+- クラス Javadoc 冒頭に「なぜ `@Transactional` を付けないか」を明記（051 派生③前半で 46 クラス一括付与により検証意図が踏み潰された再発防止）
+- 既存実装例：[`BatchProductionValidatorContextLoadTest`](../../amazia-core/src/test/java/com/example/batch/BatchProductionValidatorContextLoadTest.java)（context-load 検証）
+
+#### 2. 件数アサーション規約
+
+**禁止：全件カウントベースの件数アサーション**
+- `repository.count()` / `repository.findAll().size()` は他テスト残置で破綻する
+- 特に `REQUIRES_NEW` 経由で書き込まれる `fault_injection_logs` / `console_notifications` / `batch_executions` 等は outer TX のロールバックを貫通するため、自テスト終了後も残置する
+
+**必須：自テスト所有 ID でフィルタしたカウント**
+- fixture id / setUp で発番した ID をテストで保持し、その ID でフィルタしたクエリを使う
+- 例：`repository.findByInjectorName("test-only-marker-...").size()` のような自衛フィルタ
+
+**自衛フィルタを使う場合のコメント規約：**
+- フィルタ条件と「なぜ全件で見られないのか」をコメントで明記
+- 「他クラスの REQUIRES_NEW 書き込みがロールバックを貫通するため、自テスト所有 ID でフィルタする」のように残置の構造的理由を書く
+- 単に `// 自テスト分のみカウント` のような結果しか書かないコメントは NG（次の保守者が「なぜ」を再調査することになる）
+
+#### 3. スナップショット差分規約
+
+**before/after スナップショットの計算は「自テスト対象データのみ」に絞る**
+- before も after も同じフィルタを適用する（productId / marketCustomerId / fixture id 等）
+- 全件スナップショットで before/after を取ると、他テストが間に挟まったときに差分が破綻する
+- 051 派生③追加で `INV_2` の before スナップショット計算ミスが random 順序実行で初めて顕在化した
+
+**例（NG → OK）：**
+```java
+// NG: 全件 before スナップショット
+int before = inventoryRepository.findAll().size();
+// ... テスト本体 ...
+int after = inventoryRepository.findAll().size();
+assertEquals(before + 1, after);  // 他テストの残置で破綻
+
+// OK: 自テスト対象 productId でフィルタ
+int before = inventoryRepository.findByProductId(testProductId).size();
+// ... テスト本体 ...
+int after = inventoryRepository.findByProductId(testProductId).size();
+assertEquals(before + 1, after);
+```
+
+#### 4. AP-009 / TPL-009 への双方向リンク
+
+- AP-009：[テスト分離不足 + 単発 PR で類似クラス見落とし](ai_collaboration_antipatterns.md#ap-009-テスト分離不足--単発-pr-で類似クラス見落とし)
+- TPL-009：[件数アサーションを伴うテスト追加・改修時](prompt_templates.md#tpl-009-件数アサーションを伴うテスト追加改修時)
+
+#### テスト観点（追加）
+- [ ] `@Transactional` を「付けない」と判断したクラスは、Javadoc 冒頭に理由が明記されているか
+- [ ] 件数アサーションは自テスト所有 ID でフィルタしているか（全件カウントを使っていないか）
+- [ ] before/after スナップショットの計算に同じフィルタを適用しているか
+- [ ] 自衛フィルタを使うコードにフィルタ条件と「なぜ全件で見られないのか」のコメントがあるか
+
+### cleanup.sql + `@Sql` 運用規約（phaseX-9 Step 2 PoC 起因）
+
+REQUIRES_NEW 経由でロールバックを貫通する書き込みは、クラスレベル `@Transactional` だけでは分離できない。
+phaseX-9 Step 2 PoC（[`FaultInjectionLogRepositoryTest`](../../amazia-core/src/test/java/com/example/faultinjection/FaultInjectionLogRepositoryTest.java)）で
+**cleanup.sql + クラスレベル `@Sql(BEFORE_TEST_METHOD)` 方式の効果が確認された**（単体 PASS / random 5 回連続 PASS / テスト時間増分なし）。
+Step 4 全件適用の標準方式として以下 5 項目を規約化する。
+
+**該当 PoC 知見：[phaseX-9_poc_findings.md](../implementation/phaseX-9_poc_findings.md) の知見 A〜E**
+
+#### 1. cleanup.sql の配置・命名規約
+
+- **配置パス**: `amazia-core/src/test/resources/cleanup/{対象テーブル群}.sql`
+  - `src/test/resources/` 配下なので main の `schema.sql` と分離される
+  - `@Sql` の path は `/cleanup/...` のクラスパス絶対指定（`scripts = "/cleanup/fault_injection_logs.sql"`）
+- **命名**: 主たる検証対象テーブル名の複数形（`fault_injection_logs.sql` / `console_notifications.sql`）。複数テーブルを束ねる場合は機能名（例: `notification_subscriptions.sql` が `notification_subscriptions` + 子テーブルを掃除する場合）
+- **1 ファイルに複数 TRUNCATE を含めて良い**（FK 解決順を `SET REFERENTIAL_INTEGRITY FALSE/TRUE` で囲む）
+
+#### 2. `@Sql` 適用基準
+
+- **クラスレベル + `BEFORE_TEST_METHOD`** を基本とする
+  ```java
+  @Sql(
+      scripts = "/cleanup/{テーブル群}.sql",
+      executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+  )
+  ```
+- **`AFTER_TEST_METHOD` は不要**
+  - クラスに `@Transactional` がある場合: outer TX のロールバックで足りる
+  - `@Transactional` 不在クラスでも、次テスト前の `BEFORE_TEST_METHOD` で必ず TRUNCATE されるので AFTER は重複
+- **`@Transactional` との併用は問題なし**
+  - `@Sql` は outer TX の外側で実行されるためロールバックされず確実にクリアされる
+  - PoC で `@Transactional` + `@Sql` の併用 3 テスト全 PASS を確認済
+- **メソッドレベル `@Sql` は基本不要**
+  - クラスレベルで全テスト前 cleanup できれば十分。クラス内で「あるテストだけ追加 cleanup したい」場合のみメソッドレベル併用を検討
+- **適用対象**:
+  - 件数アサーションを行う Repository / Service / Job テスト
+  - REQUIRES_NEW 経由汚染の受け側になりうるクラス（`FaultInjectionLogger` / `BatchAlertNotifier` / `BatchExecutionRecorder` 等が書き込むテーブルを参照するもの）
+  - `scheduler-enabled=true` クラスのうち件数アサーションを伴うもの
+
+#### 3. FK 解決順 — `SET REFERENTIAL_INTEGRITY FALSE/TRUE`
+
+- **常に `SET REFERENTIAL_INTEGRITY FALSE; ... TRUNCATE ...; SET REFERENTIAL_INTEGRITY TRUE;` で囲む**
+  - FK 参照を持たないテーブル（PoC 対象 `fault_injection_logs` のような独立テーブル）でも統一テンプレートとして囲む。Step 4 全件適用で他クラスへ複製する際の差し替えコストを下げる
+- **子→親順は不要**
+  - H2 では `TRUNCATE` で IDENTITY 列のシーケンスもリセットされるため、複数テーブル束ねるときも順序を厳密にしなくてよい
+- **空のテーブルへの TRUNCATE は no-op**
+  - 自テストが書き込まないテーブルでも、他テスト残置を確実に消すために cleanup.sql に含めて良い
+
+#### 4. test-data.sql 再投入の要否判定
+
+- **判定フロー（クラス単位）**:
+  1. cleanup.sql で TRUNCATE するテーブルが [`test-data.sql`](../../amazia-core/src/test/resources/test-data.sql) に初期行を持つか grep で確認
+  2. 持つ場合 → 当該テスト群がその初期行に依存するか確認
+     - 依存する → cleanup.sql の末尾に再投入 SQL を追記（H2 では `MERGE INTO` または `INSERT IGNORE` 相当）
+     - 依存しない → そのままで OK（自テスト内で必要な fixture は `setUp` / `@BeforeEach` で自前投入）
+  3. 持たない場合 → 再投入不要（PoC 対象 `fault_injection_logs` がこのケース）
+- **判定漏れの兆候**: cleanup.sql 適用後に「他テストの fixture 依存で当該クラスが落ちる」ようになったら、test-data.sql 由来の初期行を消したことが原因。再投入の要否判定をやり直す
+
+#### 5. MySQL 互換性の前提（Phase 21 申送り事項）
+
+- cleanup.sql 内の `SET REFERENTIAL_INTEGRITY FALSE/TRUE` は **H2 専用構文**。本番 MySQL では `SET FOREIGN_KEY_CHECKS=0/1` が相当だが構文非互換
+- Phase 21 Testcontainers 移行時に `SET FOREIGN_KEY_CHECKS=0/1` への置換、または cleanup 機構自体の再設計が必要
+- 申送り先: [phaseX-9_concession_inventory.md](../implementation/phaseX-9_concession_inventory.md) の Phase 21 引継ぎ事項節を参照
+
+#### 自衛コードを `@Sql` で置換する PR の差分テンプレート
+
+Step 4 全件適用時に各クラスへ機械的に適用する標準パターン:
+
+1. クラスレベル `@Sql(scripts = "/cleanup/{テーブル群}.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)` を追加
+2. `@BeforeEach cleanupPrior*()` メソッドを削除
+3. 不要になった `import org.junit.jupiter.api.BeforeEach;` を削除（他で使っていれば残す）
+4. `import org.springframework.test.context.jdbc.Sql;` を追加
+5. クラス Javadoc に「phaseX-9 Step 4 で自衛コードを cleanup.sql + `@Sql` 方式へ置換」の旨を 1 行追記（既存 Javadoc と統合）
+
+#### テスト観点（追加）
+- [ ] cleanup.sql は `amazia-core/src/test/resources/cleanup/` 配下に配置されているか
+- [ ] `@Sql` のクラスレベル適用 + `BEFORE_TEST_METHOD` を採用しているか（`AFTER_TEST_METHOD` は重複）
+- [ ] cleanup.sql 内で `SET REFERENTIAL_INTEGRITY FALSE/TRUE` で囲んでいるか
+- [ ] cleanup 対象テーブルが `test-data.sql` に初期行を持つ場合、再投入の要否を判定しているか
+- [ ] cleanup.sql の H2 専用構文が Phase 21 で MySQL 構文へ置換が必要であることが、規約節 5 / 申送り事項として認識されているか
+
 ### Vitest 長尺 E2E のタイムアウト明示（051 起因）
 
 `@testing-library/user-event` v14 の `userEvent.type` は文字単位で内部 `setTimeout` を挟むため、入力フィールドが多い E2E は CI ランナー差で容易にデフォルト 5000ms を超える。**ローカルでは PASS、CI Ubuntu ランナーで初めて FAIL** という典型的なフレーキネスを生む。

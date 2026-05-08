@@ -1,0 +1,79 @@
+name: Weekly Test Random Order
+
+# phaseX-9 Step 5: amazia-core のテストを random 順序で週次実行し、
+# 順序依存バグ（H2 共有 DB の REQUIRES_NEW 経由貫通残置等）を早期検知する。
+# PR 毎チェックには含めない（flaky で開発体験を損ねるため）。
+# 失敗時は Issue を自動起票し、同タイトル Open Issue があればコメント追加で重複起票を防ぐ。
+
+on:
+  schedule:
+    # 毎週月曜 03:00 JST = 18:00 UTC 日曜
+    - cron: '0 18 * * 0'
+  workflow_dispatch:  # 手動実行も許可
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  random-order-test:
+    name: amazia-core random 順序テスト
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Run tests in random order
+        id: test
+        working-directory: amazia-core
+        run: mvn test -Dsurefire.runOrder=random -B
+        continue-on-error: true
+      - name: Open issue on failure
+        if: steps.test.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `[Flaky] Weekly random-order test failed: ${context.runId}`;
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'flaky-test,random-order'
+            });
+            const body = [
+              `Weekly random-order CI failed.`,
+              ``,
+              `- Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              `- Commit: ${context.sha}`,
+              `- 関連設計書: docs/design/phaseX/phaseX-9_test_isolation_redesign.md`,
+              `- 関連トラブル: docs/troubles/051_*.md`,
+              ``,
+              `## 調査手順`,
+              `1. Failed テストのクラス名を特定`,
+              `2. test_insights.md カテゴリ 7-2 で cleanup.sql 規約を確認`,
+              `3. 当該クラスの cleanup.sql 適用漏れがないか確認`,
+              `4. AP-009 / TPL-009 を参照して類似クラス未対応がないか横展開チェック`,
+            ].join('\n');
+            if (existing.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['flaky-test', 'random-order']
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing[0].number,
+                body: `再発: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+            }
+      - name: Fail job if test failed
+        if: steps.test.outcome == 'failure'
+        run: exit 1

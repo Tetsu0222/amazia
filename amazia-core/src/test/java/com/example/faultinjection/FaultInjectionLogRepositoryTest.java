@@ -3,13 +3,13 @@ package com.example.faultinjection;
 import com.example.faultinjection.entity.FaultInjectionLog;
 import com.example.faultinjection.repository.FaultInjectionLogRepository;
 import com.example.shared.config.TestAwsConfig;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -20,28 +20,22 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * フェーズ17 Step 1: fault_injection_logs Entity / Repository の永続化検証。
  * 五重防御の DB CHECK 層 chk_fault_logs_no_prod が effective であることを確認する。
+ *
+ * <p>phaseX-9 Step 2 PoC: REQUIRES_NEW 経由貫通の自衛コード（@BeforeEach cleanupPriorLogs）を
+ * cleanup.sql + クラスレベル @Sql 方式へ置換。test_insights.md カテゴリ 7-2 規約に準拠。
  */
 @SpringBootTest
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
 @Transactional
+@Sql(
+        scripts = "/cleanup/fault_injection_logs.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class FaultInjectionLogRepositoryTest {
 
     @Autowired
     private FaultInjectionLogRepository repository;
-
-    @BeforeEach
-    void cleanupPriorLogs() {
-        // FaultInjectionLogger は REQUIRES_NEW で独立コミットするため、
-        // 他テスト（TriggerFaultInjectionJobTest / SalesMismatchInjectorTest 等）の
-        // injector 発火がテストロールバックを貫通して fault_injection_logs に残る。
-        // 件数アサーションを行う本テストの直前に「SalesMismatchInjector」「InventoryMismatchInjector」名の
-        // 残置を掃除する自衛コード（051 派生②の続き）。クラス @Transactional 内なので
-        // ロールバック対象だが、auto-flush 後の find クエリには反映されるので件数検証は安定する。
-        repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("SalesMismatchInjector"));
-        repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("InventoryMismatchInjector"));
-        repository.deleteAll(repository.findByInjectorNameOrderByCreatedAtDesc("DeliveryTroubleInjector"));
-    }
 
     @Test
     void dev_および_staging_は_保存できる() {

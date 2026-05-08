@@ -46,8 +46,8 @@ flowchart TB
     subgraph L2["第2層：知見ライブラリ（docs/ai_context/）"]
         TEST["<b>test_insights.md</b><br/>過去トラブルから<br/>抽出したテスト観点"]
         OPS["<b>operational_insights.md</b><br/>実装・運用の落とし穴"]
-        AP["<b>ai_collaboration_antipatterns.md</b><br/>AP-001〜008"]
-        TPL["<b>prompt_templates.md</b><br/>TPL-001〜008"]
+        AP["<b>ai_collaboration_antipatterns.md</b><br/>AP-001〜009"]
+        TPL["<b>prompt_templates.md</b><br/>TPL-001〜009"]
     end
 
     subgraph L3["第3層：一次記録（docs/troubles/）"]
@@ -71,8 +71,8 @@ flowchart TB
 | 第1層 | [CLAUDE.md](CLAUDE.md) | AI への運用ルール（不具合対応の手順、DB/API 設計書の同期義務、主要テーブル定数の同期 など） |
 | 第2層 | [test_insights.md](docs/ai_context/test_insights.md) | 過去トラブルから抽出したテスト観点。テストケース作成・フェーズ計画時に参照 |
 | 第2層 | [operational_insights.md](docs/ai_context/operational_insights.md) | Spring Boot ライフサイクル / コンテナ運用 / SSM 経由ジョブなど、テストでは検出しづらい設計パターン |
-| 第2層 | [ai_collaboration_antipatterns.md](docs/ai_context/ai_collaboration_antipatterns.md) | AI 協働で踏みやすい落とし穴（**AP-001〜008**）。各 AP は出典トラブル番号と紐付け |
-| 第2層 | [prompt_templates.md](docs/ai_context/prompt_templates.md) | 作業種別ごとの定型プロンプト（**TPL-001〜008**）。各 TPL は対応する AP-* と双方向リンク |
+| 第2層 | [ai_collaboration_antipatterns.md](docs/ai_context/ai_collaboration_antipatterns.md) | AI 協働で踏みやすい落とし穴（**AP-001〜009**）。各 AP は出典トラブル番号と紐付け |
+| 第2層 | [prompt_templates.md](docs/ai_context/prompt_templates.md) | 作業種別ごとの定型プロンプト（**TPL-001〜009**）。各 TPL は対応する AP-* と双方向リンク |
 | 第3層 | [docs/troubles/](docs/troubles/) | 一次記録（NNN_*.md）。26 件超の実トラブルを「症状 / 根本原因 / 再発防止 / AI 協働観点」で記録 |
 
 ---
