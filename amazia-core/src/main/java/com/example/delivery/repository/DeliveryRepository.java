@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,14 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
     Optional<Delivery> findBySalesId(Long salesId);
 
     List<Delivery> findByShippingStatusId(Long shippingStatusId);
+
+    /**
+     * フェーズ17 Step 3-4 / DeliveryStatusAdvanceJob 用：配送遅延候補の抽出（設計書 §3.1 ④）。
+     * 指定 shippingStatusId（SHIPPED 想定）かつ {@code delivered_date IS NULL} かつ
+     * {@code scheduled_date < threshold} の配送を取得する。状態遷移は行わない。
+     */
+    List<Delivery> findByShippingStatusIdAndDeliveredDateIsNullAndScheduledDateBefore(
+            Long shippingStatusId, LocalDate threshold);
 
     /**
      * 入荷再計算用：対象 {@code productId} に紐づく
