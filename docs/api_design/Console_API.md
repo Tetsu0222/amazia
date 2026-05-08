@@ -941,3 +941,21 @@ PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_a
 リクエストボディ：`{ productId, skuId, quantity, inboundedAt?, supplierId? }`。phase16 Step3.1 以降は `inboundedAt` を任意項目化（未指定時は Core 側で本日付を強制セット）。
 
 **RRRR-5**: `warehouseId` がリクエストに含まれていても Console Service が **明示的に剥がす**（`unset($payload['warehouseId'], $payload['warehouse_id'])`）。Core 側でデフォルト倉庫（id=1）を自動セット。
+
+---
+
+## フェーズ17（バッチ実行履歴・通知センター・手動起動）
+
+すべて Core への Pass-through。`auth_user_id`（JWT 検証ミドルウェアが request に積む値）を Core に `X-User-Id` ヘッダで転送する。ルート定義は `routes/api/Batch.php` に集約。
+
+| メソッド | パス | コントローラー | 中継先 | 備考 |
+|----|----|----|----|----|
+| GET  | `/api/console/batch/executions`              | `App\Batch\Controller\ListBatchExecutionController`         | Core `GET /api/console/batch/executions`              | クエリ透過（`jobName` / `status` / `offset` / `size`） |
+| GET  | `/api/console/batch/executions/{id}`         | `App\Batch\Controller\GetBatchExecutionController`          | Core `GET /api/console/batch/executions/{id}`         | |
+| GET  | `/api/console/batch/notifications`           | `App\Batch\Controller\ListConsoleNotificationController`    | Core `GET /api/console/batch/notifications`           | `X-User-Id` 必須 |
+| PUT  | `/api/console/batch/notifications/{id}/read` | `App\Batch\Controller\MarkConsoleNotificationReadController`| Core `PUT /api/console/batch/notifications/{id}/read` | `X-User-Id` 必須 |
+| POST | `/api/console/batch/{jobName}/run`           | `App\Batch\Controller\TriggerBatchManualController`         | Core `POST /api/console/batch/{jobName}/run`          | `check.permission:batch.manual` ミドルウェア / `X-User-Id` 必須 |
+
+**レスポンス形式**：一覧 API は `{"items":[...], "total":N, "offset":M, "size":S}`（offset 採用。Core_API.md と整合）。
+
+**手動起動の異常系**：Core から返却される 400 / 404 / 503 をそのまま透過。Console 経由では JWT ミドルウェアが認証を担うため `X-User-Id` 欠落起因の 400 は実運用では発生せず、認証失敗は Console が 401 を返す。

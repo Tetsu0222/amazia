@@ -82,6 +82,8 @@ services:
       BATCH_RATE_LIMIT_DIGEST_ENABLED: ${BATCH_RATE_LIMIT_DIGEST_ENABLED:-true}
       # 自動購読対象ロール（G-2 / 13.0）
       BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES: ${BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES:-admin,senior_admin,eternal_advisor}
+      # 通知購読タグ一覧（設計書 6.2.3 / N-9・Step 6-4 フック用）
+      BATCH_NOTIFICATIONS_SUBSCRIPTION_TAGS: ${BATCH_NOTIFICATIONS_SUBSCRIPTION_TAGS:-inventory_alerts,sales_alerts,delivery_alerts,postal_alerts,batch_failure}
     volumes:
       # SKU 画像など Spring が /app/storage/ に保存するファイルを EBS 上に永続化。
       # 本番 EC2 では deploy.yml が /home/ssm-user/amazia-storage を実体として用意し、

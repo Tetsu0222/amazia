@@ -7,28 +7,29 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 /**
- * フェーズ17 Step 5.5-1a（設計書 §13.5.1）：現行価格 1 件取得。
+ * フェーズ17 Step 5.5-1f（設計書 §13.5.1）：SKU 価格履歴の取得。
  *
- * <p>{@code is_active = TRUE} の現行価格 1 件のみを返す。履歴は物理削除しない運用のため、
- * 過去の {@code is_active = FALSE} レコードは {@link com.example.sku.service.ListSkuPriceHistoryService}
- * 側で取り扱う。
+ * <p>{@code product_sku_prices} を {@code start_date DESC} で全件返す。Console UI の
+ * 「履歴」タブで使用する（{@code is_active = TRUE} の現行行も先頭に含まれる）。
  */
 @Service
-public class GetProductSkuPriceService {
+public class ListSkuPriceHistoryService {
 
     private final ProductSkuPriceRepository priceRepository;
     private final ProductSkuRepository skuRepository;
 
-    public GetProductSkuPriceService(ProductSkuPriceRepository priceRepository,
-                                     ProductSkuRepository skuRepository) {
+    public ListSkuPriceHistoryService(ProductSkuPriceRepository priceRepository,
+                                      ProductSkuRepository skuRepository) {
         this.priceRepository = priceRepository;
         this.skuRepository = skuRepository;
     }
 
-    public ProductSkuPrice get(Long skuId) {
+    public List<ProductSkuPrice> list(Long skuId) {
         skuRepository.findById(skuId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "SKUが見つかりません"));
-        return priceRepository.findFirstBySkuIdAndIsActiveTrue(skuId).orElse(null);
+        return priceRepository.findBySkuIdOrderByStartDateDescIdDesc(skuId);
     }
 }

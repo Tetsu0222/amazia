@@ -14,6 +14,18 @@ public interface ProductSkuPriceRepository extends JpaRepository<ProductSkuPrice
 
     Optional<ProductSkuPrice> findBySkuId(Long skuId);
 
+    /**
+     * フェーズ17 Step 5.5-1a: 現行価格（{@code is_active = TRUE}）を 1 件返す。
+     * 履歴は物理削除しない運用のため、active のみフィルタする。
+     */
+    Optional<ProductSkuPrice> findFirstBySkuIdAndIsActiveTrue(Long skuId);
+
+    /**
+     * フェーズ17 Step 5.5-1f: SKU 価格履歴の取得（{@code start_date DESC}）。
+     * Console UI の「履歴」ブロックで使用する。
+     */
+    List<ProductSkuPrice> findBySkuIdOrderByStartDateDescIdDesc(Long skuId);
+
     List<ProductSkuPrice> findBySkuIdIn(List<Long> skuIds);
 
     /**
@@ -25,7 +37,7 @@ public interface ProductSkuPriceRepository extends JpaRepository<ProductSkuPrice
      *
      * @return 非アクティブ化した行数（通常は 1）
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update ProductSkuPrice p set p.isActive = false, p.endDate = :endDate "
             + "where p.skuId = :skuId and p.isActive = true")
     int deactivateActive(@Param("skuId") Long skuId,

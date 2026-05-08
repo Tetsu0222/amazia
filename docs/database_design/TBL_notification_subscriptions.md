@@ -48,7 +48,7 @@
 
 `role_permissions` で全権限を持つロール（`admin` / `senior_admin` / `eternal_advisor`）に属するユーザー全員に、5 タグ（inventory_alerts / sales_alerts / delivery_alerts / postal_alerts / batch_failure）を `email_enabled=TRUE, in_app_enabled=TRUE` で自動購読する。再実行時は `INSERT IGNORE` で重複しない。
 
-実運用での自動購読対象ロールは環境変数 `BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES` で外出し管理（規約 4-1）。phase11 の `CreateUserService` / `UpdateUserService` から `RegisterNotificationSubscriptionService` への呼び出しが Step 6 で追加される。
+実運用での自動購読対象ロールは環境変数 `BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES` で外出し管理（規約 4-1）。phase11 の `CreateUserService` / `UpdateUserService` は Step 6-4 で `SyncNotificationSubscriptionsService.applyForUserRole(userId, roleCode)` を呼び出すようになっており、自動購読対象ロールなら全タグを `email_enabled=TRUE / in_app_enabled=TRUE` で UPSERT、非対象ロール（admin → user 降格を含む）なら当該ユーザの全行を `email_enabled=FALSE / in_app_enabled=FALSE` に降格させる（行は物理削除しない）。タグ一覧は `BATCH_NOTIFICATIONS_SUBSCRIPTION_TAGS` で外出し管理。
 
 ## Entity
 

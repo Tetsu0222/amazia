@@ -17,4 +17,15 @@ public class RandomGeneratorAdapter {
     public double nextDouble() {
         return ThreadLocalRandom.current().nextDouble();
     }
+
+    /**
+     * {@code [originInclusive, boundExclusiveOrInclusive]} の整数乱数を返す。両端含む（inclusive）。
+     * フェーズ17 Step 5（フォルトインジェクション）で {@code -3 〜 +3} 等の範囲乱数生成に使う。
+     */
+    public int nextIntBetween(int minInclusive, int maxInclusive) {
+        if (minInclusive > maxInclusive) {
+            throw new IllegalArgumentException("minInclusive must be <= maxInclusive");
+        }
+        return ThreadLocalRandom.current().nextInt(minInclusive, maxInclusive + 1);
+    }
 }

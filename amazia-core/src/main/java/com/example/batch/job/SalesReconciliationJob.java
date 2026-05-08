@@ -4,15 +4,18 @@ import com.example.batch.config.AbstractBatchJob;
 import com.example.batch.config.BatchResult;
 import com.example.batch.repository.SalesReconciliationRepository;
 import com.example.batch.service.BankTransferMockClient;
+import com.example.faultinjection.service.SalesMismatchInjector;
 import com.example.notification.service.BatchAlertNotifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.example.batch.job.InventoryConsistencyCheckJob.parseWarehouseIds;
 
@@ -41,6 +44,14 @@ public class SalesReconciliationJob extends AbstractBatchJob {
     private final SalesReconciliationRepository reconciliationRepository;
     private final BankTransferMockClient bankClient;
     private final BatchAlertNotifier alertNotifier;
+
+    /**
+     * フェーズ17 Step 5-2: 売上不一致トラブル関数。本番では Bean が DI 登録されないため
+     * {@link Optional} で受ける（{@code @Profile("!production")}）。
+     * MISMATCH 検出時に {@code fault_injection_logs} に履歴を残す責務を担う。
+     */
+    @Autowired(required = false)
+    private Optional<SalesMismatchInjector> salesMismatchInjector = Optional.empty();
 
     @Value("${amazia.batch.sales-reconciliation.target-warehouse-ids}")
     private String targetWarehouseIdsCsv;
@@ -85,6 +96,8 @@ public class SalesReconciliationJob extends AbstractBatchJob {
         int salesFailures = 0;
         if (transferResult == BankTransferMockClient.Result.MISMATCH) {
             salesFailures = 1;
+            // フォルトインジェクションが有効な環境では fault_injection_logs に履歴を残す（H-7）
+            salesMismatchInjector.ifPresent(injector -> injector.shouldInject("scheduler"));
             alertNotifier.dispatch("WARN", SALES_TAG,
                     "振込確認：MISMATCH 検知",
                     "振込確認モック API が MISMATCH を返しました。実取引との突合を行ってください。",

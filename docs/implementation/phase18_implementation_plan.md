@@ -1,0 +1,1456 @@
+# フェーズ18 実装計画（問い合わせ管理）
+
+## 概要
+- 対象設計書: [phase18_inquiry_management.md](../design/phase11_20/phase18_inquiry_management.md)（**r3 / 2026-05-07**）
+- 対象範囲: Amazia Core / Amazia Console / Amazia Market / DB 設計 / phase17 通知連携
+- 段取り: 設計書 §10「Step 0 → Step A → Step B」を実装作業単位の **Step 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8** に分解
+  - Step 0: 前提整備（環境変数・config・パッケージ確定）
+  - Step 1: DB マイグレーション + Entity / Repository（設計書 Step A 相当）
+  - Step 2: Core 共通基盤（`InquiryTargetOwnershipValidator` / DTO 群 / 例外定義）
+  - Step 3: Core Service / Controller（CRUD + 通知発火）
+  - Step 4: Console Pass-through + SPA（ベルマーク・一覧・スレッド）
+  - Step 5: Market Pass-through + SPA（マイページ問い合わせ）
+  - Step 6: 通知統合の実機検証（phase17 `NotificationDispatcher` との結線）
+  - Step 7: E2E（Market → Console ベルマーク → Console 返信 → Market 表示）
+  - Step 8: ドキュメント反映 + 本番デプロイ
+- 作成日: 2026-05-08
+- 親フェーズ: [phase15_implementation_plan.md](phase15_implementation_plan.md)（phase15 完了済み）／ [phase17_implementation_plan.md](phase17_implementation_plan.md)（phase17 完了前提）
+
+---
+
+## 0. 大方針
+
+| 項目 | 方針 |
+|------|------|
+| 段取り | Step 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 を厳守。Step を跨いだ部分実装は禁止。各 Step 末で `mvn test` / Console 側 `phpunit` + `vitest` / Market 側 `phpunit` + `vitest` の該当層が緑であることを完了条件とする |
+| 規模感 | Core 2 テーブル新設（`inquiries` / `inquiry_messages`）+ `notification_subscriptions` への `inquiry_alerts` 追加投入、Service 約 6 本（`CreateInquiryService` / `ListInquiryService` / `GetInquiryService` / `ReplyInquiryService` / `UpdateInquiryStatusService` / `GetUnreadInquiryCountService`）、Validator 1 本（`InquiryTargetOwnershipValidator`）、Console 画面 2 種（一覧・詳細）+ ヘッダー Bell、Market 画面 3 種（一覧・詳細・新規作成）、Vue Composable 1 本（`useVisibilityPolling`）|
+| TDD | 設計書 §11 の TDD ケースを Step ごとに割り当てて実装。E2E は Step 7 に集約 |
+| コーディング規約 | [coding_guidelines.md](../coding_guidelines.md) 厳守（Service にロジック寄せ・config 駆動・1 ファイル 1 ユースケース・ドメイン単位パッケージ） |
+| 環境変数 | 追加時は **必ず** `docker-compose.yml` + `application.properties`（Core）+ `application-test.properties`（Core）+ Console / Market `phpunit.xml` をセット更新（規約 4-3 ／ [user memory: env_vars_and_tests]）。設計書 §7 のチェックリストを Step 0 着手前に必ず実行 |
+| テスト値 | ハードコードせず `config()` / `@Value` 経由で取得（規約 4-1） |
+| メモリ事項 | Core 側 Heap 制限（`-Xmx384m` ／ [user memory: phaseX4_t3micro_recovery]）を意識。問い合わせ件数は無料枠運用上少量想定だが、Console 一覧（50 件 / ページ）・Market 一覧（20 件 / ページ）でページング徹底。スレッド表示はメッセージ全件取得とするが、運用上 1 スレッドあたり数十件規模を想定し許容 |
+| 多態参照 | `inquiries.target_id` / `inquiry_messages.sender_id` は **物理 FK を張らない**（多態のため）。整合性は **Service 層**（特に `InquiryTargetOwnershipValidator`）で `target_type` ごとに検証する。DB 側は CHECK 制約と pair NULL ガードで二重防御 |
+| 認証 | Console は phase11 JWT（`Authorization: Bearer ...`）／ Market は phase13 `MARKET_SESSION_ID` Cookie + CSRF（`X-CSRF-Token`）。本フェーズで認証層の追加実装はゼロ |
+| CloudFront | phase13 §2.2 で `/api/customer/*` Behavior 追加済み。**本フェーズで CloudFront 変更は不要**（[user memory: market_auth_api_routing] と整合）|
+| 通知 | phase17 r6 の `NotificationDispatcher.dispatch('inquiry_alerts', INFO, payload)` 経由。`level=INFO` のため SES 送信はされず `console_notifications` への INSERT のみ。重複抑制（60 分 / `payload_hash` ベース）は phase17 §6.4 で既実装 |
+| ベルマーク | 真実の元は `inquiries.status='NEW'` の COUNT（`console_notifications` ではない）。30 秒ポーリングで Console SPA → `/api/console/inquiries/unread-count`。タブ非表示時は `useVisibilityPolling` Composable がポーリング停止 |
+| 添付ファイル | **本フェーズスコープ外**（設計書 §範囲）。スキーマに `attachments` 系カラムを持たせない |
+| 担当者割当（`assigned_user_id`） | 本フェーズスコープ外。設計書 §14.1 で将来拡張余地のみ予約済み |
+
+### 設計書からの「本フェーズのスコープ外」確認
+
+| 項目 | 取り扱い |
+|------|---------|
+| `inquiry_attachments` テーブル | スコープ外。本フェーズではスキーマに痕跡を残さない |
+| WebSocket / SSE による push 通知 | スコープ外。30 秒ポーリングで完結 |
+| 問い合わせ優先度（`priority`） | YAGNI。`status` のみで運用 |
+| 自動クローズ（DONE 自動遷移） | スコープ外。phase17 r7 候補 `InquiryArchiveJob` / `InquiryStaleAlertJob` への要請として申し送り（設計書 §13.2） |
+| 通知種別の集約（在庫異常等を Bell に集約） | UI 構造のみ確保（`Bell.vue` の `props.fetchUrl`）。集約は phase19 / 後続フェーズへ |
+| Market 側 未読バッジ | スコープ外。元設計に未記載 |
+
+### 設計書 r3 改訂で本計画に反映する追加変更（I-1 〜 I-14 / RV-1 〜 RV-12 / RV2-1 〜 RV2-5）
+
+| ID | 反映先 Step | 内容 |
+|----|----------|------|
+| I-1 / I-2 | Step 1 / Step 2 | `target_type` / `target_id` 多態参照と `sender_type` / `sender_id` 多態参照の正式定義。Service 層で整合性検証 |
+| I-3 / RV-1 / RV-2 | Step 3 / Step 6 | phase17 `NotificationDispatcher` 統合。`title` / `body` テンプレートを `config('inquiry.notification_templates')` で管理し、`payload_hash` から `inquiry_messages.id` を除外（60 分連投を 1 通に集約） |
+| I-4 / RV-8 | Step 4 | ベルマーク 30 秒ポーリング + `useVisibilityPolling` Composable。`Bell.vue` の `props.fetchUrl` で URL 差し替え可能 |
+| I-5 | Step 1 / Step 3 | `inquiry_messages.is_internal_note` で内部メモを実装。Market API では DB CHECK + DTO 分離の二重防御 |
+| I-6 | Step 2 / Step 3 | ステータス遷移ルールを `config('inquiry.allowed_status_transitions')` に enum 定義 |
+| I-7 | Step 0 | 環境変数 5 個（subject 上限・message 上限・page-size × 2・bell ポーリング間隔）を 3+ 箇所セット更新 |
+| I-8 | Step 4 / Step 5 | operation_logs 規約（`screen_name` / `api_name` / `comment` プレフィックス）を phase14 / phase15 / phase17 と整合 |
+| I-9 / RV-9 | Step 3 / Step 5 | Market POST DTO（`MarketCreateInquiryRequest` / `MarketReplyInquiryRequest`）から `is_internal_note` を構造的に除外。Mass Assignment 攻撃対策 |
+| I-10 / RV-10 | Step 1 / Step 8 | `docs/database_design/` / `docs/api_design/` / `ops/healthcheck/required_tables.txt` の同期更新 |
+| I-11 / I-12 / I-13 | スコープ外確認 | 添付ファイル / WebSocket / `assigned_user_id` / カテゴリマスタ / 物理削除は不採用。`InquiryArchiveJob` / `InquiryStaleAlertJob` は phase17 r7 候補申し送り |
+| I-14 | Step 0 | 命名規約（フォルダ / ファイル / 設定キー）を coding_guidelines §2 と整合 |
+| RV-3 | スコープ外確認 | `InquiryArchiveJob` / `InquiryStaleAlertJob` は phase17 r7 候補追加要請として保留。本書実装は単独で完結（phase17 §6.2 `NotificationDispatcher` のみ依存）|
+| RV-4 | Step 3 / Step 4 | `market_customers.name_last` / `name_first` を Service 層で `display_name` 組み立て |
+| RV-5 | Step 2 | `com.example.inquiry.validator.InquiryTargetOwnershipValidator` を新設し `CreateInquiryService` から呼び出し |
+| RV-6 | Step 4 | Console 認証は phase11 JWT で確定。記述変更なし |
+| RV-7 | Step 5 | CloudFront Behavior 変更は **不要**（phase13 §2.2 既存） |
+| RV-11 | Step 2 | `assigned_user_id` 拡張余地として `UpdateInquiryStatusService` / `ReplyInquiryService` の入力 DTO を Java Record / クラスで明示フィールドを持たせる |
+| RV2-1 | Step 3 | §2.2.4 投稿後の挙動の古い `payload_hash` 表記は §6.1 に集約。`level=INFO` のため SES 送出なし |
+| RV2-3 | スコープ外 | `assigned_user_id` 追加マイグレーションは将来。`information_schema.columns` チェック方式の参考実装は §14.1.2 にメモ |
+| RV2-4 | Step 2 | `assigned_user_id` 拡張余地を `ReplyInquiryService` 側にも展開 |
+
+---
+
+## 1. Step 0 — 前提整備
+
+### 1-1. 既存実装との整合性確認（着手前棚卸し）
+
+#### 1-1-1. phase11 〜 phase17 既存資産（設計書 §1.1 と整合）
+
+| 既存資産 | 場所 | 本フェーズでの利用 |
+|---------|------|------------------|
+| `users` / `roles` | phase11 / [User.java](../../amazia-core/src/main/java/com/example/auth/entity/User.java) | Console 管理者の参照先。`inquiry_messages.sender_type='admin_user'` のとき `sender_id = users.id` |
+| `market_customers` | phase13 | Market 顧客の参照先。`inquiries.user_id = market_customers.id` ／ `sender_type='market_customer'` |
+| `market_sessions` | phase13 | Market 認証セッション（`MARKET_SESSION_ID` Cookie） |
+| `products` | phase8 | `target_type='product'` のとき |
+| `sales` | phase14 | `target_type='sales'` のとき。`sales.user_id = market_customers.id` で所有者検証 |
+| `deliveries` | phase15 | `target_type='delivery'` のとき。`deliveries → sales.user_id` で所有者検証 |
+| `operation_logs` | phase14 | Console 操作の記録先（`screen_name` / `api_name` / `comment` プレフィックス規約に従う） |
+| `notification_subscriptions` | phase17 | `subscription_tag = 'inquiry_alerts'` を新規投入 |
+| `console_notifications` | phase17 | 通知センター。本フェーズの新規通知は `target_subscription_tag = 'inquiry_alerts'`、`source_job` は NULL |
+| `NotificationDispatcher.dispatch(...)` | phase17 §6.2 | 本フェーズの通知発火点から呼び出す |
+
+#### 1-1-2. Step 0 着手前の確定事項
+
+| 論点 | 確定 |
+|------|------|
+| `inquiries.target_type` 許容値 | `delivery` / `product` / `sales` / NULL（汎用）の 4 種 |
+| ステータス遷移ルール | NEW / IN_PROGRESS / DONE 双方向許容（巻き戻し含む）。`config('inquiry.allowed_status_transitions')` で enum 管理 |
+| 通知 level | 全イベント `INFO`（SES 送出なし、`console_notifications` のみ INSERT） |
+| 通知 `payload_hash` | 新規：`SHA-256('inquiry_created:'+id)` ／ 返信：`SHA-256('inquiry_replied:'+id)`（messages.id 除外）／ ステータス変更：`SHA-256('inquiry_status:'+id+':'+new_status)` |
+| Bell ポーリング間隔 | 30 秒（`INQUIRY_BELL_POLLING_INTERVAL_MS=30000`） |
+| Bell 件数 API | `GET /api/console/inquiries/unread-count` → `{ count: number }` |
+| `is_internal_note` 入口防御 | DB CHECK（`is_internal_note=FALSE OR sender_type='admin_user'`）+ Market 側 DTO クラスから構造的に排除（二重防御） |
+| `notification_subscriptions` 自動投入対象 | phase17 r6 §6.2.1 の既定方針に従い `roles.name='admin' AND active_flag=TRUE` の全ユーザに `inquiry_alerts` を `email_enabled=TRUE, in_app_enabled=TRUE` で `INSERT IGNORE` |
+
+> phase17 で確定した自動購読対象ロールが `admin / senior_admin / eternal_advisor` の 3 種 CSV 駆動になっている事実（[phase17 §1-1-3](phase17_implementation_plan.md)）と整合させるため、本フェーズでも `BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES` 環境変数を流用してマイグレーション SQL の `WHERE` 条件を組み立てる。**Step 1 着手時に phase17 側の env が `application.properties` に存在することを確認**し、未存在なら phase17 側設定を改めて参照する形で結線する。
+
+### 1-2. Step 0-1: パッケージ構成の確定（Core）
+
+新規 Java パッケージ：
+
+```
+com.example.inquiry
+├── entity
+│   ├── Inquiry                  # inquiries テーブル
+│   └── InquiryMessage           # inquiry_messages テーブル
+├── repository
+│   ├── InquiryRepository
+│   └── InquiryMessageRepository
+├── validator
+│   └── InquiryTargetOwnershipValidator   # RV-5：target_type ごとの所有者検証を 1 ファイルに集約
+├── service
+│   ├── CreateInquiryService             # Market 顧客の新規作成
+│   ├── ListInquiryService               # 一覧取得（Console / Market 両用、フィルタ Service で受け取る）
+│   ├── GetInquiryService                # 詳細取得（メッセージ含む）
+│   ├── ReplyInquiryService              # 返信投稿（Market / Console 両用、is_internal_note は Console のみ可）
+│   ├── UpdateInquiryStatusService       # ステータス変更（Console のみ）
+│   ├── GetUnreadInquiryCountService     # ベルマーク用 status='NEW' COUNT
+│   └── notification
+│       └── InquiryNotificationDispatcher # NotificationDispatcher 呼び出し + payload 組み立て + target_label 解決
+├── controller
+│   ├── ListInquiryController             # GET /api/console/inquiries
+│   ├── GetInquiryController              # GET /api/console/inquiries/{id}
+│   ├── ReplyInquiryController            # POST /api/console/inquiries/{id}/messages
+│   ├── UpdateInquiryStatusController     # PATCH /api/console/inquiries/{id}/status
+│   ├── GetUnreadInquiryCountController   # GET /api/console/inquiries/unread-count
+│   ├── MarketListInquiryController       # GET /api/customer/inquiries
+│   ├── MarketGetInquiryController        # GET /api/customer/inquiries/{id}
+│   ├── MarketCreateInquiryController     # POST /api/customer/inquiries
+│   └── MarketReplyInquiryController      # POST /api/customer/inquiries/{id}/messages
+└── dto
+    ├── InquiryListResponse              # 一覧レスポンス（Console / Market 共通）
+    ├── InquiryDetailResponse            # 詳細レスポンス（messages 配列含む）
+    ├── InquiryMessageResponse           # 個別メッセージ DTO
+    ├── ConsoleReplyInquiryRequest       # is_internal_note フィールドあり
+    ├── ConsoleUpdateInquiryStatusRequest # newStatus + reason
+    ├── MarketCreateInquiryRequest       # RV-9：is_internal_note を持たない
+    ├── MarketReplyInquiryRequest        # RV-9：is_internal_note を持たない
+    ├── InquiryListFilter                # status / dateFrom / dateTo / userName / targetType（Service 入力）
+    └── InquiryStatusMutationContext     # RV-11 拡張余地：将来 assignedUserId を追加可能な Java Record
+```
+
+既存資産は一切修正しない（`User` / `Role` / `MarketCustomer` / `Sales` / `Delivery` / `Product` Entity 等）。`NotificationDispatcher` も phase17 完成形をそのまま呼び出すのみ。
+
+### 1-3. Step 0-2: パッケージ構成の確定（Console）
+
+```
+amazia-console/app/Inquiry/
+├── Controller/  ListInquiryController.php / GetInquiryController.php /
+│                ReplyInquiryController.php / UpdateInquiryStatusController.php /
+│                GetUnreadInquiryCountController.php
+└── Service/     ListInquiryService.php / GetInquiryService.php /
+                 ReplyInquiryService.php / UpdateInquiryStatusService.php /
+                 GetUnreadInquiryCountService.php
+                 # 各 Service は Pass-through（Core API を HTTP コール）。operation_logs は本層で記録
+
+amazia-console/config/app/Inquiry.php  # config 駆動値（規約 2-1 補足3）
+amazia-console/routes/api/Inquiry.php  # ルート明示読込（規約 2-1 補足4）
+
+amazia-console/resources/vue/src/features/inquiry/
+├── pages/
+│   ├── InquiryList.vue           # 一覧画面（/inquiries）
+│   └── InquiryDetail.vue         # スレッド画面（/inquiries/{id}）
+├── components/
+│   ├── InquiryStatusDropdown.vue # ステータス変更プルダウン（許容遷移のみ表示）
+│   ├── InquiryMessageBubble.vue  # 顧客左 / 管理者右の吹き出し
+│   └── InternalNoteAccordion.vue # 内部メモアコーディオン
+└── api/
+    └── inquiries.js              # axios ラッパー
+
+amazia-console/resources/vue/src/components/header/
+└── Bell.vue                      # phase18 で新設。props.fetchUrl 受取
+
+amazia-console/resources/vue/composables/
+└── useVisibilityPolling.ts       # RV-8：規約 2-3 Shared 思想
+```
+
+### 1-4. Step 0-3: パッケージ構成の確定（Market）
+
+```
+amazia-market/app/Inquiry/
+├── Controller/  ListInquiryController.php / GetInquiryController.php /
+│                CreateInquiryController.php / ReplyInquiryController.php
+└── Service/     ListInquiryService.php / GetInquiryService.php /
+                 CreateInquiryService.php / ReplyInquiryService.php
+                 # Pass-through（MARKET_SESSION_ID Cookie → Core 認証 SID 引継ぎ／phase13 既存仕組み利用）
+
+amazia-market/config/app/Inquiry.php
+amazia-market/routes/api/Inquiry.php
+
+amazia-market/resources/react/src/features/inquiry/
+├── pages/
+│   ├── MyPageInquiryList.tsx     # /mypage/inquiries
+│   ├── MyPageInquiryDetail.tsx   # /mypage/inquiries/{id}
+│   └── MyPageInquiryNew.tsx      # /mypage/inquiries/new
+├── components/
+│   ├── TargetTypeSelector.tsx    # 対象種別連動の入力 UI
+│   └── InquiryMessageBubble.tsx
+└── api/
+    └── inquiries.ts
+```
+
+### 1-5. 環境変数追加チェックリスト（設計書 §7）
+
+Step 1 着手前に以下 5 個の新規環境変数を **4 箇所セット更新**（規約 4-3 ／ [user memory: env_vars_and_tests]）：
+
+| # | 環境変数 | docker-compose.yml | application.properties (Core) | application-test.properties (Core) | phpunit.xml (Console) | phpunit.xml (Market) |
+|---|---------|:-:|:-:|:-:|:-:|:-:|
+| 1 | `INQUIRY_SUBJECT_MAX_LENGTH` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2 | `INQUIRY_MESSAGE_MAX_LENGTH` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 3 | `INQUIRY_LIST_PAGE_SIZE_CONSOLE` | ✅ | ✅ | ✅ | ✅ | — |
+| 4 | `INQUIRY_LIST_PAGE_SIZE_MARKET` | ✅ | ✅ | ✅ | — | ✅ |
+| 5 | `INQUIRY_BELL_POLLING_INTERVAL_MS` | ✅ | — | — | ✅（Vitest 用 import.meta.env）| — |
+
+> Vue 側のポーリング間隔は `import.meta.env.VITE_INQUIRY_BELL_POLLING_INTERVAL_MS` 経由で取得する設計とし、`vite.config.js` の `define` で `process.env.INQUIRY_BELL_POLLING_INTERVAL_MS` を `VITE_*` 名前空間にマッピングする。テスト時は Vitest の `setup.ts` で上書き。
+
+### 1-6. Step 0-4: config 駆動値の確定（規約 1-2 / 3-1）
+
+#### 1-6-1. Core 側 `application.yml`
+
+```yaml
+amazia:
+  inquiry:
+    statuses: [NEW, IN_PROGRESS, DONE]
+    allowed-status-transitions:
+      NEW:         [IN_PROGRESS, DONE]
+      IN_PROGRESS: [NEW, DONE]
+      DONE:        [NEW, IN_PROGRESS]
+    target-types: [delivery, product, sales]
+    subject-max-length: ${INQUIRY_SUBJECT_MAX_LENGTH:100}
+    message-max-length: ${INQUIRY_MESSAGE_MAX_LENGTH:4000}
+    page-size-console: ${INQUIRY_LIST_PAGE_SIZE_CONSOLE:50}
+    page-size-market:  ${INQUIRY_LIST_PAGE_SIZE_MARKET:20}
+    notification-tag: inquiry_alerts
+    notification-templates:
+      created:
+        title: "[問い合わせ] 新規 #{inquiry_id} {subject}"
+        body:  "{user_name} さんから新規問い合わせが登録されました。\n対象: {target_label}\n件名: {subject}"
+      replied:
+        title: "[問い合わせ] 返信 #{inquiry_id}"
+        body:  "{user_name} さんが #{inquiry_id} に返信しました。\n件名: {subject}"
+      status-changed:
+        title: "[問い合わせ] ステータス変更 #{inquiry_id}"
+        body:  "#{inquiry_id} を {old_status} → {new_status} に変更しました。\n件名: {subject}"
+    target-labels:
+      delivery: "配送 #{target_id}"
+      product:  "商品 #{target_id} ({product_name})"
+      sales:    "注文 #{target_id}"
+      generic:  "（汎用）"
+    operation-log-prefixes:
+      admin-reply:    "[admin_reply]"
+      customer-reply: "[customer_reply]"
+      status-change:  "[status_change]"
+      internal-note:  "[internal_note]"
+```
+
+#### 1-6-2. Console / Market `config/app/Inquiry.php`
+
+PHP 側は同等の構造を `config/app/Inquiry.php` に持たせ、`config/app.php` に明示読込追加：
+
+```php
+return [
+    // 既存...
+    'inquiry' => require __DIR__ . '/app/Inquiry.php',
+];
+```
+
+`config/app/Inquiry.php` の内容は Core 側 yaml と同期させる。Pass-through 層では config の **以下のサブセットのみ参照**：
+- `subject-max-length` / `message-max-length`：FormRequest バリデーション
+- `target-types`：FormRequest の in:rule
+- `operation-log-prefixes`：comment プレフィックス
+- Vue 側で `INQUIRY_BELL_POLLING_INTERVAL_MS` を環境変数から取得（vite.config.js 経由）
+
+### 1-7. Step 0-5: ルート明示読込
+
+#### Console
+```php
+// amazia-console/routes/api.php
+require __DIR__ . '/api/Inquiry.php';
+```
+```php
+// amazia-console/routes/api/Inquiry.php
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::get('/console/inquiries/unread-count', [GetUnreadInquiryCountController::class, '__invoke']);
+    Route::get('/console/inquiries', [ListInquiryController::class, '__invoke']);
+    Route::get('/console/inquiries/{id}', [GetInquiryController::class, '__invoke']);
+    Route::patch('/console/inquiries/{id}/status', [UpdateInquiryStatusController::class, '__invoke']);
+    Route::post('/console/inquiries/{id}/messages', [ReplyInquiryController::class, '__invoke']);
+});
+```
+
+#### Market
+```php
+// amazia-market/routes/api/Inquiry.php
+Route::middleware(['market.session', 'csrf'])->group(function () {
+    Route::get('/customer/inquiries', [ListInquiryController::class, '__invoke']);
+    Route::get('/customer/inquiries/{id}', [GetInquiryController::class, '__invoke']);
+    Route::post('/customer/inquiries', [CreateInquiryController::class, '__invoke']);
+    Route::post('/customer/inquiries/{id}/messages', [ReplyInquiryController::class, '__invoke']);
+});
+```
+
+phase13 で既存の `MARKET_SESSION_ID` Cookie 認証ミドルウェアと CSRF ミドルウェアにそのまま乗る。CSRF の `PROTECTED_PREFIX` は `/api/customer/`（[user memory: market_auth_api_routing] と整合）。
+
+### 1-8. 完了条件（Step 0）
+
+- [ ] パッケージ構成（Core / Console / Market）が確定（§1-2 / §1-3 / §1-4）
+- [ ] 環境変数 5 個 × 該当箇所すべてに反映済み（§1-5）
+- [ ] `application.yml` に `amazia.inquiry.*` 追加済み（§1-6-1）
+- [ ] `config/app/Inquiry.php`（Console / Market）と `config/app.php` 明示読込が追加済み（§1-6-2）
+- [ ] `routes/api/Inquiry.php`（Console / Market）と `routes/api.php` の明示読込が追加済み（§1-7）。**ただし Controller クラスは Step 4 / Step 5 で実装するため、ルート定義は Controller 実装と同タイミングで配置してよい**。Step 0 末では config / env / yml の 3 点のみ完了で OK
+- [ ] Step 0 時点で Core / Console / Market の既存テストが全緑（環境変数追加が既存テストを壊していないこと）
+
+---
+
+## 2. Step 1 — DB マイグレーション + Entity / Repository
+
+### 2-1. schema.sql 追記（本番 MySQL 向け）
+
+`amazia-core/src/main/resources/schema.sql` 末尾に「フェーズ18: 問い合わせ管理」セクションを追加。重複実行は `spring.sql.init.continue-on-error=true` で許容（[phase14 §D](../design/phase11_20/phase14_shipping.md) と同方針）。
+
+#### 2-1-1. `inquiries`（設計書 §3.1）
+
+```sql
+-- ============================================================================
+-- フェーズ18 Step 1-1: inquiries（問い合わせ親）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS inquiries (
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT NOT NULL,
+    subject     VARCHAR(100) NOT NULL,
+    status      VARCHAR(20)  NOT NULL DEFAULT 'NEW',
+    target_type VARCHAR(20)  NULL,
+    target_id   BIGINT       NULL,
+    created_at  DATETIME     NOT NULL,
+    updated_at  DATETIME     NOT NULL,
+    KEY idx_inquiries_status_updated_at      (status, updated_at),
+    KEY idx_inquiries_user_id_updated_at     (user_id, updated_at),
+    KEY idx_inquiries_target                 (target_type, target_id),
+    CONSTRAINT fk_inquiries_user FOREIGN KEY (user_id) REFERENCES market_customers(id),
+    CONSTRAINT chk_inquiries_status CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE')),
+    CONSTRAINT chk_inquiries_target_type CHECK (target_type IN ('delivery', 'product', 'sales') OR target_type IS NULL),
+    CONSTRAINT chk_inquiries_target_pair CHECK (
+        (target_type IS NULL     AND target_id IS NULL)
+        OR (target_type IS NOT NULL AND target_id IS NOT NULL)
+    )
+);
+```
+
+#### 2-1-2. `inquiry_messages`（設計書 §3.2）
+
+```sql
+-- ============================================================================
+-- フェーズ18 Step 1-2: inquiry_messages（スレッドメッセージ）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS inquiry_messages (
+    id               BIGINT  NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    inquiry_id       BIGINT  NOT NULL,
+    sender_type      VARCHAR(20) NOT NULL,
+    sender_id        BIGINT  NOT NULL,
+    message          TEXT    NOT NULL,
+    is_internal_note BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at       DATETIME NOT NULL,
+    KEY idx_inquiry_messages_inquiry_id_created_at (inquiry_id, created_at),
+    CONSTRAINT fk_inquiry_messages_inquiry FOREIGN KEY (inquiry_id) REFERENCES inquiries(id) ON DELETE CASCADE,
+    CONSTRAINT chk_inquiry_messages_sender_type CHECK (sender_type IN ('market_customer', 'admin_user')),
+    CONSTRAINT chk_inquiry_messages_internal_note_admin CHECK (is_internal_note = FALSE OR sender_type = 'admin_user')
+);
+```
+
+#### 2-1-3. `notification_subscriptions` への `inquiry_alerts` 自動投入（設計書 §3.3）
+
+```sql
+-- ============================================================================
+-- フェーズ18 Step 1-3: 既存 admin/senior_admin/eternal_advisor を inquiry_alerts に自動購読
+-- phase17 §1-1-3 の自動購読対象ロール CSV と整合（active_flag=TRUE のみ）
+-- ============================================================================
+INSERT IGNORE INTO notification_subscriptions
+    (user_id, subscription_tag, email_enabled, in_app_enabled, created_at, updated_at)
+SELECT u.id, 'inquiry_alerts', TRUE, TRUE, NOW(), NOW()
+FROM users u
+JOIN roles r ON u.role_id = r.id
+WHERE r.name IN ('admin', 'senior_admin', 'eternal_advisor')
+  AND u.active_flag = TRUE;
+```
+
+> phase17 では env CSV 駆動だが、`schema.sql` 内では `@Value` を使えないため対象ロール名をリテラルで列挙する。phase17 の env を変更した場合は本 SQL も同期が必要（**Step 8 ドキュメント反映で明記**）。
+
+### 2-2. JPA Entity 追加
+
+#### 2-2-1. `Inquiry.java`
+
+```java
+@Entity
+@Table(name = "inquiries")
+public class Inquiry {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;                  // market_customers.id
+
+    @Column(nullable = false, length = 100)
+    private String subject;
+
+    @Column(nullable = false, length = 20)
+    private String status;                // NEW / IN_PROGRESS / DONE
+
+    @Column(name = "target_type", length = 20)
+    private String targetType;            // delivery / product / sales / null
+
+    @Column(name = "target_id")
+    private Long targetId;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+        if (this.status == null) this.status = "NEW";
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // CHECK 制約の H2 反映（schema.sql の MySQL CHECK と二重防御）
+    // ※ Hibernate @Check は H2 でも反映される（phase17 で前例あり）
+}
+```
+
+`@Check` 注釈は H2 ではテーブル定義に反映されないが、設計書 §3.1 の CHECK 制約は schema.sql 側に既に書かれているため、H2 環境では `application-test.properties` の `spring.sql.init.schema-locations=` を空のまま（Entity から `ddl-auto=create-drop` で生成）にすると CHECK 制約がない状態となる。**Service 層のバリデーションで多重防御**することで対応する（DB CHECK は本番 MySQL での最後の砦）。
+
+#### 2-2-2. `InquiryMessage.java`
+
+```java
+@Entity
+@Table(name = "inquiry_messages")
+public class InquiryMessage {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "inquiry_id", nullable = false)
+    private Long inquiryId;
+
+    @Column(name = "sender_type", nullable = false, length = 20)
+    private String senderType;            // market_customer / admin_user
+
+    @Column(name = "sender_id", nullable = false)
+    private Long senderId;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String message;
+
+    @Column(name = "is_internal_note", nullable = false)
+    private Boolean isInternalNote = false;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void onCreate() {
+        if (this.createdAt == null) this.createdAt = LocalDateTime.now();
+        if (this.isInternalNote == null) this.isInternalNote = false;
+    }
+}
+```
+
+### 2-3. Repository 追加
+
+#### 2-3-1. `InquiryRepository`
+
+```java
+public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
+
+    // ベルマーク件数（§6.3 真実の元）
+    long countByStatus(String status);
+
+    // Console 一覧（status / dateFrom / dateTo / userName 部分一致 / target_type）
+    @Query("SELECT i FROM Inquiry i " +
+           " LEFT JOIN MarketCustomer mc ON mc.id = i.userId " +  // RV-4：name_last + name_first
+           "WHERE (:status IS NULL OR i.status = :status) " +
+           "  AND (:targetType IS NULL OR i.targetType = :targetType) " +
+           "  AND (:dateFrom IS NULL OR i.createdAt >= :dateFrom) " +
+           "  AND (:dateTo   IS NULL OR i.createdAt <  :dateTo) " +
+           "  AND (:userNameLike IS NULL " +
+           "    OR LOWER(CONCAT(mc.nameLast, ' ', mc.nameFirst)) LIKE LOWER(CONCAT('%', :userNameLike, '%'))) ")
+    Page<Inquiry> searchForConsole(...);
+
+    // Market 一覧（自分のみ強制）
+    Page<Inquiry> findByUserIdOrderByUpdatedAtDesc(Long userId, Pageable pageable);
+}
+```
+
+> JPQL の `MarketCustomer` JOIN は phase13 で `MarketCustomer` Entity が定義されている前提（[user memory: market_auth_api_routing] 整合）。未定義なら native SQL に切り替える判断を Step 1 着手時に実施。
+
+#### 2-3-2. `InquiryMessageRepository`
+
+```java
+public interface InquiryMessageRepository extends JpaRepository<InquiryMessage, Long> {
+    // スレッド表示（時系列順）
+    List<InquiryMessage> findByInquiryIdOrderByCreatedAtAsc(Long inquiryId);
+
+    // Market 用：内部メモ除外
+    List<InquiryMessage> findByInquiryIdAndIsInternalNoteFalseOrderByCreatedAtAsc(Long inquiryId);
+}
+```
+
+### 2-4. ドキュメント / ヘルスチェック同期（RV-10）
+
+| 同期対象 | 内容 |
+|----------|------|
+| `Amazia/docs/database_design/TBL_inquiries.md` | 新設。テーブル定義表 + ER 上の位置 |
+| `Amazia/docs/database_design/TBL_inquiry_messages.md` | 新設 |
+| `Amazia/docs/database_design/README.md` | ファイル一覧へ追記 |
+| `Amazia/docs/database_design/ER_diagram.md` | Mermaid 図に `inquiries` / `inquiry_messages` ノードと `market_customers` / `inquiries` リレーションを追加 |
+| `Amazia/ops/healthcheck/required_tables.txt` | `inquiries` / `inquiry_messages` を追記（CD のヘルスチェック対象化／[CLAUDE.md §主要テーブル定数の同期](../../CLAUDE.md) 準拠／[user memory: post_deploy_schema_healthcheck] と整合） |
+
+### 2-5. テスト
+
+| 層 | 内容 |
+|----|------|
+| Core JUnit | `Inquiry` / `InquiryMessage` の `@PrePersist` / `@PreUpdate` 動作確認 |
+| Repository テスト | `InquiryRepository.countByStatus("NEW")` / `searchForConsole(...)` 各フィルタ条件 / `findByUserIdOrderByUpdatedAtDesc` |
+| Repository テスト | `InquiryMessageRepository.findByInquiryIdOrderByCreatedAtAsc` / `findByInquiryIdAndIsInternalNoteFalseOrderByCreatedAtAsc` |
+| H2 互換 | `application-test.properties` で `schema-locations=` 空のまま、`ddl-auto=create-drop` で全 Entity 生成 |
+| MySQL 互換 | Docker `docker compose down -v && docker compose up --build` で schema.sql 全体（既存 + Step 1 追加）が完走 |
+| 冪等性 | Core 再起動後も `notification_subscriptions` の `inquiry_alerts` 行数が変わらないこと（`INSERT IGNORE` 検証） |
+
+### 2-6. 完了条件（Step 1）
+
+- [ ] `inquiries` / `inquiry_messages` が H2 / MySQL 双方で生成され、Repository 単体テストが緑
+- [ ] `notification_subscriptions` への `inquiry_alerts` 投入が冪等
+- [ ] `docs/database_design/TBL_inquiries.md` / `TBL_inquiry_messages.md` 新設、`README.md` / `ER_diagram.md` 更新済み
+- [ ] `ops/healthcheck/required_tables.txt` に `inquiries` / `inquiry_messages` 追記済み
+- [ ] Core 既存テストが全緑のまま（phase15 / phase17 含む）
+
+---
+
+## 3. Step 2 — Core 共通基盤（Validator / DTO / 例外）
+
+### 3-1. `InquiryTargetOwnershipValidator`（RV-5 / 設計書 §14）
+
+`com.example.inquiry.validator.InquiryTargetOwnershipValidator` を新設。`target_type` ごとの所有者検証ロジックを 1 ファイルに集約。
+
+```java
+@Component
+public class InquiryTargetOwnershipValidator {
+
+    @Autowired private DeliveryRepository deliveryRepo;
+    @Autowired private SalesRepository salesRepo;
+    @Autowired private ProductRepository productRepo;
+
+    public void validate(String targetType, Long targetId, Long marketCustomerId) {
+        if (targetType == null) {
+            if (targetId != null) throw new IllegalArgumentException("target_id must be null when target_type is null");
+            return;
+        }
+        if (targetId == null) throw new IllegalArgumentException("target_id is required when target_type is set");
+
+        switch (targetType) {
+            case "delivery" -> validateDelivery(targetId, marketCustomerId);
+            case "sales"    -> validateSales(targetId, marketCustomerId);
+            case "product"  -> validateProduct(targetId);
+            default -> throw new IllegalArgumentException("unknown target_type: " + targetType);
+        }
+    }
+
+    private void validateDelivery(Long deliveryId, Long marketCustomerId) {
+        Delivery d = deliveryRepo.findById(deliveryId)
+            .orElseThrow(() -> new EntityNotFoundException("delivery not found: " + deliveryId));
+        // deliveries → sales.user_id で所有者検証（phase15 §phase18 への要請事項）
+        Sales s = salesRepo.findById(d.getSalesId())
+            .orElseThrow(() -> new EntityNotFoundException("sales not found for delivery: " + deliveryId));
+        if (!Objects.equals(s.getUserId(), marketCustomerId)) {
+            throw new ForbiddenAccessException("delivery does not belong to current customer");
+        }
+    }
+
+    private void validateSales(Long salesId, Long marketCustomerId) {
+        Sales s = salesRepo.findById(salesId)
+            .orElseThrow(() -> new EntityNotFoundException("sales not found: " + salesId));
+        if (!Objects.equals(s.getUserId(), marketCustomerId)) {
+            throw new ForbiddenAccessException("sales does not belong to current customer");
+        }
+    }
+
+    private void validateProduct(Long productId) {
+        Product p = productRepo.findById(productId)
+            .orElseThrow(() -> new EntityNotFoundException("product not found: " + productId));
+        if (!Boolean.TRUE.equals(p.getIsActive())) {  // phase16 Step 1 で導入された is_active
+            throw new IllegalStateException("product is not active: " + productId);
+        }
+    }
+}
+```
+
+### 3-2. DTO 群
+
+#### 3-2-1. リクエスト DTO（RV-9 で Market POST DTO から `is_internal_note` を構造的に除外）
+
+```java
+// MarketCreateInquiryRequest（RV-9：is_internal_note 持たない）
+public record MarketCreateInquiryRequest(
+    @NotBlank @Size(max = 100) String subject,
+    @NotBlank String message,
+    String targetType,
+    Long targetId
+) {}
+
+// MarketReplyInquiryRequest（RV-9：is_internal_note 持たない）
+public record MarketReplyInquiryRequest(
+    @NotBlank String message
+) {}
+
+// ConsoleReplyInquiryRequest（is_internal_note あり）
+public record ConsoleReplyInquiryRequest(
+    @NotBlank String message,
+    Boolean isInternalNote     // null は false 扱い
+) {}
+
+// ConsoleUpdateInquiryStatusRequest
+public record ConsoleUpdateInquiryStatusRequest(
+    @NotBlank String newStatus,    // NEW / IN_PROGRESS / DONE
+    String reason                  // 任意。operation_logs.comment に埋め込む
+) {}
+```
+
+#### 3-2-2. RV-11 拡張余地：Service 入力 DTO（Java Record / クラスで明示フィールド）
+
+```java
+// 将来 assignedUserId を追加可能にする
+public record InquiryStatusMutationContext(
+    Long inquiryId,
+    String newStatus,
+    String reason,
+    Long actingUserId
+    // 将来：Long assignedUserId
+) {}
+
+public record ReplyInquiryRequest(
+    Long inquiryId,
+    String senderType,         // admin_user / market_customer
+    Long senderId,
+    String message,
+    boolean isInternalNote
+    // 将来：Long assignedUserId（未割当時の自動セット）
+) {}
+```
+
+### 3-3. レスポンス DTO
+
+```java
+public record InquiryListResponse(
+    Long id, Long userId, String userName, String subject, String status,
+    String targetType, Long targetId, String targetLabel,
+    LocalDateTime createdAt, LocalDateTime updatedAt
+) {}
+
+public record InquiryDetailResponse(
+    Long id, Long userId, String userName, String subject, String status,
+    String targetType, Long targetId, String targetLabel,
+    LocalDateTime createdAt, LocalDateTime updatedAt,
+    List<InquiryMessageResponse> messages
+) {}
+
+public record InquiryMessageResponse(
+    Long id, String senderType, Long senderId, String senderName,
+    String message, boolean isInternalNote, LocalDateTime createdAt
+) {}
+```
+
+### 3-4. 例外定義
+
+```java
+public class IllegalInquiryStatusTransitionException extends RuntimeException { ... }   // 400
+public class ForbiddenAccessException extends RuntimeException { ... }                  // 403
+// EntityNotFoundException（既存 Spring 標準）→ 404
+```
+
+`GlobalExceptionHandler` に上記をマッピング追加（既存ハンドラに 1 〜 2 件追加するだけ）。
+
+### 3-5. テスト
+
+| ID | 内容 |
+|----|------|
+| OWNV-1 | `target_type=null` + `target_id=null` → OK |
+| OWNV-2 | `target_type=delivery` + 自分の sales 配下 delivery → OK |
+| OWNV-3 | `target_type=delivery` + **他人の** sales 配下 delivery → `ForbiddenAccessException` |
+| OWNV-4 | `target_type=sales` + 他人の sales → `ForbiddenAccessException` |
+| OWNV-5 | `target_type=product` + `is_active=true` → OK |
+| OWNV-6 | `target_type=product` + `is_active=false` → `IllegalStateException` |
+| OWNV-7 | `target_type=delivery` + `target_id=999999`（存在せず）→ `EntityNotFoundException` |
+| OWNV-8 | `target_type=unknown_value` → `IllegalArgumentException` |
+| DTO-1  | `MarketCreateInquiryRequest` クラスに `isInternalNote` フィールドが**存在しない**（リフレクションで確認） |
+
+### 3-6. 完了条件（Step 2）
+
+- [ ] `InquiryTargetOwnershipValidator` 単体テスト（OWNV-1 〜 OWNV-8）が緑
+- [ ] DTO 群がコンパイル通過、`MarketCreateInquiryRequest` / `MarketReplyInquiryRequest` に `isInternalNote` がないことが構造的に保証される
+- [ ] `IllegalInquiryStatusTransitionException` / `ForbiddenAccessException` が `GlobalExceptionHandler` で適切な HTTP コードに変換される
+
+---
+
+## 4. Step 3 — Core Service / Controller（CRUD + 通知発火）
+
+### 4-1. `CreateInquiryService`（Market 顧客の新規作成）
+
+```java
+@Service
+public class CreateInquiryService {
+
+    @Autowired private InquiryRepository inquiryRepo;
+    @Autowired private InquiryMessageRepository messageRepo;
+    @Autowired private InquiryTargetOwnershipValidator targetValidator;
+    @Autowired private InquiryNotificationDispatcher notificationDispatcher;
+
+    @Value("${amazia.inquiry.subject-max-length}")
+    private int subjectMaxLength;
+
+    @Value("${amazia.inquiry.message-max-length}")
+    private int messageMaxLength;
+
+    @Transactional
+    public Long create(MarketCreateInquiryRequest req, Long marketCustomerId) {
+        // 1. バリデーション（DB CHECK と二重防御）
+        if (req.subject().length() > subjectMaxLength)
+            throw new IllegalArgumentException("subject exceeds max length");
+        if (req.message().length() > messageMaxLength)
+            throw new IllegalArgumentException("message exceeds max length");
+
+        // 2. 所有者検証
+        targetValidator.validate(req.targetType(), req.targetId(), marketCustomerId);
+
+        // 3. inquiries INSERT
+        Inquiry inquiry = new Inquiry();
+        inquiry.setUserId(marketCustomerId);
+        inquiry.setSubject(req.subject());
+        inquiry.setStatus("NEW");
+        inquiry.setTargetType(req.targetType());
+        inquiry.setTargetId(req.targetId());
+        inquiry = inquiryRepo.save(inquiry);
+
+        // 4. 初回メッセージ INSERT（同一トランザクション）
+        InquiryMessage msg = new InquiryMessage();
+        msg.setInquiryId(inquiry.getId());
+        msg.setSenderType("market_customer");
+        msg.setSenderId(marketCustomerId);
+        msg.setMessage(req.message());
+        msg.setIsInternalNote(false);
+        messageRepo.save(msg);
+
+        // 5. 通知発火（同一トランザクション内・dispatcher 側で REQUIRES_NEW 制御）
+        notificationDispatcher.dispatchCreated(inquiry);
+
+        return inquiry.getId();
+    }
+}
+```
+
+### 4-2. `ListInquiryService` / `GetInquiryService`
+
+- `ListInquiryService.listForConsole(InquiryListFilter, Pageable)` → `Page<InquiryListResponse>`
+- `ListInquiryService.listForMarket(Long marketCustomerId, Pageable)` → `Page<InquiryListResponse>`（自分のみ強制）
+- `GetInquiryService.getForConsole(Long id)` → `InquiryDetailResponse`（messages 全件、内部メモ含む）
+- `GetInquiryService.getForMarket(Long id, Long marketCustomerId)` → `InquiryDetailResponse`
+  - 所有者チェック：`inquiry.userId != marketCustomerId` なら `ForbiddenAccessException`
+  - メッセージは `findByInquiryIdAndIsInternalNoteFalseOrderByCreatedAtAsc` を使う
+
+`userName` の組み立てルール（RV-4）：
+
+```java
+String displayName(MarketCustomer mc) {
+    return mc.getNameLast() + " " + mc.getNameFirst();
+}
+```
+
+`targetLabel` の組み立てルール（設計書 §6.1）は `InquiryNotificationDispatcher` と同じヘルパー（`InquiryTargetLabelResolver`）に集約し、Service / Dispatcher 双方から呼び出す。
+
+### 4-3. `ReplyInquiryService`（Market / Console 両用）
+
+```java
+@Service
+public class ReplyInquiryService {
+
+    @Autowired private InquiryRepository inquiryRepo;
+    @Autowired private InquiryMessageRepository messageRepo;
+    @Autowired private InquiryNotificationDispatcher notificationDispatcher;
+
+    @Transactional
+    public Long reply(ReplyInquiryRequest req) {
+        Inquiry inquiry = inquiryRepo.findById(req.inquiryId())
+            .orElseThrow(() -> new EntityNotFoundException("inquiry not found"));
+
+        // Market 顧客は自分のものだけ
+        if ("market_customer".equals(req.senderType())
+            && !Objects.equals(inquiry.getUserId(), req.senderId())) {
+            throw new ForbiddenAccessException("inquiry does not belong to current customer");
+        }
+
+        // is_internal_note は admin のみ（DTO 分離 + ここで再確認）
+        boolean isInternalNote = req.isInternalNote();
+        if (isInternalNote && !"admin_user".equals(req.senderType())) {
+            throw new IllegalArgumentException("only admin can post internal note");
+        }
+
+        // メッセージ INSERT
+        InquiryMessage msg = new InquiryMessage();
+        msg.setInquiryId(req.inquiryId());
+        msg.setSenderType(req.senderType());
+        msg.setSenderId(req.senderId());
+        msg.setMessage(req.message());
+        msg.setIsInternalNote(isInternalNote);
+        messageRepo.save(msg);
+
+        // inquiries.updated_at 更新（@PreUpdate に依存しないよう明示）
+        inquiry.setUpdatedAt(LocalDateTime.now());
+        inquiryRepo.save(inquiry);
+
+        // 通知（顧客返信時のみ。管理者返信時は status 不変・通知なし）
+        // ※ 管理者返信は内部メモを除き顧客にメール通知する将来案もあるが、本フェーズでは未実装
+        if ("market_customer".equals(req.senderType()) && !isInternalNote) {
+            notificationDispatcher.dispatchReplied(inquiry);
+        }
+
+        return msg.getId();
+    }
+}
+```
+
+### 4-4. `UpdateInquiryStatusService`（Console のみ）
+
+```java
+@Service
+public class UpdateInquiryStatusService {
+
+    @Autowired private InquiryRepository inquiryRepo;
+    @Autowired private InquiryNotificationDispatcher notificationDispatcher;
+
+    @Value("#{${amazia.inquiry.allowed-status-transitions}}")
+    private Map<String, List<String>> allowedTransitions;
+
+    @Transactional
+    public void update(InquiryStatusMutationContext ctx) {
+        Inquiry inquiry = inquiryRepo.findById(ctx.inquiryId())
+            .orElseThrow(() -> new EntityNotFoundException("inquiry not found"));
+
+        String oldStatus = inquiry.getStatus();
+        String newStatus = ctx.newStatus();
+
+        if (Objects.equals(oldStatus, newStatus)) return;  // 同値遷移は no-op
+
+        List<String> allowed = allowedTransitions.getOrDefault(oldStatus, List.of());
+        if (!allowed.contains(newStatus)) {
+            throw new IllegalInquiryStatusTransitionException(
+                "transition not allowed: " + oldStatus + " -> " + newStatus);
+        }
+
+        inquiry.setStatus(newStatus);
+        inquiry.setUpdatedAt(LocalDateTime.now());
+        inquiryRepo.save(inquiry);
+
+        notificationDispatcher.dispatchStatusChanged(inquiry, oldStatus, newStatus);
+    }
+}
+```
+
+### 4-5. `GetUnreadInquiryCountService`（ベルマーク用）
+
+```java
+@Service
+public class GetUnreadInquiryCountService {
+    @Autowired private InquiryRepository inquiryRepo;
+
+    public long count() {
+        return inquiryRepo.countByStatus("NEW");  // 設計書 §6.3 真実の元
+    }
+}
+```
+
+### 4-6. `InquiryNotificationDispatcher`（phase17 統合）
+
+```java
+@Component
+public class InquiryNotificationDispatcher {
+
+    @Autowired private NotificationDispatcher phase17Dispatcher;
+    @Autowired private InquiryTargetLabelResolver targetLabelResolver;
+    @Autowired private MarketCustomerRepository customerRepo;
+
+    @Value("${amazia.inquiry.notification-tag}")
+    private String tag;                        // inquiry_alerts
+
+    @Value("${amazia.inquiry.notification-templates.created.title}")
+    private String createdTitleTpl;
+    @Value("${amazia.inquiry.notification-templates.created.body}")
+    private String createdBodyTpl;
+    // 同様に replied / status-changed のテンプレート
+
+    public void dispatchCreated(Inquiry inquiry) {
+        String userName = resolveDisplayName(inquiry.getUserId());
+        String targetLabel = targetLabelResolver.resolve(inquiry.getTargetType(), inquiry.getTargetId());
+        Map<String, String> vars = Map.of(
+            "inquiry_id", String.valueOf(inquiry.getId()),
+            "subject",    inquiry.getSubject(),
+            "user_name",  userName,
+            "target_label", targetLabel
+        );
+        String title = render(createdTitleTpl, vars);
+        String body  = render(createdBodyTpl,  vars);
+        String payloadHash = sha256("inquiry_created:" + inquiry.getId());
+
+        phase17Dispatcher.dispatch(tag, NotificationLevel.INFO,
+            NotificationPayload.builder()
+                .title(title).body(body).payloadHash(payloadHash)
+                .sourceJob(null).sourceBatchExecutionId(null)
+                .build());
+    }
+
+    public void dispatchReplied(Inquiry inquiry) {
+        // 同様。payloadHash = SHA-256("inquiry_replied:" + inquiry.getId())（messages.id 含めない／RV-2）
+    }
+
+    public void dispatchStatusChanged(Inquiry inquiry, String oldStatus, String newStatus) {
+        // payloadHash = SHA-256("inquiry_status:" + inquiry.getId() + ":" + newStatus)
+    }
+}
+```
+
+`InquiryTargetLabelResolver` は `target_type` ごとの DB 参照（`product` の場合のみ `products.name` を SELECT）を伴うため、Service 層に置く（`com.example.inquiry.service.InquiryTargetLabelResolver`）。
+
+### 4-7. Controller 層（Console / Market 両セット）
+
+#### Console（JWT 認証）
+
+```java
+@RestController
+@RequestMapping("/api/console/inquiries")
+public class GetUnreadInquiryCountController {
+    @Autowired private GetUnreadInquiryCountService service;
+
+    @GetMapping("/unread-count")
+    public ResponseEntity<Map<String, Long>> handle() {
+        return ResponseEntity.ok(Map.of("count", service.count()));
+    }
+}
+
+// ListInquiryController / GetInquiryController / ReplyInquiryController / UpdateInquiryStatusController
+// すべて 1 ファイル 1 ユースケース（規約 2-2）
+```
+
+#### Market（`MARKET_SESSION_ID` Cookie 認証）
+
+```java
+@RestController
+@RequestMapping("/api/customer/inquiries")
+public class MarketCreateInquiryController {
+    @Autowired private CreateInquiryService service;
+
+    @PostMapping
+    public ResponseEntity<Map<String, Long>> handle(
+            @Valid @RequestBody MarketCreateInquiryRequest req,
+            @AuthenticationPrincipal MarketCustomerPrincipal principal) {
+        Long inquiryId = service.create(req, principal.getCustomerId());
+        return ResponseEntity.ok(Map.of("id", inquiryId));
+    }
+}
+
+// MarketListInquiryController / MarketGetInquiryController / MarketReplyInquiryController
+```
+
+`MarketCustomerPrincipal` は phase13 で定義済み（`MARKET_SESSION_ID` Cookie 経由でセッションから `market_customers.id` を取得）。本フェーズでは追加実装しない。
+
+### 4-8. テスト（設計書 §11.1 準拠）
+
+#### 正常系
+- CRT-1: `CreateInquiryService` で inquiries + 初回 inquiry_messages が同一トランザクションで INSERT
+- CRT-2: 通知 dispatch がモック検証で 1 回呼ばれる（`payload_hash = SHA-256('inquiry_created:'+id)`）
+- LIST-1: Console 一覧で status / dateFrom / dateTo / userName / targetType フィルタが動作
+- LIST-2: Market 一覧で他顧客の問い合わせが含まれない（`WHERE user_id = :sessionUserId` 強制）
+- GET-1: Console 詳細でメッセージが時系列順、内部メモ含む
+- GET-2: Market 詳細で内部メモが API レスポンスから除外される
+- REP-1: `ReplyInquiryService` の Market 顧客返信で `payload_hash = SHA-256('inquiry_replied:'+id)` で通知
+- REP-2: 管理者返信は通知発火しない（status 不変・通知なし方針）
+- UPD-1: NEW → IN_PROGRESS の遷移が成功し `updated_at` 更新 + `payload_hash = SHA-256('inquiry_status:'+id+':IN_PROGRESS')`
+- UPD-2: DONE → NEW の巻き戻しが許容される
+- CNT-1: `GetUnreadInquiryCountService.count()` が `inquiries.status='NEW'` の COUNT を返す
+- TPL-1: `console_notifications.title` / `body` が config テンプレート展開済みで NOT NULL INSERT（RV-1）
+- SUP-1: 同一 `payload_hash` の 60 分以内連投が `console_notifications.suppressed=TRUE` で抑制される（RV-2 整合 / phase17 §6.4 結線）
+
+#### 異常系（規約 4-2）
+- ERR-1: 不正ステータス遷移（例：DONE → DONE 以外で許容されない組合せ）→ `IllegalInquiryStatusTransitionException`（HTTP 400）
+- ERR-2: 存在しない `inquiries.id` → `EntityNotFoundException`（HTTP 404）
+- ERR-3: 他人の inquiry を Market API で取得 → `ForbiddenAccessException`（HTTP 403）
+- ERR-4: `target_type='delivery'` + `target_id=NULL` → Service 層で例外（DB CHECK と二重防御）
+- ERR-5: `target_type='delivery'` + 他顧客の delivery → `InquiryTargetOwnershipValidator` で拒否
+- ERR-6: Market 顧客が `is_internal_note=TRUE` を渡そうとしても、DTO に該当フィールドがないため設定されない（DTO-1 で構造的に保証済み）。仮に Service 層直接呼出で `senderType='market_customer'` + `isInternalNote=true` のケースは Service 層で例外
+- ERR-7: 件名 / 本文の文字数上限超過 → FormRequest / `@Valid` 標準バリデーションで拒否（`config('inquiry.subject-max-length')` 経由）
+
+#### config / 環境変数経由化テスト（規約 4-1）
+- CFG-1: `subject-max-length` を `application-test.properties` で `5` に上書き → 6 文字以上で `IllegalArgumentException`
+- CFG-2: `message-max-length` を上書き → 同様
+
+### 4-9. 完了条件（Step 3）
+
+- [ ] Service 6 本（Create / List / Get / Reply / UpdateStatus / GetUnreadCount）+ Validator + NotificationDispatcher + TargetLabelResolver の単体テストが緑
+- [ ] Controller 9 本（Console 5 + Market 4）が `mvn test` の Slice テスト（`@WebMvcTest`）で緑
+- [ ] 通知発火検証（CRT-2 / REP-1 / UPD-1 / TPL-1 / SUP-1）が緑
+- [ ] 異常系 7 件すべて緑
+- [ ] phase15 / phase17 の既存テストが緑のまま
+- [ ] **`docs/api_design/Core_API.md` に `/api/console/inquiries/*` 系・`/api/customer/inquiries/*` 系を追記**（RV-10）
+
+---
+
+## 5. Step 4 — Console Pass-through + SPA
+
+### 5-1. Console Pass-through 層（Laravel）
+
+各 Controller は Core API を HTTP コール → operation_logs 記録 → そのままレスポンス転送（既存 phase14 / phase17 と同思想）。
+
+```php
+// app/Inquiry/Service/ReplyInquiryService.php
+class ReplyInquiryService {
+    public function reply(int $inquiryId, array $payload, int $actingUserId): array {
+        // Core 呼出
+        $resp = $this->coreClient->post(
+            "/api/console/inquiries/{$inquiryId}/messages",
+            $payload
+        );
+
+        // operation_logs 記録（phase14 / phase15 / phase17 と整合）
+        $prefix = $payload['isInternalNote'] ?? false
+            ? config('inquiry.operation-log-prefixes.internal-note')
+            : config('inquiry.operation-log-prefixes.admin-reply');
+        $action = $payload['isInternalNote'] ?? false
+            ? 'add_internal_note'
+            : 'reply_inquiry';
+
+        $this->operationLogRepo->insert([
+            'user_id'     => $actingUserId,
+            'action'      => $action,
+            'target_type' => 'inquiries',
+            'target_id'   => $inquiryId,
+            'screen_name' => 'ConsoleInquiryDetailPage',
+            'api_name'    => "POST /api/console/inquiries/{$inquiryId}/messages",
+            'comment'     => sprintf('%s message_id=%d', $prefix, $resp['id']),
+        ]);
+
+        return $resp;
+    }
+}
+```
+
+| Service | operation_logs.action | comment 規約 |
+|---------|------------------------|--------------|
+| `ReplyInquiryService`（通常返信）| `reply_inquiry` | `[admin_reply] message_id=N` |
+| `ReplyInquiryService`（内部メモ）| `add_internal_note` | `[internal_note] message_id=N` |
+| `UpdateInquiryStatusService` | `update_inquiry_status` | `[status_change] 旧:NEW → 新:IN_PROGRESS reason='...'` |
+
+### 5-2. Console SPA（Vue）
+
+#### 5-2-1. `Bell.vue`（ヘッダー組込）
+
+```vue
+<template>
+  <button class="bell" @click="goToInquiryList">
+    <BellIcon />
+    <span v-if="count > 0" class="badge">
+      {{ count > 99 ? '99+' : count }}
+    </span>
+  </button>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useVisibilityPolling } from '@/composables/useVisibilityPolling';
+
+const props = defineProps<{
+  fetchUrl: string;
+  intervalMs: number;
+}>();
+
+const { data } = useVisibilityPolling<{ count: number }>(props.fetchUrl, props.intervalMs);
+const count = computed(() => data.value?.count ?? 0);
+
+function goToInquiryList() {
+  window.location.href = '/inquiries';
+}
+</script>
+```
+
+- `Header.vue` での組込：
+  ```vue
+  <Bell
+    fetchUrl="/api/console/inquiries/unread-count"
+    :intervalMs="Number(import.meta.env.VITE_INQUIRY_BELL_POLLING_INTERVAL_MS) || 30000"
+  />
+  ```
+
+#### 5-2-2. `useVisibilityPolling.ts`（RV-8 / 規約 2-3 Shared）
+
+```ts
+import { ref, onMounted, onUnmounted, type Ref } from 'vue';
+
+export function useVisibilityPolling<T>(fetchUrl: string, intervalMs: number): {
+  data: Ref<T | null>;
+  error: Ref<Error | null>;
+} {
+  const data = ref<T | null>(null) as Ref<T | null>;
+  const error = ref<Error | null>(null);
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const fetchOnce = async () => {
+    try {
+      const resp = await fetch(fetchUrl, { credentials: 'include' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      data.value = (await resp.json()) as T;
+      error.value = null;
+    } catch (e) {
+      error.value = e as Error;
+    }
+  };
+
+  const start = () => {
+    if (timer) return;
+    fetchOnce();
+    timer = setInterval(fetchOnce, intervalMs);
+  };
+
+  const stop = () => {
+    if (timer) { clearInterval(timer); timer = null; }
+  };
+
+  const onVisibilityChange = () => {
+    if (document.hidden) stop();
+    else { fetchOnce(); start(); }
+  };
+
+  onMounted(() => {
+    start();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+  });
+  onUnmounted(() => {
+    stop();
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  });
+
+  return { data, error };
+}
+```
+
+#### 5-2-3. `InquiryList.vue`
+
+- フィルタ：status / dateFrom / dateTo / userName / targetType（設計書 §2.1.2）
+- ソート：updated_at DESC / ASC 切替
+- ページング：50 件 / ページ
+- 一覧の `target_type` 表示は config の `target-labels` ベース
+
+#### 5-2-4. `InquiryDetail.vue`
+
+- 上部：件名 / ユーザー名 / `InquiryStatusDropdown` / 対象（クリックで `/deliveries/{target_id}` 等へ遷移）
+- 中央：`InquiryMessageBubble`（顧客左 / 管理者右）の時系列リスト
+- 下部：返信 textarea + 「返信送信」ボタン
+- 最下部：`InternalNoteAccordion`（折りたたみ式・管理者間共有）
+
+#### 5-2-5. `InquiryStatusDropdown.vue`
+
+- 現在の status から `config('inquiry.allowed_status_transitions')` を参照して許容遷移先のみを option 化
+- 同値遷移は表示しない
+
+### 5-3. テスト（設計書 §11.2）
+
+#### バックエンド（Pass-through 層 / PHPUnit）
+- PT-CSL-1: `GET /api/console/inquiries/unread-count` が Core を呼出し `{ count: N }` を返す
+- PT-CSL-2: `PATCH /api/console/inquiries/{id}/status` で `operation_logs.action='update_inquiry_status'` 記録
+- PT-CSL-3: `POST /api/console/inquiries/{id}/messages`（通常返信）で `action='reply_inquiry'` + `[admin_reply] message_id=N`
+- PT-CSL-4: 内部メモ投稿で `action='add_internal_note'` + `[internal_note] message_id=N`
+
+#### SPA（Vitest + vue-test-utils）
+- SPA-CSL-1: ベルマークに件数が正しく表示される（バッジ数値・99+）
+- SPA-CSL-2: 未対応 0 件でバッジ非表示
+- SPA-CSL-3: 件名クリックでスレッド画面に遷移
+- SPA-CSL-4: ステータスドロップダウンで許容遷移のみが option として出る
+- SPA-CSL-5: `target_type='delivery'` の問い合わせから `/deliveries/{target_id}` へリンク遷移
+- SPA-CSL-6: `useVisibilityPolling` のタブ非表示で `clearInterval`、再表示で即時 fetch + setInterval 再開（`document.dispatchEvent(new Event('visibilitychange'))` でテスト）
+- SPA-CSL-7: ポーリング間隔が `import.meta.env.VITE_INQUIRY_BELL_POLLING_INTERVAL_MS` 経由（ハードコード禁止）
+
+### 5-4. 完了条件（Step 4）
+
+- [ ] Pass-through 層 PHPUnit が緑（PT-CSL-1 〜 4）
+- [ ] SPA Vitest が緑（SPA-CSL-1 〜 7）
+- [ ] `Header.vue` にベルマーク組込済み、ローカル起動で動作確認
+- [ ] **`docs/api_design/Console_API.md` に Pass-through 経路を追記**（RV-10）
+
+---
+
+## 6. Step 5 — Market Pass-through + SPA
+
+### 6-1. Market Pass-through 層（Laravel）
+
+Console と同構造。違いは **`MARKET_SESSION_ID` Cookie からセッションユーザを取得し、リクエストパラメータとしては受け取らない**（IDOR 対策）。
+
+```php
+// app/Inquiry/Service/CreateInquiryService.php（Market）
+class CreateInquiryService {
+    public function create(array $payload, int $marketCustomerId): array {
+        // operation_logs（Market 側にも operation_logs があるか要確認・無ければスキップ）
+        // ... Core へ Pass-through。Core 側で全バリデーション + 通知発火
+        return $this->coreClient->post('/api/customer/inquiries', $payload, [
+            'X-Market-Customer-Id' => $marketCustomerId,  // phase13 既存の Pass-through ヘッダー
+        ]);
+    }
+}
+```
+
+> Market 側 Laravel で operation_logs を取るかどうかは phase13 / phase14 の既存実装に従う。Market が operation_logs を取らない方針なら Service 層では Core 呼出のみ。
+
+### 6-2. Market SPA（React）
+
+#### 6-2-1. `MyPageInquiryList.tsx`
+
+- ページング 20 件
+- 列：件名 / ステータス / 最終更新
+
+#### 6-2-2. `MyPageInquiryDetail.tsx`
+
+- 上部：件名 + ステータス（読み取り専用：顧客は変更不可）
+- 中央：メッセージ吹き出し時系列（内部メモは API レスポンスから除外済）
+- 下部：返信 textarea
+
+#### 6-2-3. `MyPageInquiryNew.tsx`
+
+設計書 §2.2.4 の入力 UI：
+- 件名 / 本文（フロントバリデーション：`subject-max-length` / `message-max-length`）
+- 対象種別プルダウン：`delivery` / `product` / `sales` / 空（汎用）
+- 対象ID 入力 UI（`TargetTypeSelector.tsx`）：
+  - `delivery` → 自分の `deliveries`（直近 3 ヶ月）プルダウン
+  - `product` → 商品検索（既存 Market 商品一覧コンポーネント流用）
+  - `sales` → 自分の `sales` プルダウン
+  - 空 → 入力欄なし
+
+submit 後は `/mypage/inquiries/{id}` へリダイレクト（投稿完了画面ではなくスレッド画面）。
+
+### 6-3. テスト（設計書 §11.3）
+
+#### バックエンド（Pass-through 層 / PHPUnit）
+- PT-MKT-1: `POST /api/customer/inquiries` が正常に通る（Core 経由で inquiries + 初回 message INSERT）
+- PT-MKT-2: 自分の問い合わせ一覧のみ取得（他顧客の問い合わせを含まない）
+- PT-MKT-3: スレッド形式でメッセージが時系列表示される
+- PT-MKT-4: ユーザーが返信できる（`POST /api/customer/inquiries/{id}/messages`）
+- PT-MKT-5: 内部メモ（`is_internal_note=TRUE` の admin_user メッセージ）が API レスポンスに含まれない
+- PT-MKT-6: ステータスが正しく反映される（管理者がステータス変更後、Market 側で表示が更新される）
+- PT-MKT-7: `target_type='delivery'` で自分の購入履歴外の `deliveries.id` を指定すると 403 で拒否される
+
+#### SPA（Vitest + React Testing Library）
+- SPA-MKT-1: マイページから「問い合わせ」メニューに遷移できる
+- SPA-MKT-2: 新規作成画面で件名 / 本文 / 対象種別 / 対象ID を入力して送信できる
+- SPA-MKT-3: 対象種別の選択に応じて対象ID 入力 UI が切り替わる
+- SPA-MKT-4: 文字数上限超過でフロントバリデーションエラーが表示される
+
+### 6-4. 完了条件（Step 5）
+
+- [ ] Pass-through 層 PHPUnit が緑（PT-MKT-1 〜 7）
+- [ ] SPA Vitest が緑（SPA-MKT-1 〜 4）
+- [ ] Market マイページから問い合わせ作成 → 一覧 → スレッド表示の flow がローカルで動作
+- [ ] **`docs/api_design/Market_API.md` に React 側呼び出しを追記**（RV-10）
+
+---
+
+## 7. Step 6 — 通知統合の実機検証（phase17 結線確認）
+
+### 7-1. 検証項目（設計書 §11.4）
+
+| ID | 検証 | 期待結果 |
+|----|------|----------|
+| INT-1 | Market 顧客が新規作成 | `console_notifications` が `target_subscription_tag='inquiry_alerts'`, `level='INFO'`, `payload_hash=SHA-256('inquiry_created:'+id)` で 1 件 INSERT |
+| INT-2 | 同一 inquiry に 2 回 INSERT を擬似（テスト上は不可だが、`payload_hash` を同値で叩く）| 60 分以内なら `suppressed=TRUE` で抑制 |
+| INT-3 | `notification_subscriptions.subscription_tag='inquiry_alerts'` の admin が SES 送出**対象として解決される**（INFO のためメール自体は送られないが、購読者解決ロジックは走る）| WARN レベルへの一時昇格テストで購読者解決 + メール経路呼び出しが検証される |
+| INT-4 | Market 顧客が返信 | `console_notifications` が `payload_hash=SHA-256('inquiry_replied:'+id)` で INSERT |
+| INT-5 | Console 管理者がステータス変更 | `console_notifications` が `payload_hash=SHA-256('inquiry_status:'+id+':'+new_status)` で INSERT |
+| INT-6 | Bell ポーリングで `inquiries.status='NEW'` の COUNT が増減反映 | 30 秒以内（タブ非表示時はスキップ） |
+
+### 7-2. 実施手順
+
+1. **ローカル**：`docker compose up --build` で Core / Console / Market / MySQL を起動
+2. Market にログインして問い合わせ作成
+3. MySQL コンソールで `SELECT * FROM console_notifications ORDER BY id DESC LIMIT 1;` を実行し `payload_hash` が `SHA-256('inquiry_created:'+id)` と一致することを確認
+4. Console にログインしてヘッダーの Bell バッジが `1` に増えることを確認
+5. Console から返信 → Market 側でリロード → 返信表示確認
+6. ステータスを NEW → IN_PROGRESS → DONE → NEW と一巡させ、`console_notifications` 件数を確認
+7. 同一 inquiry に 60 秒以内に 2 回返信 → 2 件目が `suppressed=TRUE` で記録されることを確認
+
+### 7-3. 完了条件（Step 6）
+
+- [ ] INT-1 〜 INT-6 の手動検証がローカル環境で完走
+- [ ] phase17 の既存テスト（`NotificationDispatcher` / `DigestNotificationDispatchJob` 等）が緑のまま
+- [ ] `console_notifications.title` / `body` が config テンプレート展開済みで NOT NULL 保存されている
+
+---
+
+## 8. Step 7 — E2E（end-to-end 動作確認）
+
+### 8-1. シナリオ
+
+設計書 §10 Step B 完了条件と同等：
+
+> Market から問い合わせ作成 → Console ベルマーク件数増加 → 管理者が返信 → Market 側で返信表示、の end-to-end が **本番 HTTPS 構成（CloudFront → EC2）**で通る
+
+### 8-2. 手順
+
+1. ローカル `docker-compose.yml`（マルチコンテナ）で完走 → Core / Console / Market 全テスト緑
+2. ステージング相当環境（EC2）にデプロイ：
+   - schema.sql 反映を確認（`SHOW TABLES LIKE 'inquiries';` / `'inquiry_messages';`）
+   - `notification_subscriptions` への `inquiry_alerts` 投入を確認（`SELECT COUNT(*) FROM notification_subscriptions WHERE subscription_tag='inquiry_alerts';`）
+   - `ops/healthcheck/required_tables.txt` に新規 2 テーブルが含まれ、phaseX-6 の post-deploy ヘルスチェック（[user memory: post_deploy_schema_healthcheck]）でグリーンになる
+3. 本番 HTTPS（CloudFront → EC2 / [user memory: phase11_https_policy]）で end-to-end フロー：
+   - Market マイページから新規問い合わせ作成（`target_type='delivery'` を 1 件）
+   - Console ヘッダーで Bell バッジが `1` 表示（30 秒以内）
+   - Console 一覧で件名クリック → スレッド画面
+   - 返信投稿
+   - Market 側でリロード → 返信表示
+   - Console でステータス NEW → DONE
+   - Market 側で「完了」表示確認
+4. 失敗時のロールバック手順：phase15 / phase17 と同様、`console_notifications` への INSERT は冪等抑制が効くためロールバック不要。`inquiries` / `inquiry_messages` の DROP は Step 8 のドキュメントに「事故時の手動 DROP 手順」として明記しておく（実際には実行しない）。
+
+### 8-3. 完了条件（Step 7）
+
+- [ ] ローカル `docker compose down -v && docker compose up --build` で Core / Console / Market 全テスト緑、起動完走
+- [ ] EC2 デプロイ後 `required_tables.txt` ヘルスチェック緑
+- [ ] 本番 HTTPS で end-to-end フロー完走
+
+---
+
+## 9. Step 8 — ドキュメント反映 + 本番デプロイ
+
+### 9-1. ドキュメント同期チェック（RV-10 / [user memory: design_doc_completion_checklist]）
+
+| 同期対象 | 反映内容 |
+|----------|----------|
+| `docs/database_design/TBL_inquiries.md` | Step 1 で新設 |
+| `docs/database_design/TBL_inquiry_messages.md` | Step 1 で新設 |
+| `docs/database_design/README.md` | ファイル一覧へ 2 行追記 |
+| `docs/database_design/ER_diagram.md` | Mermaid 図に inquiries / inquiry_messages とリレーション追加 |
+| `ops/healthcheck/required_tables.txt` | `inquiries` / `inquiry_messages` 追記 |
+| `docs/api_design/Core_API.md` | `/api/console/inquiries/*` 系 + `/api/customer/inquiries/*` 系の入出力 DTO・認証要件・例外コード |
+| `docs/api_design/Console_API.md` | Pass-through 経路（admin / user 両方が叩ける） |
+| `docs/api_design/Market_API.md` | React 側呼び出し API 一覧 |
+| `docs/architecture.md` 等 | 該当があれば「Bell.vue + useVisibilityPolling」の記述追加（[user memory: project_phase20_scope] のスコープ外確認：必要に応じて） |
+
+### 9-2. 本番デプロイ
+
+1. EC2 へ Core デプロイ（`mvn package` → `scp` → 再起動）
+2. Console / Market デプロイ（CloudFront 配下の S3 / EC2 へ）
+3. デプロイ後ヘルスチェック（phaseX-6）：
+   - `required_tables.txt` チェッカーが緑
+   - `/api/console/inquiries/unread-count` が `{ count: 0 }` を返す（初期は 0 件）
+   - `notification_subscriptions` の `inquiry_alerts` 行数 = `(admin + senior_admin + eternal_advisor で active_flag=TRUE) のユーザ数`
+
+### 9-3. 完了条件（Step 8 / フェーズ18 完了の定義）
+
+- [ ] DB 設計書同期：`TBL_inquiries.md` / `TBL_inquiry_messages.md` 新設・`README.md` / `ER_diagram.md` 更新
+- [ ] API 設計書同期：`Core_API.md` / `Console_API.md` / `Market_API.md` 更新
+- [ ] ヘルスチェック同期：`ops/healthcheck/required_tables.txt` 更新
+- [ ] 本番 EC2 で end-to-end フロー完走（Step 7-2 手順 3）
+- [ ] phase17 r7 候補申し送り：`InquiryArchiveJob` / `InquiryStaleAlertJob` の追加要請を phase17 §14.1 r7 候補リストに記載（[user memory: feedback_trouble_doc_consolidation] と整合：別フェーズ起こしではなく phase17 r7 への追記で対応）
+- [ ] phase15 / phase17 への要請事項が解消されたことを各設計書に追記（phase15 RR-7 解決完了・phase17 §6.2 統合完了）
+
+---
+
+## 10. リスク / 留意点
+
+### 10-1. メモリ事項（[user memory: phaseX4_t3micro_recovery]）
+
+t3.micro + `-Xmx384m` 構成のため：
+- `InquiryRepository.searchForConsole` は必ず `Pageable` で発行（全件 List 化禁止）
+- `InquiryMessageRepository.findByInquiryIdOrderByCreatedAtAsc` は 1 スレッドあたりメッセージ全件取得だが、運用想定は 1 スレッド数十件規模で許容。**スレッド長が 100 件超になる兆候**が出たら別フェーズで pagination を検討（YAGNI）
+- ベルマーク件数 SQL は `idx_inquiries_status_updated_at` で `WHERE status='NEW'` の COUNT が O(log n)
+
+### 10-2. 無料枠完走方針（[user memory: free_tier_first]）
+
+- WebSocket / SSE 不採用（30 秒ポーリング維持）
+- `console_notifications` への INSERT は phase17 既存の重複抑制（60 分・`payload_hash`）が効くため、嵐になっても 1 通に集約される
+- SES 送出は `level=INFO` で行わない（SES 月 62,000 通の枠を圧迫しない）
+
+### 10-3. phase17 への依存
+
+本フェーズは **phase17 r6 完了が前提**：
+- `notification_subscriptions` テーブル存在
+- `console_notifications` テーブル存在
+- `NotificationDispatcher.dispatch(...)` Bean 存在
+- 重複抑制（60 分・`payload_hash`）動作
+
+phase17 が r6 完了済みであることを Step 0 着手前に確認する（既存 phase17 実装計画書のステータス確認）。
+
+### 10-4. phase15 への依存
+
+`inquiries.target_type='delivery'` の所有者検証は `deliveries → sales.user_id` で行う。`Delivery.salesId` / `Sales.userId` が phase15 で確定していることを Step 2 着手前に確認する。
+
+### 10-5. 既存 `MarketCustomer` Entity の `name_last` / `name_first` カラム名（RV-4）
+
+設計書 r2 で実カラム名を `name_last` / `name_first` に確定済み。`MarketCustomer.java` Entity にもこのフィールド名で定義されている前提。Step 1 着手時に Entity を grep で確認する：
+```bash
+grep -E "nameLast|nameFirst|first_name|last_name" amazia-core/src/main/java/com/example/customer/entity/MarketCustomer.java
+```
+万一 `firstName` / `lastName` で定義されていた場合は phase13 の Entity 修正を**含めずに**本フェーズの JPQL 側を実態に合わせる（[user memory: scope_check_when_planning] 整合）。
+
+### 10-6. RV-3 phase17 r7 候補申し送り
+
+`InquiryArchiveJob`（DONE 後 N 日でアーカイブ）と `InquiryStaleAlertJob`（NEW のまま N 日経過で WARN 通知）は本フェーズスコープ外。phase17 r7 改訂時に新規 ID（phase17 prefix 規則 / `R-` / `N-` / `M-` / `K-` / `J-` は r2 〜 r6 で既出のためアルファベット繰上げ）で受理してもらう。**本フェーズ実装は単独完結**（phase17 §6.2 `NotificationDispatcher` のみ依存）。Step 8 の完了時に phase17 r7 著者へ申し送り 1 行追記を依頼する。
+
+---
+
+## 11. 採用しなかった選択肢（実装観点）
+
+| 候補 | 不採用理由 |
+|------|-----------|
+| Step 0 → A → B のまま 3 段で実装 | 設計書の段取りそのものは適切だが、実装作業として「DB / Validator / Service / Console / Market」をまとめて 1 ステップにすると差分レビューが大粒度になりすぎる。本書は 8 ステップに分解 |
+| `InquiryNotificationDispatcher` を `NotificationDispatcher` に直接マージ | phase17 の `NotificationDispatcher` を改修すると phase17 既存テストへの影響範囲が広がる。本フェーズ専用のドメイン dispatcher を 1 層噛ませて phase17 側は「タグ + level + payload」を受け取るだけの汎用 API に保つ |
+| `Bell.vue` を Header.vue に直接埋め込み（Composable 切り出さず）| RV-8 で明示された通り、phase19 集約 Bell との再利用余地のため `useVisibilityPolling` を Composable 化する |
+| `InquiryTargetOwnershipValidator` を Service 内のプライベートメソッドで実装 | RV-5 で「1 ファイルに集約する」方針が明示。`CreateInquiryService` 以外（将来の `UpdateInquiryService` 等）でも再利用したい構造のため、専用 Validator クラスとして切り出す |
+| Market 側 DTO を Console と共通化 | RV-9 で `is_internal_note` の構造的除外が明示。**Mass Assignment 攻撃面を Controller 入口で塞ぐ**ため別 DTO クラスを保つ |
+
+---
+
+## 12. レビューコメント対応サマリ（実装計画レイヤー）
+
+設計書 r3 までで RV-1 〜 RV-12 / RV2-1 〜 RV2-5 はすべて反映済み。本実装計画書はそれらを Step 単位に**実装作業**として落とし込んだもの。実装計画書レイヤー独自のレビューはまだ存在しない（初版 / 2026-05-08）。
+
+---
+
+## 改訂履歴
+
+| 版 | 日付 | 内容 |
+|----|------|------|
+| 初版 | 2026-05-08 | 設計書 r3 を実装作業に落とし込み。Step 0 〜 Step 8 の 8 段階で実装計画化。phase17 実装計画書の構造（Step 別の作業 / TDD / 完了条件 / コード例 / 既存実装との整合確認）と同等粒度で記述 |

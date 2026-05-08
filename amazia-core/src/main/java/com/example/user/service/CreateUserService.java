@@ -4,6 +4,7 @@ import com.example.auth.entity.Role;
 import com.example.auth.entity.User;
 import com.example.auth.repository.RoleRepository;
 import com.example.auth.repository.UserRepository;
+import com.example.notification.service.SyncNotificationSubscriptionsService;
 import com.example.user.dto.CreateUserRequest;
 import com.example.user.dto.UserResponse;
 import org.springframework.http.HttpStatus;
@@ -23,13 +24,16 @@ public class CreateUserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final BCryptPasswordEncoder encoder;
+    private final SyncNotificationSubscriptionsService syncNotificationSubscriptionsService;
 
     public CreateUserService(UserRepository userRepository,
                              RoleRepository roleRepository,
-                             BCryptPasswordEncoder encoder) {
+                             BCryptPasswordEncoder encoder,
+                             SyncNotificationSubscriptionsService syncNotificationSubscriptionsService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.encoder = encoder;
+        this.syncNotificationSubscriptionsService = syncNotificationSubscriptionsService;
     }
 
     @Transactional
@@ -56,6 +60,8 @@ public class CreateUserService {
         user.setRole(role);
         user.setActiveFlag(true);
 
-        return UserResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        syncNotificationSubscriptionsService.applyForUserRole(saved.getId(), role.getCode());
+        return UserResponse.from(saved);
     }
 }
