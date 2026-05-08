@@ -37,6 +37,12 @@
 |------------|------|------|
 | product_skus | N:1 | 紐づくSKU |
 | product_sku_price_history | - | 過去・未来の価格履歴 |
+| product_sku_scheduled_prices | - | 予約変更（apply_date 到来時に ApplyScheduledPricesJob が反映） |
+
+## 設計上の注意
+
+- **履歴は物理削除しない**（フェーズ17 r7）。価格スケジュール反映時、既存 `is_active = TRUE` 行は `is_active = FALSE` ＋ `end_date = 適用日 - 1日` に降格させ、新行を `is_active = TRUE` で INSERT する。過去の値段で売れた注文の参照整合を担保するため、たとえ短期間しか有効でなかった行でも DELETE しない。
+- 同 `sku_id` で `is_active = TRUE` の行は常に 1 件（`ApplyScheduledPriceService` のトランザクションで担保）。部分 UNIQUE が MySQL でサポートされないため、DB 制約ではなくサービス層契約で担保する。
 
 ## 変更履歴
 

@@ -73,6 +73,15 @@
 | 050 | [テストヘルパーのハードコードで `@UniqueConstraint(product_id, color, size)` に衝突し CI 全滅（H2 ドリフト系統の "逆向き" 顕在化）](050_h2_unique_constraint_test_helper_collision.md) | `ListPreorderProductsServiceTest` の `createSku` が `color="赤"` `size="M"` をハードコードしたまま同一 product に対して 3 回呼ばれる新規テストを追加。`skuCode` のみ `nanoTime` で一意化していたが UNIQUE 制約は `(product_id, color, size)` にかかっており 2 件目で H2 が UNIQUE 違反を返して CI 全滅。`color` を `nanoTime` で一意化して解消。**027/037/038/044/045/049 と同じ H2/本番 MySQL 乖離系統だが本件は方向が逆（H2 が Entity の `@UniqueConstraint` を忠実に DDL 化するから落ちる）**。二次リスクとして `product_skus` の `CREATE TABLE` が schema.sql に未記載（049 同型）の課題を次フェーズに送り（メタ評価対象） | ✅ 解決済 | - | - |
 | 051 | [CI 失敗：`ApplyScheduledPricesJobTest` の H2 テスト分離不足 + Market E2E のタイムアウト張り付き](051_ci_apply_scheduled_prices_test_h2_isolation_and_market_e2e_timeout.md) | 「価格予約変更機能の実装」コミットで CI が core/market 同時失敗。core 側は `ApplyScheduledPricesJobTest` にクラスレベル `@Transactional` が無く、同パッケージ `scheduledprice` の他テスト群とは違って H2 にレコードが残る → `mvn test` 全体実行時に他クラスが残した `is_pending=true && apply_date<=today` レコードが APP_3 の 2 回目 `job.run` で拾われ「冪等で 0 件」期待が 1 件に。**ApplyScheduledPricesJobTest 単体／batch パッケージ単体では PASS、`mvn test` 全体で初めて FAIL**。market 側は登録〜ログアウト E2E（`auth_flow.e2e.test.jsx`）がローカル 3.5 秒の重量シナリオで CI Ubuntu ランナーの遅延差で Vitest デフォルト 5000ms を超過。050 直後に**テスト分離は別軸（クラスライフサイクル）でも事故りうる**ことを示した事例。**同ドキュメントに派生節として `SalesMismatchInjectorTest` / `SyncNotificationSubscriptionsServiceTest` の `@Transactional` 付け忘れによる連鎖 CI 失敗（`expected: <1> but was: <2>`）、`@SpringBootTest` 全体の `@Transactional` 一括棚卸し（38 クラス追加・6 クラスは設計上維持）+ `ApplyScheduledPricesJobTest` への自衛クリーンアップ、さらに `FaultInjectionLogger` の `REQUIRES_NEW` がテストロールバックを貫通する設計に対して `FaultInjectionLogRepositoryTest` への自衛コード追加 + `ApplyScheduledPricesJobTest.APP_3` のアサーションを「自テスト所有レコード」ベースに変更した経緯も併記**。**派生①〜③の症状療法が積み上がったことを契機に [phaseX-9](../design/phaseX/phaseX-9_test_isolation_redesign.md) で構造的対策を実施（2026-05-09）**：AP-009 / TPL-009 追加・cleanup.sql + クラスレベル `@Sql(BEFORE_TEST_METHOD)` を 12 クラスへ全件適用・週次 random 順序 CI ジョブ稼働開始・残妥協点 4 件は [Phase 21](../design/phaseX/phaseX-10_testcontainers_migration.md) へ申送り | ✅ 解決済（phaseX-9 抹本対策済） | - | - |
 
+## 雛形（未発生 / 枠予約）
+
+実発生時に直近の連番にリネームし、本セクションから対応行を削除する。
+
+| ファイル | 概要 | 作成経緯 |
+|---|---|---|
+| [XXX_batch_lock_leak.md](XXX_batch_lock_leak.md) | `BatchJobLockRegistry` のロック解放漏れで「skip: another instance is running」のみ繰り返す事象 | phase17 Step 10（2026-05-09） |
+| [XXX_digest_double_send.md](XXX_digest_double_send.md) | 再起動跨ぎ / 多重 JVM 起動でダイジェストメールが二重配信される事象（N-7 永続化の破綻） | phase17 Step 10（2026-05-09） |
+
 ## 再発防止アクション（未対応）
 
 分析レポートで特定された再発防止策のうち、まだ実施されていないもの。

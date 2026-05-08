@@ -403,6 +403,18 @@ erDiagram
         BIGINT sku_id FK
     }
 
+    operation_logs_archive {
+        BIGINT id PK
+        BIGINT user_id
+        VARCHAR action
+    }
+
+    console_notifications_archive {
+        BIGINT id PK
+        VARCHAR level
+        VARCHAR target_subscription_tag
+    }
+
     batch_executions ||--o{ console_notifications : "1:N（source_batch_execution_id）"
     users ||--o{ notification_subscriptions : "1:N"
     product_skus ||--o{ product_sku_scheduled_prices : "1:N"
@@ -498,6 +510,8 @@ erDiagram
 | monthly_sales_reports | 月次売上レポート | 月次バッチが UPSERT する正本（4軸 NULL 運用） | フェーズ17 |
 | yearly_sales_reports | 年次売上レポート | 年次バッチが UPSERT する正本（4軸 NULL 運用） | フェーズ17 |
 | product_sku_scheduled_prices | SKU 価格変更予約 | apply_date 到来時に ApplyScheduledPricesJob が反映 | フェーズ17 |
+| operation_logs_archive | 操作履歴アーカイブ | 1 年超の operation_logs を OperationLogArchiveJob が年次移送 | フェーズ17 |
+| console_notifications_archive | 通知センターアーカイブ | 1 年超の通知 / 抑制送出済を ConsoleNotificationsArchiveJob が年次移送 | フェーズ17 |
 
 > 既存テーブル `product_sku_prices` にはフェーズ17 で `is_active`（BOOLEAN NOT NULL DEFAULT TRUE）を追加済み。
 

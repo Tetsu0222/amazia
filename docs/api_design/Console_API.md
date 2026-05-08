@@ -959,3 +959,18 @@ PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_a
 **レスポンス形式**：一覧 API は `{"items":[...], "total":N, "offset":M, "size":S}`（offset 採用。Core_API.md と整合）。
 
 **手動起動の異常系**：Core から返却される 400 / 404 / 503 をそのまま透過。Console 経由では JWT ミドルウェアが認証を担うため `X-User-Id` 欠落起因の 400 は実運用では発生せず、認証失敗は Console が 401 を返す。
+
+---
+
+## フェーズ17（価格スケジュール Pass-through）
+
+設計書 §13.5.2 に従い、Core の価格スケジュール API を Console から 1:1 で透過する。ルート定義は `routes/api/Sku.php` に集約。既存の現行価格 / 履歴系（`/api/skus/{id}/prices` 系）と同じネームスペースに収める。
+
+| メソッド | パス | コントローラー | 中継先 |
+|----|----|----|----|
+| GET    | `/api/skus/{id}/scheduled-price` | `App\ScheduledPrice\Controller\GetScheduledSkuPriceController`      | Core `GET /api/skus/{id}/scheduled-price`（`is_pending=TRUE` の 1 件 / 無ければ 204） |
+| PUT    | `/api/skus/{id}/scheduled-price` | `App\ScheduledPrice\Controller\RegisterScheduledSkuPriceController` | Core `PUT /api/skus/{id}/scheduled-price`（UPSERT。`apply_date < today` で 422） |
+| DELETE | `/api/skus/{id}/scheduled-price` | `App\ScheduledPrice\Controller\DeleteScheduledSkuPriceController`   | Core `DELETE /api/skus/{id}/scheduled-price`（`is_pending=TRUE` を物理削除） |
+| GET    | `/api/skus/{id}/prices/history`  | `App\Sku\Controller\ListSkuPriceHistoryController`                  | Core `GET /api/skus/{id}/prices/history`（`start_date DESC`） |
+
+**SKU UI との対応**：Console SKU 詳細モーダルの「価格管理」タブ 3 ブロック化（実装計画書 §6.5）が、上記 4 エンドポイントと既存 `/api/skus/{id}/prices`（GET/POST）を組み合わせて使う。
