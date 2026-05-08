@@ -194,6 +194,32 @@ H2 + `ddl-auto=create-drop` は Entity の `@UniqueConstraint` を忠実に DDL 
 - [ ] H2 で作成される DDL（`ddl-auto=create-drop` の Entity 由来）と本番 MySQL の実 DDL（mysqldump スナップショット）の **両方向** で UNIQUE 制約・カラム型が一致しているか確認する観点を持つ
 - [ ] テストヘルパー新規作成時、ローカル `mvn test` を必ず通してから push（push 直後の CI で UNIQUE 違反を踏むのは構造的に再発する）
 
+### `@SpringBootTest` のクラスライフサイクル分離（051 起因）
+
+`@SpringBootTest` のテストキャッシュにより同一構成のテストクラスは H2 インスタンスを共有する。クラスレベル `@Transactional` を**付け忘れた1つのテスト**が他テストクラスに残置レコードを撒くと、**単体実行 / パッケージ単体実行では PASS、`mvn test` 全体で初めて FAIL** という最も気付きにくい形で顕在化する（051）。
+
+- DB を直接書き込む `@SpringBootTest` テストは **クラスレベル `@Transactional` を原則付ける**。同一ドメインの兄弟テスト（同パッケージ）が `@Transactional` を付けているか先に確認し揃える
+- `@Transactional` を**敢えて付けない**例外（`REQUIRES_NEW` の独立コミットを検証する／長時間実行されるバッチを実 DB で観察したい等）はテストクラス JavaDoc に理由を明記する
+- `@Transactional` × `REQUIRES_NEW` の併用は問題なし。テスト outer TX は終了時にロールバックされ、`REQUIRES_NEW` 内で別 TX コミットされた行は残る。`batch_executions` のように JOB_NAME で最新を引く設計なら自テストの行が必ず上に来るので、テスト分離は崩れない（051 で実証）
+- 実装したテストが**単体では PASS** することは「分離されている」ことの証明にならない。`mvn test` 全体で必ず通してから push する
+
+#### テスト観点（追加）
+- [ ] 新規 `@SpringBootTest` テストクラスは、同パッケージ・同ドメインの兄弟テストの `@Transactional` 付与状況に揃っているか
+- [ ] テストクラス内で DB に書き込む処理がある場合、`@Transactional` 不在を意識的に選択した理由が JavaDoc に書かれているか
+- [ ] push 前に `mvn test` 全体で `BUILD SUCCESS` を確認したか（パッケージ単体だけで PASS を確認して push しない）
+
+### Vitest 長尺 E2E のタイムアウト明示（051 起因）
+
+`@testing-library/user-event` v14 の `userEvent.type` は文字単位で内部 `setTimeout` を挟むため、入力フィールドが多い E2E は CI ランナー差で容易にデフォルト 5000ms を超える。**ローカルでは PASS、CI Ubuntu ランナーで初めて FAIL** という典型的なフレーキネスを生む。
+
+- 重量シナリオ（複数フィールド入力 → submit → 画面遷移 → 再入力 → ...）を 1 つの `it()` で通すテストは、第 3 引数 or `{ timeout: ms }` で**個別タイムアウトを明示**する（既定 5000ms に対し 15000ms 程度が安全圏）
+- ファイル全体で底上げするなら `vitest.config.js` の `test.testTimeout` で対応するが、長尺シナリオが少数なら個別指定に留める方が「重いテストの存在」が可視化されて望ましい
+- テスト追加時は `vitest run --reporter=verbose` でローカル実行時間を計測し、デフォルト閾値の 50% 超なら明示拡張（CI は概ねローカルの 1.5〜2 倍遅い前提）
+
+#### テスト観点（追加）
+- [ ] 重量級 E2E シナリオ（10 フィールド超の入力・複数画面遷移を 1 テストで通すもの）は個別タイムアウトを `it(name, fn, ms)` で明示しているか
+- [ ] テスト追加時に `vitest run --reporter=verbose` でローカル実行時間を確認したか（デフォルト閾値の 50% 超なら拡張検討）
+
 ---
 
 ## カテゴリ7: Core API 依存の異常系テスト

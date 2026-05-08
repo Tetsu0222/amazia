@@ -1,0 +1,139 @@
+# 051: CI 失敗 — `ApplyScheduledPricesJobTest` の H2 テスト分離不足 + Market E2E のタイムアウト張り付き
+
+## ステータス
+✅ 解決済（2026-05-08）
+
+## 発症箇所
+- CI: GitHub Actions `Deploy to EC2` ワークフロー / Run [#25548702763](https://github.com/Tetsu0222/amazia/actions/runs/25548702763)
+- 失敗ジョブ:
+  - `amazia-core テスト` — `ApplyScheduledPricesJobTest.APP_3_2度実行しても_2回目は対象0件で冪等` ([ApplyScheduledPricesJobTest.java:91-108](../../amazia-core/src/test/java/com/example/batch/ApplyScheduledPricesJobTest.java#L91-L108))
+  - `amazia-market テスト` — `auth_flow.e2e.test.jsx` の `Market 認証フロー E2E > 登録 → ログイン → マイページ → ログアウト の一連フロー` ([auth_flow.e2e.test.jsx#L117](../../amazia-market/src/test/auth_flow.e2e.test.jsx#L117))
+- 起因コミット: [`633901ef`](https://github.com/Tetsu0222/amazia/commit/633901ef) `価格予約変更機能の実装`
+
+本トラブルは「同じ CI run で同時に発生した CI 失敗 2 件」をまとめて記録する（性質は別だが同じ修正サイクル内）。
+
+## 症状
+
+### 症状①: amazia-core テスト失敗
+```
+[ERROR] ApplyScheduledPricesJobTest.APP_3_2度実行しても_2回目は対象0件で冪等:102
+        2 回目は is_pending=true が無く対象 0 件 ==> expected: <0> but was: <1>
+[ERROR] Tests run: 524, Failures: 1, Errors: 0, Skipped: 0
+```
+
+`ApplyScheduledPricesJob` を 2 回連続で実行したとき、2 回目は対象 0 件（冪等）であるべきだが、`batch_executions.target_count = 1` になっている。
+
+### 症状②: amazia-market テスト失敗
+```
+src/test/auth_flow.e2e.test.jsx > Market 認証フロー E2E > 登録 → ログイン → マイページ → ログアウト の一連フロー
+Error: Test timed out in 5000ms.
+```
+
+会員登録 → ログイン → マイページ → ログアウトを 1 シナリオで通す Vitest E2E が、デフォルトタイムアウト 5000ms に張り付いて落ちる。
+
+## 根本原因
+
+### 原因①: ApplyScheduledPricesJobTest のテスト分離不足（H2 持ち越し）
+
+[ApplyScheduledPricesJobTest.java:36-39](../../amazia-core/src/test/java/com/example/batch/ApplyScheduledPricesJobTest.java#L36-L39) のクラス宣言:
+
+```java
+@SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
+@Import(TestAwsConfig.class)
+@ActiveProfiles("test")
+class ApplyScheduledPricesJobTest {  // ← @Transactional が付いていない
+```
+
+`@Transactional` が付いていないため、テスト終了時に DB がロールバックされず H2 に永続化されたまま残る。同パッケージ `scheduledprice` の他テスト（`RegisterScheduledSkuPriceServiceTest` `DeleteScheduledSkuPriceServiceTest` `GetScheduledSkuPriceServiceTest` `ProductSkuScheduledPriceRepositoryTest`）はいずれもクラスレベル `@Transactional` を付与しており自動ロールバックされる ([RegisterScheduledSkuPriceServiceTest.java:31](../../amazia-core/src/test/java/com/example/scheduledprice/RegisterScheduledSkuPriceServiceTest.java#L31) など)。
+
+`ApplyScheduledPriceService` 自身は[`@Transactional`](../../amazia-core/src/main/java/com/example/scheduledprice/service/ApplyScheduledPriceService.java#L35) で `is_pending=false` への更新を確実にコミットしている（**冪等性のロジックは正しい**）。問題はテスト側で、`mvn test` 全体実行時に **このクラスより前に動いた他のテストが H2 に残した「`is_pending=true && apply_date <= today`」のレコード**が、`APP_3` の 2 回目 `job.run` で `findByApplyDateLessThanEqualAndIsPendingTrue` クエリに引っかかる。
+
+#### 切り分け実測（ローカル）
+
+| 実行範囲 | APP_3 結果 |
+|---|---|
+| `ApplyScheduledPricesJobTest` 単体 | ✅ PASS（1回目=1/1, 2回目=0/0） |
+| `ApplyScheduledPricesJobTest.APP_1 + APP_2 + APP_3` メソッド指定 | ✅ PASS |
+| `com.example.batch.*Test`（68件） | ✅ PASS |
+| `mvn test` 全体（524件） | ❌ FAIL（2回目=1/1） |
+
+`batch` パッケージ単体では PASS、`mvn test` 全体で FAIL。**汚染源は `batch` パッケージ外のテスト**だが、surefire のデフォルト実行順序は filesystem 依存で再現が壊れやすい。本件の本質は「特定のテストクラスが汚染源」ではなく「**`@Transactional` 無しテストが他クラスのテストキャッシュ共有 H2 上にレコードを残しうる**」という構造問題。
+
+### 原因②: Market E2E が Vitest デフォルトタイムアウト 5000ms に張り付き
+
+[auth_flow.e2e.test.jsx:117-195](../../amazia-market/src/test/auth_flow.e2e.test.jsx#L117-L195) の「登録 → ログイン → マイページ → ログアウト」シナリオは、
+
+- `userEvent.type` で姓名・郵便番号・生年月日・メール・パスワード×2 を入力（10 フィールド超）
+- 郵便番号 → 住所 API（モック）→ 自動補完待機
+- 登録 submit → ログイン画面遷移 → 再度フォーム入力 → ログイン → マイページ確認 → ログアウト → ヘッダ再描画確認
+
+を 1 つの `it()` で通す重量級シナリオ。ローカル（Windows）でも実測 **3455ms**（`vitest run --reporter=verbose` 計測値）と、デフォルトタイムアウト 5000ms の約 70% を消費している。CI（GitHub Actions Ubuntu ランナー）はローカルより遅いため、5000ms を恒常的に超過する。
+
+価格予約変更機能の実装コミット（633901ef）自体に Market E2E の追加・変更は含まれていないが、`@testing-library/user-event` v14 系の `userEvent.type` は文字単位で内部 setTimeout を挟むため、ランナー差で容易に閾値を跨ぐ。
+
+## なぜ CI で検知できなかったか
+
+### 原因①について
+- `ApplyScheduledPricesJobTest` を実装した時点（おそらく phase17 step3-6 タイミング）では surefire の実行順序によって他クラスのレコードが先に走らない実行プランで通っていた。**冪等性ロジック単体では正しい**ため、TDD では検知できない構造（テスト同士の相互作用問題）。
+- 同パッケージ `scheduledprice` のテストはすべて `@Transactional` を付けていたが、`batch` パッケージの本テストだけ付け忘れていた。コードレビューで「並びの他テストと揃えるべき」観点が漏れた。
+
+### 原因②について
+- ローカルでは PASS するため、コミット時点では検知できない（CI ランナーの実行速度差で初めて顕在化）。
+- Vitest のテストごとに「想定実行時間」を見直す運用が確立しておらず、長尺シナリオでも `it()` 既定値（5000ms）のまま放置されていた。
+
+## 修正内容
+
+### 修正① ApplyScheduledPricesJobTest にクラスレベル `@Transactional` を付与
+
+`scheduledprice` パッケージの他テストと並べる方針。`@SpringBootTest` + `@Transactional` は Spring Test の標準的な組み合わせで、テストメソッド終了時に自動ロールバック。
+
+```java
+@SpringBootTest(properties = "amazia.batch.scheduler-enabled=true")
+@Import(TestAwsConfig.class)
+@ActiveProfiles("test")
+@Transactional  // ← 追加
+class ApplyScheduledPricesJobTest {
+```
+
+注意: `ApplyScheduledPriceService.applyOne` は `@Transactional` 付き Service。テストクラスに `@Transactional` を付けるとテストトランザクションに参加するが、Spring の `Propagation.REQUIRED`（デフォルト）なら参加・ロールバックで問題ない。**ただし `BatchExecutionRecorder` が `@Transactional(propagation = REQUIRES_NEW)` で別トランザクションに記録する場合、テストロールバック後も `batch_executions` 行が残る可能性がある** — テストはこれを assertEquals で参照しているので、修正と同時に挙動を確認する。
+
+### 修正② Market E2E の該当シナリオにテストレベルタイムアウトを 15 秒へ拡張
+
+```js
+it('登録 → ログイン → マイページ → ログアウト の一連フロー', async () => {
+  // ...
+}, 15000);  // ← 第3引数で個別タイムアウト指定
+```
+
+Vitest は `it()` の第 3 引数（または `{ timeout: 15000 }`）で個別タイムアウトを指定できる。ファイル全体で底上げするなら `vitest.config.js` の `test.testTimeout` で対応するが、本件は重量級 E2E シナリオが 1 件だけのため局所修正に留める。
+
+### 検証
+- ✅ `mvn test`（524件）が `Tests run: 524, Failures: 0, Errors: 0, Skipped: 0` / `BUILD SUCCESS` で完走（2026-05-08 ローカル）
+- ✅ `npx vitest run src/test/auth_flow.e2e.test.jsx`（7件）が全 PASS（2026-05-08 ローカル）。該当シナリオの実測 3366ms（拡張後 15000ms に対し十分余裕あり）
+- ⏳ 修正後コミットを push して GitHub Actions の `Deploy to EC2` ワークフローが test-core / test-market 両方グリーン（次のデプロイで確認）
+
+### 検証時に確認した `@Transactional` × `REQUIRES_NEW` の挙動
+
+[BatchExecutionRecorder.java](../../amazia-core/src/main/java/com/example/batch/service/BatchExecutionRecorder.java) は `@Transactional(propagation = REQUIRES_NEW)` で `batch_executions` を独立トランザクションに記録する設計。テストクラスに `@Transactional` を付けると以下の挙動になる:
+
+| 操作 | TX 関係 | テスト終了時 |
+|---|---|---|
+| `persistProductWithSku` / `persistActivePrice` / `persistScheduled` | テスト outer TX | ロールバックで消える |
+| `applyService.applyOne`（`@Transactional` REQUIRED） | outer に参加 | ロールバック対象 |
+| `BatchExecutionRecorder.start/success`（REQUIRES_NEW） | 別 TX 即コミット | **`batch_executions` に残る** |
+
+`latestExecution()` の `findByJobNameOrderByStartedAtDesc(JOB_NAME).get(0)` は JOB_NAME 単位で最新を返すため、同一テスト内で `job.run` 直後に呼べば自テストの行が上に来る。テスト分離は崩れない。524 件完走で実証済み。
+
+## 再発防止
+
+| 観点 | 対策 |
+|------|------|
+| **Spring Boot テストの `@Transactional` 付与の規律**：DB を直接触る `@SpringBootTest` テストはクラスレベル `@Transactional` を原則付ける | `test_insights.md` カテゴリに「Spring Boot テストの分離方針」を新設。`@Transactional` を付けない例外（`AbstractBatchJob` の `BatchExecutionRecorder` のように `REQUIRES_NEW` を検証するケース等）はテストクラス JavaDoc に理由を明記する規律へ |
+| **CI 単体ローカル相互再現性の検知**：「ローカル単体 PASS / CI 全体 FAIL」を踏んだ事例として AP に追記 | `ai_collaboration_antipatterns.md` に「単体テストでは PASS でも `mvn test` 全体で FAIL するテスト分離不足」を新規 AP として検討（既存 AP-* に該当が無い場合 AP-009 候補） |
+| **Vitest E2E の閾値運用**：長尺 E2E シナリオはタイムアウトを明示する | `test_insights.md` に「Vitest の長尺 E2E は `it(..., 15000)` で明示」観点を追加。テスト追加時に `vitest run --reporter=verbose` でローカル実行時間を確認し、デフォルト閾値の 50% 超なら明示拡張する規律 |
+| **CI 失敗時の差分切り分けランブック**：「単体 PASS / 全体 FAIL」を踏んだとき即座に試す観点（`@Transactional` 有無確認・パッケージ単位再実行・surefire 順序変更）の手順を残す | `operational_insights.md` カテゴリに「CI 失敗時のテスト分離切り分け手順」追記 |
+
+## AI協働観点
+- **AI の判断ミス**：phase17 step3-6 で `ApplyScheduledPricesJobTest` を新規作成した際、`scheduledprice` パッケージの既存 4 テストがすべて `@Transactional` を付けている事実を確認せず、`batch` パッケージのテンプレ（他のジョブテストが `@Transactional` 無しで書かれている）に寄せて書いた。**「並びの兄弟テストの規律」と「同じドメイン領域（scheduledprice）の規律」のどちらに合わせるべきかという判断が必要だったが、機械的にディレクトリ近接性で寄せた**。実際は「DB 永続化を伴う Service／Repository テスト」かどうかで決めるべきで、`ApplyScheduledPricesJobTest` は両方触る重量テストだったため `scheduledprice` 側に寄せるのが正解だった。
+- **人間が止めるべきだった点**：レビュー時点では `mvn test` を回して PASS していたため検知できない（surefire の実行順依存で隠れていた）。コードレビューで「`@Transactional` 付け忘れ」を指摘するチェックポイントが規約化されていれば事前に止まっていた。
+- **該当アンチパターン**：既存 AP-* に「単体 PASS / 全体 FAIL のテスト分離不足」は無い。AP-009 として追加候補（既存 AP の対応プロンプトテンプレでテストヘルパー観点はあるが、テストクラスのライフサイクル分離は未カバー）。

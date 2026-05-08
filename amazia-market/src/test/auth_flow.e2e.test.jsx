@@ -192,7 +192,10 @@ describe('Market 認証フロー E2E', () => {
     expect(screen.getByRole('menuitem', { name: '会員登録' })).toBeInTheDocument();
     // 認証必須のマイページ画面は閉じている
     expect(screen.queryByRole('heading', { name: 'マイページ' })).not.toBeInTheDocument();
-  });
+  }, 15000);
+  // ↑ 第3引数は本シナリオ専用の Vitest タイムアウト（既定 5000ms に対し拡張）。
+  //   登録 → ログイン → マイページ → ログアウト を 1 it() で通す重量シナリオで
+  //   userEvent.type の文字単位 setTimeout 起因のランナー差で CI が timeout する事象あり（051）。
 
   it('ログイン失敗（401）でエラーメッセージが出て認証状態にならない', async () => {
     customerApi.loginCustomer.mockRejectedValue({ response: { status: 401 } });
