@@ -1,6 +1,6 @@
 <template>
-  <div style="padding: 24px; max-width: 1400px">
-    <a-page-header title="バッチ実行履歴" sub-title="Amazia Console" />
+  <div :style="embedded ? 'max-width: 1400px' : 'padding: 24px; max-width: 1400px'">
+    <a-page-header v-if="!embedded" title="バッチ実行履歴" sub-title="Amazia Console" />
 
     <a-form layout="inline" style="margin-bottom: 16px" @submit.prevent="reload(0)">
       <a-form-item label="ジョブ名">
@@ -87,6 +87,10 @@
 import { ref, reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { listBatchExecutions, getBatchExecution } from '../api/batchApi.js';
+
+defineProps({
+  embedded: { type: Boolean, default: false },
+});
 
 const STATUS_OPTIONS = [
   { value: 'RUNNING', label: 'RUNNING' },

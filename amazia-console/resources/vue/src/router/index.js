@@ -25,9 +25,8 @@ import DeliveryDetail             from '../features/delivery/pages/DeliveryDetai
 import InboundList                from '../features/inbound/pages/InboundList.vue';
 import InboundCreate              from '../features/inbound/pages/InboundCreate.vue';
 import InboundStockImport         from '../features/inbound/pages/InboundStockImport.vue';
-import BatchExecutionList         from '../features/batch/pages/BatchExecutionList.vue';
+import BatchManagementPage        from '../features/batch/pages/BatchManagementPage.vue';
 import BatchNotificationList      from '../features/batch/pages/BatchNotificationList.vue';
-import BatchManualPage            from '../features/batch/pages/BatchManualPage.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -63,11 +62,11 @@ const routes = [
   { path: '/delivery',                 component: DeliveryList,        meta: { requiresAuth: true } },
   { path: '/delivery/:id',             component: DeliveryDetail,      meta: { requiresAuth: true } },
 
-  // フェーズ17 バッチ管理
-  { path: '/batch/executions',         component: BatchExecutionList,    meta: { requiresAuth: true } },
+  // フェーズ17 バッチ管理（実行履歴・手動起動はタブ切り替え。手動タブは admin 相当のみ表示）
+  { path: '/batch',                    component: BatchManagementPage,   meta: { requiresAuth: true } },
+  { path: '/batch/executions',         redirect: { path: '/batch', query: { tab: 'executions' } } },
+  { path: '/batch/manual',             redirect: { path: '/batch', query: { tab: 'manual' } } },
   { path: '/batch/notifications',      component: BatchNotificationList, meta: { requiresAuth: true } },
-  { path: '/batch/manual',             component: BatchManualPage,
-    meta: { requiresAuth: true, roles: ['admin', 'senior_admin', 'eternal_advisor'] } },
 ];
 
 const router = createRouter({

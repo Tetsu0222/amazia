@@ -1331,3 +1331,17 @@ phase11 の `CreateUserService` / `UpdateUserService` に：
 
 ### 14-3. SKU TX 構造的限界（H-6）
 `product_sku_stocks.quantity = 0` の SKU について、`InventoryConsistencyCheckJob` は不整合を検知できない（`0 = SUM(空集合) = 0` で偶然一致）。SKU TX に CHECK 制約を追加する将来対応までは構造的限界。Step 3-1 の TDD コメントに「将来 CHECK 追加時に期待値反転」を明記。
+
+### 14-4. t3.micro バッチ実行中の応答遅延（2026-05-08 顕在化）
+
+phase17 で `PostalCsvImportJob`（KEN_ALL.CSV 12 万件 INSERT）等の重量バッチが追加されたが、
+EC2 t3.micro（vCPU 2 / 1 GB RAM / `-Xmx384m`）でバッチ実行中の同時負荷は phaseX-4 軽負荷試験
+の対象外であり、Market 顧客・Console 管理者の API 応答が **5〜30 秒の遅延 or タイムアウト**
+する可能性がある。
+
+定期バッチ cron は深夜帯（日次 03:30 / 月次 03:00 + 04:30 / 年次 1/1 05:00）に集中しているため、
+**深夜帯メンテナンスウィンドウ（02:30-05:30 JST）** で Market を「メンテ画面」表示にする方針が
+合理的。
+
+**対応：** [phaseX-8 設計書](../design/phaseX/phaseX-8_maintenance_window_for_batch_load.md) として切り出し済。
+phase17 では実装しない。本フェーズ完了後に phaseX-8 を独立フェーズとして実施する。

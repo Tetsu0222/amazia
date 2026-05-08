@@ -1,6 +1,6 @@
 <template>
-  <div style="padding: 24px; max-width: 900px">
-    <a-page-header title="バッチ手動起動" sub-title="Amazia Console" />
+  <div :style="embedded ? 'max-width: 900px' : 'padding: 24px; max-width: 900px'">
+    <a-page-header v-if="!embedded" title="バッチ手動起動" sub-title="Amazia Console" />
 
     <a-alert
       type="warning"
@@ -45,6 +45,10 @@ import { ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { triggerBatchManual } from '../api/batchApi.js';
 
+defineProps({
+  embedded: { type: Boolean, default: false },
+});
+
 const JOBS = [
   {
     jobName: 'RebuildInventoriesJob',
@@ -65,6 +69,11 @@ const JOBS = [
     jobName: 'ApplyScheduledPricesJob',
     label: 'ApplyScheduledPricesJob（予約価格反映）',
     description: '予約変更登録された SKU 価格を即時反映します。通常は日次 03:30 に自動実行。',
+  },
+  {
+    jobName: 'PostalCsvImportJob',
+    label: 'PostalCsvImportJob（郵便番号 CSV 取込）',
+    description: '日本郵便の KEN_ALL.CSV をダウンロードし postal_addresses を全件洗い替えします。通常は毎月 1 日 03:00 に自動実行。',
   },
 ];
 

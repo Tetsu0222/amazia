@@ -2,6 +2,7 @@ package com.example.batch.job;
 
 import com.example.batch.config.AbstractBatchJob;
 import com.example.batch.config.BatchResult;
+import com.example.batch.config.OnDemandJob;
 import com.example.market.postal.service.ImportPostalCsvService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,11 +18,14 @@ import org.springframework.stereotype.Component;
  * <p>phase13 に実装済の {@link ImportPostalCsvService} を再利用し、本ジョブは
  * 「{@code @Scheduled} の引き金」と「{@code batch_executions} への記録」のみを担当する。
  * 手動起動経路（{@code --import-postal-csv} フラグ）は phase17 完了後も残し、運用救済として併存させる。
+ *
+ * <p>{@link OnDemandJob} を実装し、Bean 名 = jobName で
+ * {@link com.example.batch.controller.BatchManualTriggerController} 経由の Console 手動起動にも対応。
  */
-@Component
+@Component(PostalCsvImportJob.JOB_NAME)
 @ConditionalOnProperty(name = "amazia.batch.scheduler-enabled",
                        havingValue = "true", matchIfMissing = true)
-public class PostalCsvImportJob extends AbstractBatchJob {
+public class PostalCsvImportJob extends AbstractBatchJob implements OnDemandJob {
 
     public static final String JOB_NAME = "PostalCsvImportJob";
 
@@ -38,7 +42,7 @@ public class PostalCsvImportJob extends AbstractBatchJob {
     }
 
     @Override
-    protected String jobName() { return JOB_NAME; }
+    public String jobName() { return JOB_NAME; }
 
     @Override
     protected BatchResult execute() {
