@@ -13,15 +13,19 @@ React / Vue / PHP / Java / MySQL / AWS / GitHub Actions / AI 協働開発
 ## プロジェクトの特徴（3 本柱）
 
 **1. マルチシステム連携**
-React（Market）・Vue/PHP（Console）・Spring Boot（Core）・MySQL を連動させた 3 システム構成の EC 基盤。
+- 3 システム構成の EC 基盤。
+  - React（Market）
+  - Vue/PHP（Console）
+  - Spring Boot（Core）
+  - MySQL
 
 **2. 完全自動 CI/CD** 
-GitHub Actions → ECR → S3 → SSM → nginx reload までを自前構築。
-ゾンビコンテナ・SSM 不達・DDL 失敗など実運用の落とし穴を踏み抜きながら改善。
+- GitHub Actions → ECR → S3 → SSM → nginx reload までを自前構築。
+- ゾンビコンテナ・SSM 不達・DDL 失敗など実運用の落とし穴を踏み抜きながら改善。
 
 **3. AI 協働開発の制度化** 
-AI に渡すコンテキストを 資産として設計・蓄積。
-CLAUDE.md → `docs/ai_context/` → `docs/troubles/`の 3 層構造で、AI が継続学習する仕組みを構築。
+- AI に渡すコンテキストを 資産として設計・蓄積。
+- CLAUDE.md → `docs/ai_context/` → `docs/troubles/`の 3 層構造で、AI が継続学習する仕組みを構築。
 
 ---
 
