@@ -24,6 +24,9 @@
           <a-menu-item key="/inbound">入荷管理</a-menu-item>
           <a-menu-item key="/operation-logs">操作履歴</a-menu-item>
           <a-menu-item key="/workflows">ワークフロー</a-menu-item>
+          <a-menu-item key="/batch/executions">バッチ実行履歴</a-menu-item>
+          <a-menu-item key="/batch/notifications">通知センター</a-menu-item>
+          <a-menu-item v-if="isAdmin" key="/batch/manual">バッチ手動起動</a-menu-item>
           <a-menu-item v-if="isAdmin" key="/users">社員管理</a-menu-item>
           <a-menu-divider />
           <a-menu-item key="__logout">ログアウト</a-menu-item>

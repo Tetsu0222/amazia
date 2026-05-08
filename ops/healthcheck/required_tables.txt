@@ -63,3 +63,5 @@ fault_injection_logs
 monthly_sales_reports
 yearly_sales_reports
 product_sku_scheduled_prices
+operation_logs_archive
+console_notifications_archive

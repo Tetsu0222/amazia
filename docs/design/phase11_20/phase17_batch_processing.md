@@ -1166,6 +1166,42 @@ API 関数（`features/skus/api/skus.js`）：
 - `ops/healthcheck/required_tables.txt`：`product_sku_scheduled_prices` を追加（Core テーブル）
 - `amazia-core/src/main/resources/schema.sql`：`ALTER TABLE product_sku_prices ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE` および新規テーブル DDL を追記
 
+## 13.7 バッチ履歴 / 通知センター取得系 API（2026-05-08 追加・Step 6 スコープ）
+
+> **追加経緯：** §11 ステップ表で Step 6 を「Console UI」として括っていたが、実装着手時点で「Console UI が呼ぶ Core 取得系 API」が §5（DB）にも §11 にも明記されていないことが判明。Step 6 のスコープに **Step 6-0** として追加する（実装計画書 §8-0 と整合）。手動起動 API（既存 `BatchManualTriggerController`）と同パッケージで束ねる。
+
+### 13.7.1 Core API（amazia-core）
+
+| メソッド | パス | Service / Controller | 認可 | 備考 |
+|----------|------|---------------------|------|------|
+| GET | `/api/console/batch/executions` | `ListBatchExecutionService` / `ListBatchExecutionController` | `X-User-Id` ヘッダ必須 | `started_at DESC`・`job_name` / `status` フィルタ・LIMIT/OFFSET ページング・レスポンスは `{items, total, page, size}` |
+| GET | `/api/console/batch/executions/{id}` | `GetBatchExecutionService` / `GetBatchExecutionController` | `X-User-Id` ヘッダ必須 | 詳細（`error_summary` 含む）・404 で未存在 |
+| GET | `/api/console/batch/notifications` | `ListConsoleNotificationService` / `ListConsoleNotificationController` | `X-User-Id` ヘッダ必須 | `target_user_id = X-User-Id` または `target_subscription_tag IN (購読中タグ)` の **未読** のみ。`level` / `target_subscription_tag` フィルタ |
+| PUT | `/api/console/batch/notifications/{id}/read` | `MarkConsoleNotificationReadService` / `MarkConsoleNotificationReadController` | `X-User-Id` ヘッダ必須 | `read_by_user_id` / `read_at` 更新・他ユーザ宛通知の既読化は 403 |
+
+### 13.7.2 通知センター可視化条件（重要）
+
+- `suppressed = true` レコードは UI 一覧から **除外**（ダイジェスト経路で吸収済のため）
+- `digest_sent_at IS NOT NULL` でも UI 個別表示は継続（既読化は個別に行える）
+- フィルタ未指定時は「未読」を既定とする。`?include_read=true` で既読も含める
+
+### 13.7.3 Console Pass-through（amazia-console / Laravel）
+
+| メソッド | パス | Pass-through 先 |
+|----------|------|----------------|
+| GET | `/api/console/batch/executions` | Core `/api/console/batch/executions` |
+| GET | `/api/console/batch/executions/{id}` | Core 同上 |
+| GET | `/api/console/batch/notifications` | Core 同上 |
+| PUT | `/api/console/batch/notifications/{id}/read` | Core 同上 |
+| POST | `/api/console/batch/{job_name}/run` | Core `BatchManualTriggerController`（既存） |
+
+`amazia-console/app/Batch/Controller/` 配下に Pass-through を配置。ルート定義は `routes/api/Batch.php` に集約（規約 2-1 補足4）。
+
+### 13.7.4 認可
+
+- 履歴一覧・通知センター取得・既読：**全ログインユーザ**（自身宛通知のみ取得できる仕様で十分）
+- 手動起動：admin / senior_admin / eternal_advisor のみ（Console FE 側で `meta.roles` 制限・BE 側でも `check.permission` ミドルウェア）
+
 ---
 
 # 14. レビュー観点（r7 で取り込み候補）

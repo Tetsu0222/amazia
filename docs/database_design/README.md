@@ -87,6 +87,8 @@
 | [TBL_monthly_sales_reports.md](TBL_monthly_sales_reports.md) | monthly_sales_reports | 月次売上レポート | Core |
 | [TBL_yearly_sales_reports.md](TBL_yearly_sales_reports.md) | yearly_sales_reports | 年次売上レポート | Core |
 | [TBL_product_sku_scheduled_prices.md](TBL_product_sku_scheduled_prices.md) | product_sku_scheduled_prices | SKU 価格変更予約 | Core |
+| [TBL_operation_logs_archive.md](TBL_operation_logs_archive.md) | operation_logs_archive | 操作履歴アーカイブ（年次） | Core |
+| [TBL_console_notifications_archive.md](TBL_console_notifications_archive.md) | console_notifications_archive | 通知センター アーカイブ（年次） | Core |
 
 ### Console システム（Laravel 標準）
 

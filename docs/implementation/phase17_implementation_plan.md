@@ -946,7 +946,23 @@ public void run() {
 
 ---
 
-## 5. Step 4 — 月次・年次ジョブ
+## 5. Step 4 — 月次・年次ジョブ ✅ 完了（2026-05-08）
+
+### 5-0. 実装ログ（2026-05-08）
+
+| 区分 | 概要 |
+|------|------|
+| 追加スキーマ | `operation_logs_archive` / `console_notifications_archive` を `schema.sql` に追加（PK ＋ 必要最低限の Index 1 本ずつ）。`ops/healthcheck/required_tables.txt` も更新 |
+| 追加 Entity / Repository | `OperationLogArchive` / `ConsoleNotificationArchive` ＋ それぞれの `JpaRepository`、`SalesAggregationRepository`（4 軸 + 総合計の UNION ネイティブクエリ）、`MonthlySalesReportRepository#findByAxes` / `YearlySalesReportRepository#findByAxes`（NULL 軸対応 UPSERT 検索）、`PostalAddressRepository#findMaxUpdatedAt`、`OperationLogRepository#findByCreatedAtBefore`、`ConsoleNotificationRepository#findArchiveCandidates` |
+| 追加 Job | Step 4-1 `PostalAddressIntegrityCheckJob` / 4-2 `MonthlySalesReportJob` / 4-3 `YearlySalesReportJob` / 4-4 `OperationLogArchiveJob` / 4-5 `ConsoleNotificationsArchiveJob` |
+| 追加共通 Bean | `BatchClockConfig`（`Clock` Bean ／ テスト容易性確保）、`YamlPropertySourceFactory`（将来の YAML プロパティソース用に新設・本フェーズでは未使用） |
+| 設定 | `application.properties` / `application-test.properties` に `amazia.batch.postal-check.sample-codes` を追加（CSV）。月次売上レポートの cron は `amazia.batch.monthly.postal-check-cron` を **流用**（同 04:30 JST に直列実行）。新規環境変数は追加していない |
+| TDD | 5 ファイル / 14 ケースすべて緑（`PostalAddressIntegrityCheckJobTest` / `MonthlySalesReportJobTest` / `YearlySalesReportJobTest` / `OperationLogArchiveJobTest` / `ConsoleNotificationsArchiveJobTest`）。R-15 冪等性は MSR_3 / YSR_3 で検証 |
+| バッチ全体回帰 | `mvn -Dtest='com.example.batch.*Test' test` で 45 件すべて緑 |
+
+> 月次・年次ジョブは時刻依存テストを避けるため、各ジョブに `Clock` を注入し、テストでは
+> `aggregateAndPersist(YearMonth)` / `aggregateAndPersist(short)` / `archiveBefore(threshold)`
+> / `archiveAt(now)` を直接呼ぶ形に分離した（規約 4-1 と整合）。
 
 ### 5-1. Step 4-1: `PostalAddressIntegrityCheckJob`（月次／設計書 §3.2 ①）
 
@@ -1067,6 +1083,29 @@ public class InventoryMismatchInjector {
 ---
 
 ## 8. Step 6 — Console UI（バッチ実行履歴・通知センター・手動起動）
+
+### 8-0. Step 6-0: Core 取得系 API（履歴一覧・通知センター取得・既読）
+
+> **追加経緯（2026-05-08）：** 設計書 r8 §11 のステップ表は Step 6 を「Console UI」として括っているが、Step 6-1 / 6-2 を成立させるには Console から呼び出す **Core 側の取得系 API**（バッチ履歴一覧・通知センター取得・既読更新）が必要。Step 5 / 5.5 のスコープは「業務バッチ本体」「価格スケジュール CRUD」までで、本系統の API は未実装のため、本実装計画で Step 6-0 として先行追加する。設計書側にも r9 候補ではなく本フェーズスコープとして §13.7 に追記する。
+
+| メソッド | パス | Service / Controller | 備考 |
+|----------|------|---------------------|------|
+| GET | `/api/console/batch/executions` | `ListBatchExecutionService` 新設 | `started_at DESC`・`job_name` / `status` フィルタ・LIMIT/OFFSET ページング |
+| GET | `/api/console/batch/executions/{id}` | `GetBatchExecutionService` 新設 | 詳細（`error_summary` を含む単一行） |
+| GET | `/api/console/batch/notifications` | `ListConsoleNotificationService` 新設 | `target_user_id = X-User-Id` または `target_subscription_tag IN (購読中タグ)` の未読のみ。`level` / `target_subscription_tag` フィルタ |
+| PUT | `/api/console/batch/notifications/{id}/read` | `MarkConsoleNotificationReadService` 新設 | `read_by_user_id` / `read_at` 更新 |
+
+#### 共通仕様
+- パッケージ：`com.example.batch.controller` / `com.example.notification.controller`（ドメイン単位／規約 2-1）
+- 認証ヘッダ：`X-User-Id`（既存 `BatchManualTriggerController` 準拠）
+- 一覧 API のレスポンス形式：`{"items":[...], "total":N, "page":P, "size":S}`（既存 OperationLog 等と整合）
+- 通知センター取得時は **JOIN 不要のクエリ**：`(target_user_id = :userId AND read_by_user_id IS NULL) OR (target_subscription_tag IN :subscribedTags AND read_by_user_id IS NULL)`
+
+#### TDD ケース
+- `ListBatchExecutionService`：`status='RUNNING'` のみ抽出、`job_name` 指定時の絞り込み、空結果（`total=0, items=[]`）
+- `GetBatchExecutionService`：未存在 ID で 404、正常 ID で `error_summary` を含む詳細
+- `ListConsoleNotificationService`：購読タグ未登録ユーザは `total=0`、`level=ERROR` フィルタの絞り込み、`suppressed=true` レコードは UI 一覧から除外（ダイジェスト経路で吸収済のため）
+- `MarkConsoleNotificationReadService`：他ユーザ宛通知の既読化拒否（403）、二重既読化は冪等
 
 ### 8-1. Step 6-1: バッチ実行履歴画面（`/batch/executions`）
 

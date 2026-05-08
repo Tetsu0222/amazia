@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface OperationLogRepository extends JpaRepository<OperationLog, Long> {
@@ -27,4 +28,7 @@ public interface OperationLogRepository extends JpaRepository<OperationLog, Long
     List<OperationLog> search(@Param("screenName") String screenName,
                               @Param("apiName") String apiName,
                               @Param("action") String action);
+
+    /** Step 4-4: 1 年超のレコードをアーカイブ対象として取得。 */
+    List<OperationLog> findByCreatedAtBefore(LocalDateTime threshold);
 }

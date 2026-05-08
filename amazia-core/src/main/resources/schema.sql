@@ -606,6 +606,44 @@ CREATE INDEX idx_pssp_apply_pending ON product_sku_scheduled_prices (apply_date,
 CREATE INDEX idx_pssp_sku_pending   ON product_sku_scheduled_prices (sku_id, is_pending);
 
 -- ----------------------------------------------------------------------------
+-- 1-8: アーカイブテーブル 2 種（設計書 §3.3 ② / ③）
+--   Step 4-4 (OperationLogArchiveJob) / Step 4-5 (ConsoleNotificationsArchiveJob)
+--   t3.micro のディスク圧迫を抑えるため、アーカイブ先は PK + 最低限のインデックス 1 本のみ。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS operation_logs_archive (
+    id           BIGINT          NOT NULL PRIMARY KEY,        -- 元 operation_logs.id を保持（INSERT → DELETE で同 id）
+    user_id      BIGINT UNSIGNED NOT NULL,
+    action       VARCHAR(100)    NOT NULL,
+    target_type  VARCHAR(50)     NULL,
+    target_id    BIGINT          NULL,
+    screen_name  VARCHAR(100)    NULL,
+    api_name     VARCHAR(100)    NULL,
+    comment      TEXT            NULL,
+    created_at   DATETIME        NOT NULL,
+    archived_at  DATETIME        NOT NULL
+);
+CREATE INDEX idx_ola_created_at ON operation_logs_archive (created_at);
+
+CREATE TABLE IF NOT EXISTS console_notifications_archive (
+    id                          BIGINT       NOT NULL PRIMARY KEY,  -- 元 console_notifications.id を保持
+    level                       VARCHAR(10)  NOT NULL,
+    target_subscription_tag     VARCHAR(50)  NOT NULL,
+    target_user_id              BIGINT       NULL,
+    title                       VARCHAR(200) NOT NULL,
+    body                        TEXT         NOT NULL,
+    payload_hash                VARCHAR(64)  NOT NULL,
+    suppressed                  BOOLEAN      NOT NULL,
+    digest_sent_at              DATETIME     NULL,
+    read_by_user_id             BIGINT       NULL,
+    read_at                     DATETIME     NULL,
+    source_job                  VARCHAR(100) NULL,
+    source_batch_execution_id   BIGINT       NULL,
+    created_at                  DATETIME     NOT NULL,
+    archived_at                 DATETIME     NOT NULL
+);
+CREATE INDEX idx_cna_tag_created ON console_notifications_archive (target_subscription_tag, created_at);
+
+-- ----------------------------------------------------------------------------
 -- 1-7: SKU TX bootstrap 投入（H-9 / 設計書 §13.2）
 --   既存 product_sku_stocks.quantity を SKU TX に type='adjust' で1件ずつ初期反映。
 --   schema.sql L357-361 (inventories 初期複製 / phase15 RRRR-1) と対になる初期化。
