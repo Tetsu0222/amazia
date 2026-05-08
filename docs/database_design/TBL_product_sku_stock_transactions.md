@@ -28,7 +28,13 @@
 | 値 | 意味 |
 |----|------|
 | receive | 入荷（加算のみ） |
-| adjust | 在庫調整（加減算） |
+| adjust | 在庫調整（加減算）。フェーズ17 r8 で `InventoryAdjustmentService` の唯一の投入経路となり、棚卸補正・bootstrap・フォルトインジェクションの補償もすべてこの値で記録する |
+| sale | 通常購入の注文確定時の減算（フェーズ14 r4）|
+| return | 返品復元時の加算（フェーズ14 r4）|
+| cancel | キャンセル復元（フェーズ14 r4 ／将来 phase21）|
+| sale_preorder_shipment | 予約購入の PENDING→SHIPPED 遷移時の減算（フェーズ15 r5 / P5-3）|
+
+> 実値は `application.properties` の `amazia.sales.sku-stock-tx-types.*` で外出し管理（規約 4-1 / G-1）。
 
 ## インデックス
 
@@ -54,10 +60,12 @@
 | フェーズ11 | `reference_type` / `reference_id` / `created_by_user_id` / `comment` の4カラムと、対応する3つのインデックスを追加。在庫変動の出所追跡（売上・ワークフロー等）と監査性を強化 |
 | フェーズ14 r4 | `type` 値に `sale` / `return` / `cancel` を追加（注文確定時の販売減算・返品復元・キャンセル復元の記録用） |
 | フェーズ15 r5 | `type` 値に `sale_preorder_shipment` を追加（予約購入の PENDING→SHIPPED 遷移時の在庫減算記録用 / P5-3） |
+| フェーズ17 r8 | bootstrap 投入（`type='adjust'` / `reference_type='bootstrap'`）を schema.sql 末尾に追加。`product_sku_stocks.quantity > 0` の SKU を 1 行ずつ初期反映する。`INSERT IGNORE` ＋ `WHERE reference_type='bootstrap'` の重複検知で再実行で件数が変わらない（H-9 / J-7） |
 
 ## 設計上の注意
 
 - `reference_type` / `reference_id` の組み合わせで在庫変動の出所を特定する。たとえば売上による出庫は `reference_type='sales'` / `reference_id=<sales.id>` を入れる運用。
+- `reference_type` の運用値（フェーズ17 r8 時点）：`sales` / `sales_return` / `inbound` / `workflow` / `bootstrap`（初期化）/ `fault_injection_compensation`（H-7 補償）。
 - `created_by_user_id` は Console 社員 `users.id` を想定。Market 顧客の購入経由の出庫では NULL となる場合がある。
 - 既存テーブルへの追加カラムは schema.sql の ALTER TABLE で投入。重複実行は `spring.sql.init.continue-on-error=true` で許容している。
 

@@ -451,3 +451,171 @@ CREATE TABLE IF NOT EXISTS cart_items (
     CONSTRAINT fk_cart_items_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
     CONSTRAINT fk_cart_items_sku FOREIGN KEY (sku_id) REFERENCES product_skus(id)
 );
+
+-- ============================================================================
+-- フェーズ17 Step 1: バッチ処理基盤
+--   設計書: docs/design/phase11_20/phase17_batch_processing.md (r8 / 2026-05-08)
+--   実装計画: docs/implementation/phase17_implementation_plan.md §2
+--   重複実行は spring.sql.init.continue-on-error=true で許容（test_insights カテゴリ7-2）。
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1-1: batch_executions（バッチ実行履歴 / 設計書 §5.1）
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS batch_executions (
+    id              BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    job_name        VARCHAR(100) NOT NULL,
+    status          VARCHAR(20)  NOT NULL,
+    started_at      DATETIME     NOT NULL,
+    finished_at     DATETIME     NULL,
+    target_count    INT          NULL,
+    success_count   INT          NULL,
+    failure_count   INT          NULL,
+    error_summary   TEXT         NULL,
+    triggered_by    VARCHAR(50)  NOT NULL,
+    created_at      DATETIME     NOT NULL
+);
+CREATE INDEX idx_batch_executions_job_started ON batch_executions (job_name, started_at);
+CREATE INDEX idx_batch_executions_status      ON batch_executions (status);
+
+-- ----------------------------------------------------------------------------
+-- 1-2: console_notifications（通知センター / 設計書 §5.2）
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS console_notifications (
+    id                          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    level                       VARCHAR(10)  NOT NULL,
+    target_subscription_tag     VARCHAR(50)  NOT NULL,
+    target_user_id              BIGINT       NULL,
+    title                       VARCHAR(200) NOT NULL,
+    body                        TEXT         NOT NULL,
+    payload_hash                VARCHAR(64)  NOT NULL,
+    suppressed                  BOOLEAN      NOT NULL DEFAULT FALSE,
+    digest_sent_at              DATETIME     NULL,
+    read_by_user_id             BIGINT       NULL,
+    read_at                     DATETIME     NULL,
+    source_job                  VARCHAR(100) NULL,
+    source_batch_execution_id   BIGINT       NULL,
+    created_at                  DATETIME     NOT NULL,
+    CONSTRAINT fk_console_notifications_batch FOREIGN KEY (source_batch_execution_id) REFERENCES batch_executions(id)
+);
+CREATE INDEX idx_cn_tag_unread        ON console_notifications (target_subscription_tag, read_by_user_id, created_at);
+CREATE INDEX idx_cn_user_unread       ON console_notifications (target_user_id, read_by_user_id, created_at);
+CREATE INDEX idx_cn_payload_hash      ON console_notifications (payload_hash, created_at);
+CREATE INDEX idx_cn_suppressed_digest ON console_notifications (suppressed, digest_sent_at, created_at);
+
+-- ----------------------------------------------------------------------------
+-- 1-3: notification_subscriptions（設計書 §6.2.1）
+--   user_id は users(id) に合わせて BIGINT UNSIGNED。
+--   既存 admin/senior_admin/eternal_advisor の users 全員に全タグ自動購読
+--   （CSV 環境変数で外出しする値だが、bootstrap は素直に IN 句で記述）。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS notification_subscriptions (
+    id                BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id           BIGINT UNSIGNED NOT NULL,
+    subscription_tag  VARCHAR(50) NOT NULL,
+    email_enabled     BOOLEAN     NOT NULL DEFAULT TRUE,
+    in_app_enabled    BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at        DATETIME    NOT NULL,
+    updated_at        DATETIME    NOT NULL,
+    CONSTRAINT uk_ns_user_tag UNIQUE (user_id, subscription_tag),
+    CONSTRAINT fk_ns_user     FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX idx_ns_subscription_tag ON notification_subscriptions (subscription_tag);
+
+INSERT IGNORE INTO notification_subscriptions (user_id, subscription_tag, email_enabled, in_app_enabled, created_at, updated_at)
+SELECT u.id, t.tag, TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+  FROM users u
+  CROSS JOIN (
+       SELECT 'inventory_alerts' AS tag UNION ALL
+       SELECT 'sales_alerts'           UNION ALL
+       SELECT 'delivery_alerts'        UNION ALL
+       SELECT 'postal_alerts'          UNION ALL
+       SELECT 'batch_failure'
+  ) t
+ WHERE u.role_id IN (
+       SELECT id FROM roles WHERE code IN ('admin', 'senior_admin', 'eternal_advisor')
+ );
+
+-- ----------------------------------------------------------------------------
+-- 1-4: fault_injection_logs（設計書 §5.3 / 五重防御の DB CHECK 層）
+--   environment は dev / staging のみ許可。本番 INSERT は CHECK 制約で物理拒否。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS fault_injection_logs (
+    id              BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    injector_name   VARCHAR(100) NOT NULL,
+    triggered_at    DATETIME     NOT NULL,
+    triggered_by    VARCHAR(50)  NOT NULL,
+    environment     VARCHAR(20)  NOT NULL,
+    target_summary  TEXT         NULL,
+    created_at      DATETIME     NOT NULL,
+    CONSTRAINT chk_fault_logs_no_prod CHECK (environment IN ('dev', 'staging'))
+);
+CREATE INDEX idx_fil_injector_created ON fault_injection_logs (injector_name, created_at);
+
+-- ----------------------------------------------------------------------------
+-- 1-5: monthly_sales_reports / yearly_sales_reports（設計書 §5.4 / R-15）
+--   集計軸 NULL 運用（r8）。UNIQUE + UPSERT で同月二重 INSERT を防止。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS monthly_sales_reports (
+    id                  BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `year`              SMALLINT NOT NULL,
+    `month`             TINYINT  NOT NULL,
+    product_id          BIGINT   NULL,
+    payment_method_id   BIGINT   NULL,
+    shipping_method_id  BIGINT   NULL,
+    is_preorder         BOOLEAN  NULL,
+    total_amount        BIGINT   NOT NULL,
+    total_quantity      INT      NOT NULL,
+    created_at          DATETIME NOT NULL,
+    CONSTRAINT uk_msr_axes UNIQUE (`year`, `month`, product_id, payment_method_id, shipping_method_id, is_preorder)
+);
+
+CREATE TABLE IF NOT EXISTS yearly_sales_reports (
+    id                  BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `year`              SMALLINT NOT NULL,
+    product_id          BIGINT   NULL,
+    payment_method_id   BIGINT   NULL,
+    shipping_method_id  BIGINT   NULL,
+    is_preorder         BOOLEAN  NULL,
+    total_amount        BIGINT   NOT NULL,
+    total_quantity      INT      NOT NULL,
+    created_at          DATETIME NOT NULL,
+    CONSTRAINT uk_ysr_axes UNIQUE (`year`, product_id, payment_method_id, shipping_method_id, is_preorder)
+);
+
+-- ----------------------------------------------------------------------------
+-- 1-6: 価格スケジュール（設計書 §3.1 ⑥ / §13.5）
+--   product_sku_prices.is_active 追加 + product_sku_scheduled_prices 新設。
+-- ----------------------------------------------------------------------------
+ALTER TABLE product_sku_prices ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE INDEX idx_product_sku_prices_active ON product_sku_prices (sku_id, is_active);
+
+CREATE TABLE IF NOT EXISTS product_sku_scheduled_prices (
+    id               BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    sku_id           BIGINT  NOT NULL,
+    scheduled_price  INT     NOT NULL,
+    apply_date       DATE    NOT NULL,
+    is_pending       BOOLEAN NOT NULL DEFAULT TRUE,
+    applied_at       DATETIME NULL,
+    created_at       DATETIME NOT NULL,
+    updated_at       DATETIME NOT NULL,
+    CONSTRAINT fk_pssp_sku FOREIGN KEY (sku_id) REFERENCES product_skus(id),
+    CONSTRAINT chk_pssp_price_nonneg CHECK (scheduled_price >= 0)
+);
+CREATE INDEX idx_pssp_apply_pending ON product_sku_scheduled_prices (apply_date, is_pending);
+CREATE INDEX idx_pssp_sku_pending   ON product_sku_scheduled_prices (sku_id, is_pending);
+
+-- ----------------------------------------------------------------------------
+-- 1-7: SKU TX bootstrap 投入（H-9 / 設計書 §13.2）
+--   既存 product_sku_stocks.quantity を SKU TX に type='adjust' で1件ずつ初期反映。
+--   schema.sql L357-361 (inventories 初期複製 / phase15 RRRR-1) と対になる初期化。
+--   INSERT IGNORE + reference_type='bootstrap' の二重保証で再実行で重複しない（J-7）。
+--   type の実値は application.properties amazia.sales.sku-stock-tx-types.adjust と同じ
+--   'adjust'（G-1）。schema.sql 内では @Value を使えないためリテラルで記述。
+-- ----------------------------------------------------------------------------
+INSERT IGNORE INTO product_sku_stock_transactions
+    (sku_id, type, quantity, reference_type, reference_id, created_by_user_id, comment, created_at)
+SELECT s.sku_id, 'adjust', s.quantity, 'bootstrap', NULL, NULL,
+       '[bootstrap] initial inventory', CURRENT_TIMESTAMP
+  FROM product_sku_stocks s
+ WHERE s.quantity > 0;

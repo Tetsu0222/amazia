@@ -14,6 +14,7 @@ ER図はシステム規模が大きくなったため、フェーズごとに分
 - [§5 Core 購入・配送（フェーズ14）](#5-core-購入配送フェーズ14)
 - [§6 Core 配送管理・在庫並行運用（フェーズ15）](#6-core-配送管理在庫並行運用フェーズ15)
 - [§7 Core カート機能（フェーズ16.5）](#7-core-カート機能フェーズ165)
+- [§8 Core バッチ処理基盤（フェーズ17）](#8-core-バッチ処理基盤フェーズ17)
 - [テーブル一覧](#テーブル一覧)
 - [備考](#備考)
 
@@ -352,6 +353,68 @@ erDiagram
 
 ---
 
+## 8. Core バッチ処理基盤（フェーズ17）
+
+```mermaid
+erDiagram
+    users {
+        BIGINT id PK
+    }
+
+    product_skus {
+        BIGINT id PK
+    }
+
+    batch_executions {
+        BIGINT id PK
+    }
+
+    console_notifications {
+        BIGINT id PK
+        BIGINT source_batch_execution_id FK
+        BIGINT target_user_id
+    }
+
+    notification_subscriptions {
+        BIGINT id PK
+        BIGINT user_id FK
+    }
+
+    fault_injection_logs {
+        BIGINT id PK
+    }
+
+    monthly_sales_reports {
+        BIGINT id PK
+        BIGINT product_id
+        BIGINT payment_method_id
+        BIGINT shipping_method_id
+    }
+
+    yearly_sales_reports {
+        BIGINT id PK
+        BIGINT product_id
+        BIGINT payment_method_id
+        BIGINT shipping_method_id
+    }
+
+    product_sku_scheduled_prices {
+        BIGINT id PK
+        BIGINT sku_id FK
+    }
+
+    batch_executions ||--o{ console_notifications : "1:N（source_batch_execution_id）"
+    users ||--o{ notification_subscriptions : "1:N"
+    product_skus ||--o{ product_sku_scheduled_prices : "1:N"
+```
+
+> - `console_notifications.target_user_id` / `monthly_sales_reports.product_id` / 等は schema.sql 上は明示的な FK 制約を持たない（NULL 運用・集計軸の柔軟性のため）。
+> - `fault_injection_logs.environment` は `CHECK (environment IN ('dev', 'staging'))` で本番からの INSERT を物理拒否する（五重防御の DB 層）。
+> - `notification_subscriptions` は `(user_id, subscription_tag)` の UNIQUE で 1 ユーザー × 1 タグが一意。
+> - `product_sku_scheduled_prices` の「未適用は 1 SKU 1 件まで」はアプリ側 UPSERT で担保（部分 UNIQUE が MySQL でサポートされないため）。
+
+---
+
 ## テーブル一覧
 
 ### Core システム（認証・認可）— フェーズ11
@@ -423,6 +486,20 @@ erDiagram
 |------------|--------|------|------------|
 | carts | カート | 1顧客1カート（UNIQUE customer_id）| フェーズ16.5 |
 | cart_items | カート明細 | 同一 SKU・同一 is_preorder は1行に集約（複合 UNIQUE）| フェーズ16.5 |
+
+### Core システム（バッチ処理基盤）— フェーズ17
+
+| テーブル名 | 論理名 | 用途 | 追加フェーズ |
+|------------|--------|------|------------|
+| batch_executions | バッチ実行履歴 | バッチ起動／成功／失敗の正本 | フェーズ17 |
+| console_notifications | Console 通知センター | タグ別／ユーザー別通知の正本 | フェーズ17 |
+| notification_subscriptions | 通知購読設定 | ユーザー × タグ単位の購読フラグ | フェーズ17 |
+| fault_injection_logs | フォルトインジェクション実行履歴 | dev / staging 限定の障害注入ログ（CHECK で本番拒否） | フェーズ17 |
+| monthly_sales_reports | 月次売上レポート | 月次バッチが UPSERT する正本（4軸 NULL 運用） | フェーズ17 |
+| yearly_sales_reports | 年次売上レポート | 年次バッチが UPSERT する正本（4軸 NULL 運用） | フェーズ17 |
+| product_sku_scheduled_prices | SKU 価格変更予約 | apply_date 到来時に ApplyScheduledPricesJob が反映 | フェーズ17 |
+
+> 既存テーブル `product_sku_prices` にはフェーズ17 で `is_active`（BOOLEAN NOT NULL DEFAULT TRUE）を追加済み。
 
 ---
 

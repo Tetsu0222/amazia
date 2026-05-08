@@ -54,3 +54,12 @@ deliveries
 # カート機能
 carts
 cart_items
+
+# バッチ処理基盤（フェーズ17）
+batch_executions
+console_notifications
+notification_subscriptions
+fault_injection_logs
+monthly_sales_reports
+yearly_sales_reports
+product_sku_scheduled_prices

@@ -53,6 +53,34 @@ services:
       MARKET_PASSWORD_MIN_LENGTH: ${MARKET_PASSWORD_MIN_LENGTH:-8}
       # フェーズ13-5: 郵便局 KEN_ALL.CSV 取込 URL（フェーズ17 で月次バッチ化）
       POSTAL_CSV_URL: ${POSTAL_CSV_URL:-https://www.post.japanpost.jp/zipcode/dl/kogaki/zip/ken_all.zip}
+      # フェーズ17: バッチ処理基盤（設計書 phase17_batch_processing.md r8 / 13.3 / §7）
+      # 設計書 r3 で BATCH_ENABLED は scheduler / manual の alias に格下げされているため、
+      # YAML 側で ${BATCH_SCHEDULER_ENABLED:${BATCH_ENABLED:true}} のフォールバックを構成する。
+      # BATCH_DIGEST_ENABLED は意図的に独立（J-1）。
+      BATCH_ENABLED: ${BATCH_ENABLED:-true}
+      BATCH_SCHEDULER_ENABLED: ${BATCH_SCHEDULER_ENABLED:-true}
+      BATCH_MANUAL_TRIGGER_ENABLED: ${BATCH_MANUAL_TRIGGER_ENABLED:-true}
+      BATCH_DIGEST_ENABLED: ${BATCH_DIGEST_ENABLED:-true}
+      # フォルトインジェクション（本番は false 固定。BatchProductionValidator が起動時に検査）
+      SIMULATION_FAULT_INJECTION: ${SIMULATION_FAULT_INJECTION:-false}
+      SIM_SALES_RATE: ${SIM_SALES_RATE:-0.05}
+      SIM_INV_RATE: ${SIM_INV_RATE:-0.05}
+      SIM_DELIVERY_RATE: ${SIM_DELIVERY_RATE:-0.10}
+      # cron（JST）
+      BATCH_DAILY_CRON: ${BATCH_DAILY_CRON:-0 30 3 * * *}
+      BATCH_MONTHLY_POSTAL_CHECK_CRON: ${BATCH_MONTHLY_POSTAL_CHECK_CRON:-0 30 4 1 * *}
+      BATCH_YEARLY_CRON: ${BATCH_YEARLY_CRON:-0 0 5 1 1 *}
+      # 通知連携（任意。空文字なら Slack 連携を行わない）
+      BATCH_NOTIFICATIONS_SLACK_WEBHOOK_URL: ${BATCH_NOTIFICATIONS_SLACK_WEBHOOK_URL:-}
+      # 振込確認モード（disabled / mock-match / mock-mismatch-rate）。本番は disabled 固定
+      BANK_TRANSFER_VERIFICATION_MODE: ${BANK_TRANSFER_VERIFICATION_MODE:-disabled}
+      # 売上再計算の対象倉庫 ID（CSV / R-3）
+      SALES_RECONCILIATION_WAREHOUSES: ${SALES_RECONCILIATION_WAREHOUSES:-1}
+      # レートリミット（同 payload_hash 抑制 / R-10）
+      BATCH_RATE_LIMIT_SUPPRESSION_MINUTES: ${BATCH_RATE_LIMIT_SUPPRESSION_MINUTES:-60}
+      BATCH_RATE_LIMIT_DIGEST_ENABLED: ${BATCH_RATE_LIMIT_DIGEST_ENABLED:-true}
+      # 自動購読対象ロール（G-2 / 13.0）
+      BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES: ${BATCH_NOTIFICATIONS_AUTO_SUBSCRIBE_ROLES:-admin,senior_admin,eternal_advisor}
     volumes:
       # SKU 画像など Spring が /app/storage/ に保存するファイルを EBS 上に永続化。
       # 本番 EC2 では deploy.yml が /home/ssm-user/amazia-storage を実体として用意し、

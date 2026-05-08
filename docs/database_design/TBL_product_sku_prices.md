@@ -19,8 +19,9 @@
 | 4 | start_date | 適用開始日 | DATE | - | NULL | NULL | |
 | 5 | end_date | 適用終了日 | DATE | - | NULL | NULL | NULL = 無期限 |
 | 6 | version | 楽観ロックバージョン | BIGINT | - | NOT NULL | 0 | フェーズ12追加。JPA `@Version` 用 |
-| 7 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
-| 8 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
+| 7 | is_active | 有効フラグ | BOOLEAN | - | NOT NULL | TRUE | フェーズ17追加。価格スケジュール反映時の旧価格無効化等に利用 |
+| 8 | created_at | 作成日時 | DATETIME | - | NULL | NULL | |
+| 9 | updated_at | 更新日時 | DATETIME | - | NULL | NULL | |
 
 ## インデックス
 
@@ -28,6 +29,7 @@
 |----------------|------|--------|
 | PRIMARY | PRIMARY KEY | id |
 | idx_sku_prices_sku_id | INDEX | sku_id |
+| idx_product_sku_prices_active | INDEX | (sku_id, is_active) |
 
 ## 関連テーブル
 
@@ -41,8 +43,10 @@
 | フェーズ | 内容 |
 |---------|------|
 | フェーズ12 | `version`（BIGINT NOT NULL DEFAULT 0）を追加。価格更新ワークフローの競合検知に利用 |
+| フェーズ17 | `is_active`（BOOLEAN NOT NULL DEFAULT TRUE）を追加。`(sku_id, is_active)` の複合インデックスを追加 |
 
 ## マイグレーションファイル
 
 - JPA `@Entity` により自動生成
 - `version` カラムは `amazia-core/src/main/resources/schema.sql` の ALTER TABLE で追加（既存環境向けフォールバック）
+- `is_active` カラムは `amazia-core/src/main/resources/schema.sql` の ALTER TABLE で追加（フェーズ17 Step 1-6）

@@ -76,6 +76,18 @@
 | [TBL_carts.md](TBL_carts.md) | carts | Market 顧客のカート（1顧客1カート） | Core |
 | [TBL_cart_items.md](TBL_cart_items.md) | cart_items | カート明細（同一 SKU・同一 is_preorder は1行に集約） | Core |
 
+### Core システム（バッチ処理基盤）※フェーズ17追加
+
+| ファイル名 | テーブル名 | 論理名 | 所属システム |
+|------------|------------|--------|------------|
+| [TBL_batch_executions.md](TBL_batch_executions.md) | batch_executions | バッチ実行履歴 | Core |
+| [TBL_console_notifications.md](TBL_console_notifications.md) | console_notifications | Console 通知センター | Core |
+| [TBL_notification_subscriptions.md](TBL_notification_subscriptions.md) | notification_subscriptions | 通知購読設定 | Core |
+| [TBL_fault_injection_logs.md](TBL_fault_injection_logs.md) | fault_injection_logs | フォルトインジェクション実行履歴（dev / staging のみ） | Core |
+| [TBL_monthly_sales_reports.md](TBL_monthly_sales_reports.md) | monthly_sales_reports | 月次売上レポート | Core |
+| [TBL_yearly_sales_reports.md](TBL_yearly_sales_reports.md) | yearly_sales_reports | 年次売上レポート | Core |
+| [TBL_product_sku_scheduled_prices.md](TBL_product_sku_scheduled_prices.md) | product_sku_scheduled_prices | SKU 価格変更予約 | Core |
+
 ### Console システム（Laravel 標準）
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |

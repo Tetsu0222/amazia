@@ -1,7 +1,6 @@
 # Amazia — フルスタック EC 基盤の実運用シミュレーション
 
-React / Vue / PHP / Java / MySQL / AWS / GitHub Actions / AI 協働開発  
-個人開発で「業務レベルの EC プラットフォーム」を 設計 → 実装 → デプロイ → 運用 まで一貫して構築するプロジェクトです。
+AI 協働開発 で「業務レベルの EC プラットフォーム」を 設計 → 実装 → デプロイ → 運用 まで一貫して構築するプロジェクトです。
 
 <p align="center">
   <img src="docs/images/hero_market.png" alt="Amazia Market 商品詳細画面" width="48%" />

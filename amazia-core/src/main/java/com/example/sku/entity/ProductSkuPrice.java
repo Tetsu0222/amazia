@@ -27,6 +27,9 @@ public class ProductSkuPrice {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = Boolean.TRUE;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,6 +42,7 @@ public class ProductSkuPrice {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (version == null) version = 0L;
+        if (isActive == null) isActive = Boolean.TRUE;
     }
 
     @PreUpdate
@@ -55,6 +59,8 @@ public class ProductSkuPrice {
     public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+    public Boolean getIsActive() { return isActive; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }
