@@ -32,10 +32,10 @@ import java.util.zip.ZipInputStream;
  * - 失敗時は最大 3 回リトライ（指数バックオフ 1s → 2s → 4s）
  *
  * 起動方法:
- * - フェーズ17 までは {@link com.example.market.postal.runner.ImportPostalCsvRunner} 経由のコマンド起動のみ
+ * - 定期実行: {@link com.example.batch.job.PostalCsvImportJob}（毎月 1 日 03:00 JST / @Scheduled）
+ * - 手動実行: {@link com.example.market.postal.runner.ImportPostalCsvRunner} 経由のコマンド起動
  *   ローカル: {@code java -jar target/amazia-core.jar --import-postal-csv}
  *   本番:     {@code docker compose run --rm --no-deps amazia-core java -jar app.jar --import-postal-csv}
- * - フェーズ17 で月次バッチ（@Scheduled）に組み込む際にも同 Service を再利用する
  */
 @Service
 public class ImportPostalCsvService {

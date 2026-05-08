@@ -964,9 +964,28 @@ public void run() {
 > `aggregateAndPersist(YearMonth)` / `aggregateAndPersist(short)` / `archiveBefore(threshold)`
 > / `archiveAt(now)` を直接呼ぶ形に分離した（規約 4-1 と整合）。
 
+### 5-0. Step 4-0: `PostalCsvImportJob`（月次／設計書 §3.2 ⓪／2026-05-08 追加）
+
+> **追加経緯：** 設計書 r8 までは「取込本体は phase13 で 03:00 JST に @Scheduled 実装済」を前提にしていたが、phase13 の実体は `ApplicationRunner` ベースの手動コマンド起動のみで、`@Scheduled` 化されていなかった。phase17 で取込結果の整合性チェック（Step 4-1）が成立する前提を満たすため、本ジョブで取込本体も定期化する。
+
+`@Scheduled(cron = "${amazia.batch.monthly.postal-import-cron}")` で毎月 1 日 03:00 JST。
+
+- 既存 `ImportPostalCsvService.execute()` を呼び出すだけのシン Job 実装（リトライ・バックオフは Service が担当）
+- `batch_executions` には取込件数を `target_count` / `success_count` に記録、例外時は `FAILED` + `error_summary`
+- 手動起動経路（`--import-postal-csv`）は本番事故時のリカバリ救済として併存
+
+#### 環境変数（規約 4-3 セット更新）
+- `BATCH_MONTHLY_POSTAL_IMPORT_CRON`（既定 `0 0 3 1 * *`）を `application.properties` / `application-test.properties` / `docker-compose.yml` の 3 点セットで追加
+
+#### TDD ケース（PostalCsvImportJobTest）
+- POSTAL_IMPORT_1 正常系：`ImportPostalCsvService.execute()` を 1 回呼び、件数を `batch_executions.target/success_count` に記録
+- POSTAL_IMPORT_2 異常系：Service が例外を投げると `status=FAILED` + `error_summary` に例外メッセージ
+- POSTAL_IMPORT_3 取込 0 件：`status=SUCCESS, target_count=0` で記録（後段 PostalAddressIntegrityCheckJob が件数閾値で WARN を出す責務）
+
 ### 5-1. Step 4-1: `PostalAddressIntegrityCheckJob`（月次／設計書 §3.2 ①）
 
 `@Scheduled(cron = "${amazia.batch.monthly.postal-check-cron}")` で毎月 1 日 04:30 JST。
+**前提：** Step 4-0 の `PostalCsvImportJob` が同日 03:00 JST に取込本体を実行済。
 
 - 件数チェック：`postal_addresses` の総件数が直近 12 ヶ月の中央値 ± 5%
 - `MAX(updated_at)` が当日以内

@@ -8,10 +8,11 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * 郵便局 KEN_ALL.CSV 取込を「明示フラグ起動」で実行する Runner。
+ * 郵便局 KEN_ALL.CSV 取込を「明示フラグ起動」で実行する Runner（手動運用救済用）。
  *
- * 設計書 phase13 §7.2 では月次の Spring @Scheduled を採用予定だが、
- * フェーズ17 で組み込むまでは手動コマンド起動とする。
+ * <p>定期取込はフェーズ17 で {@link com.example.batch.job.PostalCsvImportJob} に切り出され、
+ * 毎月 1 日 03:00 JST に {@code @Scheduled} 経由で動作する。本 Runner は「定期実行に乗らなかった
+ * 月の手動再実行」「本番事故時のリカバリ」など運用救済の経路として併存させる。
  *
  * 起動例:
  *   # ローカル（pom.xml の finalName=amazia-core により target/amazia-core.jar が生成される）

@@ -5,6 +5,156 @@
 -- テスト環境(H2)では application-test.properties で schema-locations を空にして
 -- このスクリプトを読み込まない。テストは ddl-auto=create-drop で JPA が生成する。
 
+-- ============================================================================
+-- 認証ドメイン（V1 マイグレーション相当 / 044 派生節 (2)(3) で発覚した未移植 DDL）
+--   過去は永続ボリュームに残った Hibernate ddl-auto=update 作成済テーブルに依存していたが、
+--   docker compose down -v でボリュームを破棄すると消失する設計欠陥があったため schema.sql に書き起こす。
+-- users.id が BIGINT UNSIGNED で他テーブルから参照されている前提（044 派生節 (1) との整合）。
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS roles (
+    id   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50)  NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS permissions (
+    id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    screen_id VARCHAR(100) NOT NULL UNIQUE,
+    name      VARCHAR(200) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id       BIGINT UNSIGNED NOT NULL,
+    permission_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    KEY idx_rp_permission (permission_id),
+    CONSTRAINT fk_rp_role       FOREIGN KEY (role_id)       REFERENCES roles(id),
+    CONSTRAINT fk_rp_permission FOREIGN KEY (permission_id) REFERENCES permissions(id)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    employee_id     VARCHAR(50)  NOT NULL UNIQUE,
+    email           VARCHAR(255) NOT NULL UNIQUE,
+    name            VARCHAR(50)  NOT NULL,
+    password_hash   VARCHAR(255) NOT NULL,
+    role_id         BIGINT UNSIGNED NOT NULL,
+    active_flag     BOOLEAN      NOT NULL DEFAULT TRUE,
+    failed_attempts INT          NOT NULL DEFAULT 0,
+    locked_until    DATETIME     NULL,
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+
+-- ============================================================================
+-- 商品ドメイン（044 派生節 (3) で発覚した未移植 DDL）
+--   Entity: Product / ProductImage / ProductStatus / ProductSku / ProductSkuImage
+--           ProductSkuPrice / ProductSkuPriceHistory / ProductSkuStock /
+--           ProductSkuStockTransaction
+--   旧来は ddl-auto=update で生成されていたものを Hibernate 出力からそのまま書き起こす。
+--   FK は Hibernate が自動付与しないため idx_*_id インデックスのみ確保。
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS product_statuses (
+    code       VARCHAR(50)  NOT NULL PRIMARY KEY,
+    name       VARCHAR(100) NULL,
+    sort_order INT          NULL
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id            BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    name          VARCHAR(255) NULL,
+    description   VARCHAR(255) NULL,
+    price         INT          NULL,
+    stock         INT          NULL,
+    status_code   VARCHAR(50)  NULL,
+    publish_start DATETIME(6)  NULL,
+    publish_end   DATETIME(6)  NULL,
+    version       BIGINT       NOT NULL DEFAULT 0,
+    created_at    DATETIME(6)  NULL,
+    updated_at    DATETIME(6)  NULL,
+    INDEX idx_products_status (status_code)
+);
+
+CREATE TABLE IF NOT EXISTS product_images (
+    id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT       NOT NULL,
+    image_path VARCHAR(300) NOT NULL,
+    sort_order INT          NOT NULL DEFAULT 0,
+    created_at DATETIME(6)  NULL,
+    updated_at DATETIME(6)  NULL,
+    INDEX idx_product_images_product (product_id)
+);
+
+CREATE TABLE IF NOT EXISTS product_skus (
+    id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT       NOT NULL,
+    sku_code   VARCHAR(255) NOT NULL UNIQUE,
+    color      VARCHAR(255) NULL,
+    size       VARCHAR(255) NULL,
+    status     VARCHAR(50)  NOT NULL,
+    created_at DATETIME(6)  NULL,
+    updated_at DATETIME(6)  NULL,
+    UNIQUE KEY uk_skus_product_color_size (product_id, color, size),
+    INDEX idx_skus_product (product_id)
+);
+
+CREATE TABLE IF NOT EXISTS product_sku_images (
+    id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    sku_id     BIGINT       NOT NULL,
+    image_path VARCHAR(300) NOT NULL,
+    sort_order INT          NOT NULL DEFAULT 0,
+    created_at DATETIME(6)  NULL,
+    updated_at DATETIME(6)  NULL,
+    INDEX idx_sku_images_sku (sku_id)
+);
+
+CREATE TABLE IF NOT EXISTS product_sku_prices (
+    id         BIGINT      AUTO_INCREMENT PRIMARY KEY,
+    sku_id     BIGINT      NOT NULL,
+    price      INT         NOT NULL,
+    start_date DATE        NULL,
+    end_date   DATE        NULL,
+    version    BIGINT      NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NULL,
+    updated_at DATETIME(6) NULL,
+    INDEX idx_sku_prices_sku (sku_id)
+);
+
+CREATE TABLE IF NOT EXISTS product_sku_price_history (
+    id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    sku_id     BIGINT       NOT NULL,
+    price      INT          NOT NULL,
+    start_date DATE         NULL,
+    end_date   DATE         NULL,
+    status     VARCHAR(50)  NOT NULL,
+    created_at DATETIME(6)  NULL,
+    updated_at DATETIME(6)  NULL,
+    INDEX idx_sku_price_history_sku (sku_id)
+);
+
+CREATE TABLE IF NOT EXISTS product_sku_stocks (
+    id         BIGINT      AUTO_INCREMENT PRIMARY KEY,
+    sku_id     BIGINT      NOT NULL UNIQUE,
+    quantity   INT         NOT NULL DEFAULT 0,
+    version    BIGINT      NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NULL,
+    updated_at DATETIME(6) NULL
+);
+
+CREATE TABLE IF NOT EXISTS product_sku_stock_transactions (
+    id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    sku_id     BIGINT       NOT NULL,
+    quantity   INT          NOT NULL,
+    type       VARCHAR(50)  NOT NULL,
+    created_at DATETIME(6)  NULL,
+    INDEX idx_sku_tx_sku (sku_id),
+    INDEX idx_sku_tx_type (type),
+    INDEX idx_sku_tx_created (created_at)
+);
+
 -- リフレッシュトークン（V1 マイグレーション相当）
 -- 本番 MySQL に過去のいずれかの段階で作られていなかった場合のフォールバック。
 -- users.id が Laravel 由来で BIGINT UNSIGNED のため、FK の型を合わせる必要がある（029 と同種の経緯）。
