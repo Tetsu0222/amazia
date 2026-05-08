@@ -199,7 +199,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { getMarketProducts } from '../api/products';
-import { getProductSkus, getSkuPrices, getSkuStock } from '../../skus/api/skus';
+import { getProductSkus, getCurrentSkuPrice, getSkuStock } from '../../skus/api/skus';
 
 const products = ref([]);
 const loading = ref(false);
@@ -348,7 +348,7 @@ const loadSkusFor = async (productId) => {
     const enriched = await Promise.all(
       skus.map(async (sku) => {
         const [priceData, stockData] = await Promise.allSettled([
-          getSkuPrices(sku.id),
+          getCurrentSkuPrice(sku.id),
           getSkuStock(sku.id),
         ]);
         return {

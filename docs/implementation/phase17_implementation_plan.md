@@ -1216,6 +1216,8 @@ phase11 の `CreateUserService` / `UpdateUserService` から `SyncNotificationSu
 
 ## 9. Step 6.5 — SKU 詳細モーダル「価格管理」タブの 3 ブロック化
 
+**ステータス：** ✅ 完了（2026-05-08）
+
 設計書 §13.5.3 のレイアウトに従って、`SkuList.vue` 内のモーダルから呼ばれる `PriceManagementTab.vue` を新設：
 
 ```

@@ -101,7 +101,7 @@ import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 // 管理画面では公開期間外の商品（予約開始前など）も対象にするため admin 一覧を使う
 import { getAdminProducts } from '../../products/api/products';
-import { getProductSkus, getSkuPrices, createSkuPrice } from '../api/skus';
+import { getProductSkus, getCurrentSkuPrice, registerCurrentSkuPrice } from '../api/skus';
 
 const products = ref([]);
 const productsLoading = ref(false);
@@ -162,7 +162,7 @@ const onSkuChange = async (skuId) => {
 const fetchPrices = async (skuId) => {
   pricesLoading.value = true;
   try {
-    prices.value = await getSkuPrices(skuId);
+    prices.value = await getCurrentSkuPrice(skuId);
   } catch {
     message.warning('価格一覧の取得に失敗しました');
   } finally {
@@ -173,7 +173,7 @@ const fetchPrices = async (skuId) => {
 const handleSubmit = async () => {
   submitting.value = true;
   try {
-    await createSkuPrice(selectedSkuId.value, form.value);
+    await registerCurrentSkuPrice(selectedSkuId.value, form.value);
     message.success('価格を登録しました');
     form.value = { price: null, startDate: null, endDate: null };
     formRef.value.resetFields();

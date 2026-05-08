@@ -3,8 +3,14 @@ import api from '../../auth/api/authApi.js';
 export const getProductSkus     = (productId) => api.get(`/products/${productId}/skus`).then(r => r.data);
 export const createProductSku   = (productId, data) => api.post(`/products/${productId}/skus`, data).then(r => r.data);
 
-export const getSkuPrices       = (skuId) => api.get(`/skus/${skuId}/prices`).then(r => r.data);
-export const createSkuPrice     = (skuId, data) => api.post(`/skus/${skuId}/prices`, data).then(r => r.data);
+export const getCurrentSkuPrice      = (skuId) => api.get(`/skus/${skuId}/prices`).then(r => r.data);
+export const registerCurrentSkuPrice = (skuId, data) => api.post(`/skus/${skuId}/prices`, data).then(r => r.data);
+export const getSkuPriceHistory      = (skuId) => api.get(`/skus/${skuId}/prices/history`).then(r => r.data);
+
+export const getScheduledSkuPrice   = (skuId) =>
+  api.get(`/skus/${skuId}/scheduled-price`).then(r => (r.status === 204 ? null : r.data));
+export const setScheduledSkuPrice   = (skuId, data) => api.put(`/skus/${skuId}/scheduled-price`, data).then(r => r.data);
+export const clearScheduledSkuPrice = (skuId) => api.delete(`/skus/${skuId}/scheduled-price`).then(r => r.data);
 
 export const getSkuStock        = (skuId) => api.get(`/skus/${skuId}/stocks`).then(r => r.data);
 export const receiveSkuStock    = (skuId, data) => api.post(`/skus/${skuId}/stocks/receive`, data).then(r => r.data);

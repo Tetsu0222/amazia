@@ -89,7 +89,7 @@ import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { createWorkflow, immediateApply } from '../api/workflowApi.js';
 import { getAdminProducts } from '../../products/api/products.js';
-import { getProductSkus, getSkuPrices, getSkuStock } from '../../skus/api/skus.js';
+import { getProductSkus, getCurrentSkuPrice, getSkuStock } from '../../skus/api/skus.js';
 import { authStore } from '../../../stores/authStore.js';
 
 const router     = useRouter();
@@ -192,7 +192,7 @@ async function onSkuChange() {
   // 現在値を取得して before に自動セット
   try {
     if (form.targetType === 'price') {
-      const price = await getSkuPrices(form.skuId);
+      const price = await getCurrentSkuPrice(form.skuId);
       const current = price?.price;
       form.fields = [{ field: 'price', before: current ?? '', after: '' }];
     } else if (form.targetType === 'stock') {

@@ -192,35 +192,7 @@
     >
       <a-tabs v-model:activeKey="activeTab" @change="onTabChange">
         <a-tab-pane key="price" tab="価格管理">
-          <a-table
-            :dataSource="prices"
-            :columns="priceColumns"
-            :loading="pricesLoading"
-            rowKey="id"
-            size="small"
-            :scroll="{ x: 'max-content' }"
-            style="margin-bottom: 16px"
-          />
-          <a-form
-            :model="priceForm"
-            :rules="priceRules"
-            ref="priceFormRef"
-            layout="inline"
-            @finish="handlePriceSubmit"
-          >
-            <a-form-item label="価格（円）" name="price">
-              <a-input-number v-model:value="priceForm.price" :min="0" style="width: 120px" placeholder="例: 1980" />
-            </a-form-item>
-            <a-form-item label="適用開始日" name="startDate">
-              <a-date-picker v-model:value="priceForm.startDate" value-format="YYYY-MM-DD" placeholder="開始日" />
-            </a-form-item>
-            <a-form-item label="適用終了日">
-              <a-date-picker v-model:value="priceForm.endDate" value-format="YYYY-MM-DD" placeholder="未設定 = 恒久" />
-            </a-form-item>
-            <a-form-item>
-              <a-button type="primary" html-type="submit" :loading="priceSubmitting">登録</a-button>
-            </a-form-item>
-          </a-form>
+          <PriceManagementTab :sku-id="selectedSkuId" />
         </a-tab-pane>
 
         <a-tab-pane key="stock" tab="在庫管理">
@@ -287,10 +259,10 @@ import { EditOutlined } from '@ant-design/icons-vue';
 import { getAdminProducts } from '../../products/api/products';
 import {
   getProductSkus, createProductSku,
-  getSkuPrices, createSkuPrice,
   getSkuStock, getSkuStockHistory,
   getSkuImages, uploadSkuImage,
 } from '../api/skus';
+import PriceManagementTab from './PriceManagementTab.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -413,22 +385,6 @@ const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280
 const onResize = () => { windowWidth.value = window.innerWidth; };
 const modalWidth = computed(() => Math.min(900, Math.max(640, windowWidth.value - 80)));
 
-const prices = ref([]);
-const pricesLoading = ref(false);
-const priceFormRef = ref();
-const priceForm = ref({ price: null, startDate: null, endDate: null });
-const priceSubmitting = ref(false);
-const priceRules = {
-  price:     [{ required: true, message: '価格は必須です' }],
-  startDate: [{ required: true, message: '適用開始日は必須です' }],
-};
-const priceColumns = [
-  { title: '価格（円）', dataIndex: 'price',     key: 'price' },
-  { title: '適用開始日', dataIndex: 'startDate', key: 'startDate' },
-  { title: '適用終了日', dataIndex: 'endDate',   key: 'endDate',
-    customRender: ({ text }) => text ?? '恒久' },
-];
-
 const currentStock = ref(null);
 const stockHistory = ref([]);
 const stockHistoryLoading = ref(false);
@@ -533,7 +489,6 @@ const openSkuModal = async (product, sku) => {
   selectedSkuLabel.value = `${sku.skuCode}（${sku.color} / ${sku.size}）`;
   resetModalState();
   skuModalOpen.value = true;
-  await fetchTabData('price', sku.id);
 };
 
 const closeSkuModal = () => {
@@ -545,7 +500,6 @@ const closeSkuModal = () => {
 };
 
 const resetModalState = () => {
-  prices.value = [];
   currentStock.value = null;
   stockHistory.value = [];
   images.value = [];
@@ -560,9 +514,7 @@ const onTabChange = async (tab) => {
 const fetchTabData = async (tab, skuId) => {
   if (!skuId) return;
   if (loadedTabs.value.has(tab)) return;
-  if (tab === 'price') {
-    await fetchPrices(skuId);
-  } else if (tab === 'stock') {
+  if (tab === 'stock') {
     await Promise.all([fetchStock(skuId), fetchStockHistory(skuId)]);
   } else if (tab === 'image') {
     await fetchImages(skuId);
@@ -575,33 +527,6 @@ const goToInboundCreate = () => {
   const query = { skuId: selectedSkuId.value };
   if (selectedProductId.value) query.productId = selectedProductId.value;
   router.push({ path: '/inbound/create', query });
-};
-
-const fetchPrices = async (skuId) => {
-  pricesLoading.value = true;
-  try {
-    const data = await getSkuPrices(skuId);
-    prices.value = data ? [data] : [];
-  } catch {
-    prices.value = [];
-  } finally {
-    pricesLoading.value = false;
-  }
-};
-
-const handlePriceSubmit = async () => {
-  priceSubmitting.value = true;
-  try {
-    await createSkuPrice(selectedSkuId.value, priceForm.value);
-    message.success('価格を登録しました');
-    priceForm.value = { price: null, startDate: null, endDate: null };
-    priceFormRef.value.resetFields();
-    await fetchPrices(selectedSkuId.value);
-  } catch {
-    message.error('価格登録に失敗しました');
-  } finally {
-    priceSubmitting.value = false;
-  }
 };
 
 const fetchStock = async (skuId) => {
