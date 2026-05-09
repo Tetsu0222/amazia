@@ -65,3 +65,7 @@ yearly_sales_reports
 product_sku_scheduled_prices
 operation_logs_archive
 console_notifications_archive
+
+# 問い合わせ管理（フェーズ18）
+inquiries
+inquiry_messages

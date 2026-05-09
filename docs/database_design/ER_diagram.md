@@ -427,6 +427,62 @@ erDiagram
 
 ---
 
+## 9. Core 問い合わせ管理（フェーズ18）
+
+```mermaid
+erDiagram
+    market_customers {
+        BIGINT id PK
+    }
+
+    users {
+        BIGINT id PK
+    }
+
+    deliveries {
+        BIGINT id PK
+    }
+
+    products {
+        BIGINT id PK
+    }
+
+    sales {
+        BIGINT id PK
+    }
+
+    inquiries {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR subject
+        VARCHAR status
+        VARCHAR target_type
+        BIGINT target_id
+    }
+
+    inquiry_messages {
+        BIGINT id PK
+        BIGINT inquiry_id FK
+        VARCHAR sender_type
+        BIGINT sender_id
+        BOOLEAN is_internal_note
+    }
+
+    market_customers ||--o{ inquiries : "1:N（user_id）"
+    inquiries ||--o{ inquiry_messages : "1:N（CASCADE DELETE）"
+    deliveries ||..o{ inquiries : "多態（target_type='delivery' / FK なし）"
+    products   ||..o{ inquiries : "多態（target_type='product'  / FK なし）"
+    sales      ||..o{ inquiries : "多態（target_type='sales'    / FK なし）"
+    market_customers ||..o{ inquiry_messages : "多態（sender_type='market_customer' / FK なし）"
+    users            ||..o{ inquiry_messages : "多態（sender_type='admin_user'       / FK なし）"
+```
+
+> - `inquiries.target_type` / `inquiry_messages.sender_type` は多態参照のため物理 FK を持たない。整合性は Service 層 `InquiryTargetOwnershipValidator` と DB CHECK の二重防御で担保する。
+> - `inquiry_messages.is_internal_note=TRUE` は `sender_type='admin_user'` のみ許容（DB CHECK + Market 側 DTO 構造分離の二重防御 / RV-9）。
+> - 通知発火点（新規作成・顧客返信・ステータス変更）は phase17 `BatchAlertNotifier.dispatch(...)` を `subscription_tag='inquiry_alerts'`、`level='INFO'` で呼び出す。`console_notifications` への INSERT のみで SES 送出はされない。
+
+---
+
 ## テーブル一覧
 
 ### Core システム（認証・認可）— フェーズ11
@@ -514,6 +570,13 @@ erDiagram
 | console_notifications_archive | 通知センターアーカイブ | 1 年超の通知 / 抑制送出済を ConsoleNotificationsArchiveJob が年次移送 | フェーズ17 |
 
 > 既存テーブル `product_sku_prices` にはフェーズ17 で `is_active`（BOOLEAN NOT NULL DEFAULT TRUE）を追加済み。
+
+### Core システム（問い合わせ管理）— フェーズ18
+
+| テーブル名 | 論理名 | 用途 | 追加フェーズ |
+|------------|--------|------|------------|
+| inquiries | 問い合わせ親 | Market 顧客から登録された 1 件の問い合わせ（件名 + ステータス + 対象多態） | フェーズ18 |
+| inquiry_messages | 問い合わせスレッドメッセージ | 顧客／管理者の往復メッセージ。`is_internal_note=TRUE` で管理者間共有メモ | フェーズ18 |
 
 ---
 

@@ -37,5 +37,10 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="JWT_SECRET" value="test-secret-key-for-unit-tests-only-32chars!!"/>
+        <!-- フェーズ18: 問い合わせ管理 テスト用既定値（規約 4-3） -->
+        <env name="INQUIRY_SUBJECT_MAX_LENGTH" value="100"/>
+        <env name="INQUIRY_MESSAGE_MAX_LENGTH" value="4000"/>
+        <env name="INQUIRY_LIST_PAGE_SIZE_CONSOLE" value="50"/>
+        <env name="INQUIRY_BELL_POLLING_INTERVAL_MS" value="30000"/>
     </php>
 </phpunit>

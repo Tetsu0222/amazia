@@ -127,5 +127,6 @@ return [
     'workflow' => require __DIR__.'/app/Workflow.php',
     'sales'    => require __DIR__.'/app/Sales.php',
     'delivery' => require __DIR__.'/app/Delivery.php',
+    'inquiry'  => require __DIR__.'/app/Inquiry.php',
 
 ];

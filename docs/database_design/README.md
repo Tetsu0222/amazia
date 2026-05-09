@@ -90,6 +90,13 @@
 | [TBL_operation_logs_archive.md](TBL_operation_logs_archive.md) | operation_logs_archive | 操作履歴アーカイブ（年次） | Core |
 | [TBL_console_notifications_archive.md](TBL_console_notifications_archive.md) | console_notifications_archive | 通知センター アーカイブ（年次） | Core |
 
+### Core システム（問い合わせ管理）※フェーズ18追加
+
+| ファイル名 | テーブル名 | 論理名 | 所属システム |
+|------------|------------|--------|------------|
+| [TBL_inquiries.md](TBL_inquiries.md) | inquiries | 問い合わせ親 | Core |
+| [TBL_inquiry_messages.md](TBL_inquiry_messages.md) | inquiry_messages | 問い合わせスレッドメッセージ | Core |
+
 ### Console システム（Laravel 標準）
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |

@@ -807,3 +807,67 @@ SELECT s.sku_id, 'adjust', s.quantity, 'bootstrap', NULL, NULL,
        '[bootstrap] initial inventory', CURRENT_TIMESTAMP
   FROM product_sku_stocks s
  WHERE s.quantity > 0;
+
+-- ============================================================================
+-- フェーズ18: 問い合わせ管理（設計書 phase18_inquiry_management.md r3 / 規約 4-1）
+--   実装計画: docs/implementation/phase18_implementation_plan.md §2
+--   spring.sql.init.continue-on-error=true で再実行を許容（既存セクションと同方針）。
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- フェーズ18 Step 1-1: inquiries（問い合わせ親 / 設計書 §3.1）
+--   target_type / target_id は多態参照（FK は張らず Service 層で整合性検証）。
+--   pair NULL CHECK + status / target_type の値域 CHECK で本番 MySQL 側に最後の砦を置く。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS inquiries (
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT NOT NULL,
+    subject     VARCHAR(100) NOT NULL,
+    status      VARCHAR(20)  NOT NULL DEFAULT 'NEW',
+    target_type VARCHAR(20)  NULL,
+    target_id   BIGINT       NULL,
+    created_at  DATETIME     NOT NULL,
+    updated_at  DATETIME     NOT NULL,
+    CONSTRAINT fk_inquiries_user FOREIGN KEY (user_id) REFERENCES market_customers(id),
+    CONSTRAINT chk_inquiries_status      CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE')),
+    CONSTRAINT chk_inquiries_target_type CHECK (target_type IN ('delivery', 'product', 'sales') OR target_type IS NULL),
+    CONSTRAINT chk_inquiries_target_pair CHECK (
+        (target_type IS NULL     AND target_id IS NULL)
+        OR (target_type IS NOT NULL AND target_id IS NOT NULL)
+    )
+);
+CREATE INDEX idx_inquiries_status_updated_at  ON inquiries (status, updated_at);
+CREATE INDEX idx_inquiries_user_id_updated_at ON inquiries (user_id, updated_at);
+CREATE INDEX idx_inquiries_target             ON inquiries (target_type, target_id);
+
+-- ----------------------------------------------------------------------------
+-- フェーズ18 Step 1-2: inquiry_messages（スレッドメッセージ / 設計書 §3.2）
+--   sender_type / sender_id は多態参照。is_internal_note は admin のみ（CHECK で物理担保）。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS inquiry_messages (
+    id               BIGINT  NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    inquiry_id       BIGINT  NOT NULL,
+    sender_type      VARCHAR(20) NOT NULL,
+    sender_id        BIGINT  NOT NULL,
+    message          TEXT    NOT NULL,
+    is_internal_note BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at       DATETIME NOT NULL,
+    CONSTRAINT fk_inquiry_messages_inquiry FOREIGN KEY (inquiry_id) REFERENCES inquiries(id) ON DELETE CASCADE,
+    CONSTRAINT chk_inquiry_messages_sender_type CHECK (sender_type IN ('market_customer', 'admin_user')),
+    CONSTRAINT chk_inquiry_messages_internal_note_admin CHECK (is_internal_note = FALSE OR sender_type = 'admin_user')
+);
+CREATE INDEX idx_inquiry_messages_inquiry_id_created_at ON inquiry_messages (inquiry_id, created_at);
+
+-- ----------------------------------------------------------------------------
+-- フェーズ18 Step 1-3: notification_subscriptions への inquiry_alerts 自動投入（設計書 §3.3）
+--   phase17 §1-1-3 の自動購読対象ロール CSV と整合（admin / senior_admin / eternal_advisor）。
+--   schema.sql 内では @Value を使えないため対象ロール名をリテラルで列挙する。
+--   INSERT IGNORE で再実行冪等。
+-- ----------------------------------------------------------------------------
+INSERT IGNORE INTO notification_subscriptions
+    (user_id, subscription_tag, email_enabled, in_app_enabled, created_at, updated_at)
+SELECT u.id, 'inquiry_alerts', TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+  FROM users u
+ WHERE u.role_id IN (
+       SELECT id FROM roles WHERE code IN ('admin', 'senior_admin', 'eternal_advisor')
+ );
