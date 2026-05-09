@@ -2,7 +2,9 @@
 # フェーズ19：お知らせ機能（改訂版 r1）
 
 ## ステータス
-🔲 未着手
+✅ 完了（2026-05-09）
+
+実装計画：[phase19_implementation_plan.md](../../implementation/phase19_implementation_plan.md)（Step 0 → A → B → C → D の 5 段階完了）
 
 ## 改訂履歴
 | 版 | 日付 | 内容 |
@@ -10,6 +12,7 @@
 | 初版 | 改訂日不明 | 初稿（Console / Market の概念設計と DB 2テーブル案） |
 | r1 | 2026-05-07 | 実装可能レベルへの全面詳細化。Console/Core/Market の責務分割、API エンドポイント定義、`market_customers` 既読モデルへの修正（`notice_reads.deleted_flag` 廃止 → UNIQUE + 物理 DELETE）、`notice_categories` マスタ化、公開期間判定の JST 0:00 基準、自動切替の Polling / 一覧の N+1 回避、TDD 異常系の追加、設計書反映ルール（DB / API）の整備。 |
 | r2 | 2026-05-07 | r1 レビュー指摘 R19-1〜R19-12 を反映。**operation_logs 書き込みは Core Service が直接行い、`X-User-Id` ヘッダで `actor users.id` を受け取る既存パターン（phase14 / phase15）に統一**。`api_name` は Core API パスを記録。「JST 0:00 基準」の表現を「JST タイムゾーン保存・リアルタイム DATETIME 比較」に書き換え、`publish_end` の 23:59:59 自動付与は Console 側 FormRequest の責務として明文化。PK 型ポリシーの注記、未認証時 `is_read` 省略、ローテーション×Polling 競合方針、DTO 分離（`NoticeMarketDto` / `NoticeConsoleDto`）、ER カーディナリティの記載、`required_tables.txt` 検証スクリプトの追加。 |
+| 完了反映 | 2026-05-09 | 実装完了。Core 側スキーマ + 9 エンドポイント、Console 側 Pass-through 5 エンドポイント + Vue 画面、Market 側 6 エンドポイント呼出 + React コンポーネント実装。テスト結果：Core 649 件 / Console 158 件 / Market 175 件すべて緑。Vitest テストは Console SPA のみスコープ外（Vitest 未導入）— PHPUnit Pass-through テストで代替担保。`required_tables.txt` 整合性 CI アサーションは別途追加。 |
 
 ---
 

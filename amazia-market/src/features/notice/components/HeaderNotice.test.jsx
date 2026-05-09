@@ -58,6 +58,31 @@ describe('HeaderNotice', () => {
     expect(screen.getAllByText('一件目').length).toBeGreaterThan(0);
   });
 
+  it('未読が 1 件だけのときは展開ボタンと件数表示を出さない', async () => {
+    noticeApi.fetchUnreadHeader.mockResolvedValue([
+      { id: 1, subject: '一件目', category: { code: 'important', label: '重要' } },
+    ]);
+
+    renderHeader();
+
+    await waitFor(() => expect(screen.getAllByText('一件目').length).toBeGreaterThan(0));
+    expect(screen.queryByRole('button', { name: 'お知らせをすべて表示' })).not.toBeInTheDocument();
+    expect(screen.queryByText('1 / 1')).not.toBeInTheDocument();
+  });
+
+  it('未読が 2 件以上あるときは展開ボタンが描画される', async () => {
+    noticeApi.fetchUnreadHeader.mockResolvedValue([
+      { id: 1, subject: '一件目', category: { code: 'important', label: '重要' } },
+      { id: 2, subject: '二件目', category: { code: 'normal',    label: '普通' } },
+    ]);
+
+    renderHeader();
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'お知らせをすべて表示' })).toBeInTheDocument()
+    );
+  });
+
   it('5 秒経過すると次のお知らせに切り替わる（fake timer）', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     noticeApi.fetchUnreadHeader.mockResolvedValue([

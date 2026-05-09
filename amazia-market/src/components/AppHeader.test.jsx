@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,7 +9,20 @@ vi.mock('../features/customer/context/useAuth', () => ({
   useAuth: () => useAuthMock(),
 }));
 
+const useUnreadCountMock = vi.fn();
+vi.mock('../features/notice/hooks/useUnreadCount', () => ({
+  useUnreadCount: () => useUnreadCountMock(),
+}));
+
 describe('AppHeader', () => {
+  beforeEach(() => {
+    useUnreadCountMock.mockReturnValue({
+      counts: { important: 0, normal: 0, total: 0 },
+      authError: false,
+      refresh: vi.fn(),
+    });
+  });
+
   it('メインバーにロゴ・検索フィールド・カートアイコンが存在する', () => {
     useAuthMock.mockReturnValue({ isAuthenticated: false, customer: null, logout: vi.fn() });
     render(<MemoryRouter><AppHeader /></MemoryRouter>);
@@ -17,6 +30,23 @@ describe('AppHeader', () => {
     // SearchBar はメインバー用とモバイル用の2インスタンスが描画される
     expect(screen.getAllByLabelText('商品検索').length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'カート' })).toBeInTheDocument();
+  });
+
+  it('未読0件でもお知らせアイコンが /notices へのリンクとして常設される', () => {
+    useAuthMock.mockReturnValue({ isAuthenticated: false, customer: null, logout: vi.fn() });
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'お知らせ' })).toHaveAttribute('href', '/notices');
+  });
+
+  it('未読がある場合はお知らせアイコンの aria-label に件数が含まれる', () => {
+    useAuthMock.mockReturnValue({ isAuthenticated: false, customer: null, logout: vi.fn() });
+    useUnreadCountMock.mockReturnValue({
+      counts: { important: 1, normal: 2, total: 3 },
+      authError: false,
+      refresh: vi.fn(),
+    });
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'お知らせ（未読3件）' })).toHaveAttribute('href', '/notices');
   });
 
   it('未ログイン時はアカウントメニューにログイン/会員登録が表示される', async () => {

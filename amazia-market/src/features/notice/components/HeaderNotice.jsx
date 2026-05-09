@@ -73,16 +73,18 @@ export default function HeaderNotice() {
             {activeIndex + 1} / {currentList.length}
           </Typography>
         )}
-        <IconButton
-          size="small"
-          onClick={() => setExpanded((v) => !v)}
-          aria-label={expanded ? 'お知らせを閉じる' : 'お知らせをすべて表示'}
-        >
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </IconButton>
+        {currentList.length > 1 && (
+          <IconButton
+            size="small"
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={expanded ? 'お知らせを閉じる' : 'お知らせをすべて表示'}
+          >
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        )}
       </Box>
 
-      <Collapse in={expanded}>
+      <Collapse in={expanded && currentList.length > 1}>
         <Box sx={{ pb: 1 }}>
           {currentList.map((n) => (
             <Box
