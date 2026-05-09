@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Alert,
@@ -11,34 +11,59 @@ import {
   Typography,
 } from '@mui/material';
 import { createInquiry } from '../api/inquiry';
+import { getMyPurchaseHistory } from '../../checkout/api/checkout';
 
 const SUBJECT_MAX = 100;
 const MESSAGE_MAX = 4000;
 
-const TARGET_TYPE_OPTIONS = [
-  { value: '',         label: '指定なし（汎用のお問い合わせ）' },
-  { value: 'sales',    label: '注文について' },
-  { value: 'delivery', label: '配送について' },
-  { value: 'product',  label: '商品について' },
+const CATEGORY_NONE = '__none__';
+
+const CATEGORY_OPTIONS = [
+  { value: CATEGORY_NONE, label: '指定なし' },
+  { value: 'delivery',    label: '配送について' },
+  { value: 'sales',       label: '注文について' },
+  { value: 'product',     label: '商品について' },
+  { value: 'other',       label: 'その他' },
 ];
+
+const TARGET_NONE = '__none__';
 
 export default function MyPageInquiryNew() {
   const navigate = useNavigate();
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [targetType, setTargetType] = useState('');
-  const [targetId, setTargetId] = useState('');
+  const [category, setCategory] = useState(CATEGORY_NONE);
+  const [target, setTarget] = useState(TARGET_NONE);
+  const [purchases, setPurchases] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const subjectError = subject.length > SUBJECT_MAX
-    ? `件名は ${SUBJECT_MAX} 文字以内で入力してください` : null;
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const data = await getMyPurchaseHistory();
+        if (alive) setPurchases(Array.isArray(data) ? data : []);
+      } catch {
+        if (alive) setPurchases([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const categoryLabel = CATEGORY_OPTIONS.find((o) => o.value === category)?.label;
+  const subjectWithPrefix = (category === CATEGORY_NONE)
+    ? subject.trim()
+    : `[${categoryLabel}] ${subject.trim()}`;
+
+  const subjectError = subjectWithPrefix.length > SUBJECT_MAX
+    ? `件名は ${SUBJECT_MAX} 文字以内で入力してください（種別接頭辞を含めて ${subjectWithPrefix.length} 文字）`
+    : null;
   const messageError = message.length > MESSAGE_MAX
     ? `本文は ${MESSAGE_MAX} 文字以内で入力してください` : null;
 
   const canSubmit =
-    subject.trim() && message.trim() && !subjectError && !messageError &&
-    (!targetType || targetId);
+    subject.trim() && message.trim() && !subjectError && !messageError;
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -46,11 +71,12 @@ export default function MyPageInquiryNew() {
     setSubmitting(true);
     setError(null);
     try {
+      const isTargetNone = target === TARGET_NONE;
       const result = await createInquiry({
-        subject: subject.trim(),
+        subject: subjectWithPrefix,
         message: message.trim(),
-        targetType: targetType || null,
-        targetId: targetType ? Number(targetId) : null,
+        targetType: isTargetNone ? null : 'sales',
+        targetId: isTargetNone ? null : Number(target),
       });
       navigate(`/mypage/inquiries/${result.id}`);
     } catch (e) {
@@ -58,6 +84,15 @@ export default function MyPageInquiryNew() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const formatPurchaseLabel = (p) => {
+    const parts = [];
+    if (p.salesDate) parts.push(`[${p.salesDate}]`);
+    parts.push(p.productName ?? '商品');
+    const variant = [p.color, p.size].filter(Boolean).join(' / ');
+    if (variant) parts.push(`（${variant}）`);
+    return parts.join(' ');
   };
 
   return (
@@ -68,34 +103,39 @@ export default function MyPageInquiryNew() {
         <form onSubmit={onSubmit}>
           <Stack spacing={2}>
             <TextField
+              select
+              label="お問い合わせ種別"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              helperText="件名の先頭にカテゴリラベルが自動で付与されます"
+            >
+              {CATEGORY_OPTIONS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+              ))}
+            </TextField>
+            <TextField
               label="件名"
               required
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               error={!!subjectError}
-              helperText={subjectError || `${subject.length} / ${SUBJECT_MAX}`}
+              helperText={subjectError || `${subjectWithPrefix.length} / ${SUBJECT_MAX}`}
               inputProps={{ maxLength: SUBJECT_MAX + 10 }}
             />
             <TextField
               select
-              label="対象種別"
-              value={targetType}
-              onChange={(e) => { setTargetType(e.target.value); setTargetId(''); }}
+              label="関連する購入履歴（任意）"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              helperText="関連する商品・注文がある場合は選択してください"
             >
-              {TARGET_TYPE_OPTIONS.map((o) => (
-                <MenuItem key={o.value || 'none'} value={o.value}>{o.label}</MenuItem>
+              <MenuItem value={TARGET_NONE}>選択しない</MenuItem>
+              {purchases.map((p) => (
+                <MenuItem key={p.salesId} value={String(p.salesId)}>
+                  {formatPurchaseLabel(p)}
+                </MenuItem>
               ))}
             </TextField>
-            {targetType && (
-              <TextField
-                label={`対象ID（${TARGET_TYPE_OPTIONS.find(o => o.value === targetType)?.label}）`}
-                required
-                type="number"
-                value={targetId}
-                onChange={(e) => setTargetId(e.target.value)}
-                helperText="マイページの注文・配送履歴等から ID を確認してください"
-              />
-            )}
             <TextField
               label="本文"
               required

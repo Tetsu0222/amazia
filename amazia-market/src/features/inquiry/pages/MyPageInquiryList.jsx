@@ -16,6 +16,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import { listMyInquiries } from '../api/inquiry';
 
 const STATUS_LABELS = { NEW: '未対応', IN_PROGRESS: '対応中', DONE: '完了' };
@@ -44,9 +45,20 @@ export default function MyPageInquiryList() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h5">問い合わせ一覧</Typography>
-        <Button component={Link} to="/mypage/inquiries/new" variant="contained">
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        spacing={2}
+        mb={3}
+        sx={{ width: '100%' }}
+      >
+        <Typography variant="h5" sx={{ flexGrow: 1 }}>問い合わせ一覧</Typography>
+        <Button
+          component={Link}
+          to="/mypage/inquiries/new"
+          variant="contained"
+          startIcon={<AddIcon />}
+        >
           新規問い合わせ
         </Button>
       </Stack>
