@@ -819,9 +819,14 @@ SELECT s.sku_id, 'adjust', s.quantity, 'bootstrap', NULL, NULL,
 --   target_type / target_id は多態参照（FK は張らず Service 層で整合性検証）。
 --   pair NULL CHECK + status / target_type の値域 CHECK で本番 MySQL 側に最後の砦を置く。
 -- ----------------------------------------------------------------------------
+-- 045 / 044 同型対策（型の一致）：
+--   market_customers.id は BIGINT UNSIGNED（schema.sql §238）。MySQL の FK は型が完全
+--   一致していないと作成失敗するため、user_id も BIGINT UNSIGNED で揃える必要がある。
+--   当初 BIGINT（unsigned 無し）で書いた版が本番にデプロイされ、CREATE TABLE が
+--   `continue-on-error=true` で WARN 化 → テーブル不在の不具合（045）を発生させた。
 CREATE TABLE IF NOT EXISTS inquiries (
-    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    user_id     BIGINT NOT NULL,
+    id          BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT UNSIGNED NOT NULL,
     subject     VARCHAR(100) NOT NULL,
     status      VARCHAR(20)  NOT NULL DEFAULT 'NEW',
     target_type VARCHAR(20)  NULL,

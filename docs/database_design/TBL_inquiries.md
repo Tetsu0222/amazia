@@ -15,7 +15,7 @@
 | # | カラム名 | 論理名 | 型 | 長さ | NULL | デフォルト | 備考 |
 |---|----------|--------|-----|------|------|------------|------|
 | 1 | id | 問い合わせID | BIGINT | - | NOT NULL | AUTO_INCREMENT | PK |
-| 2 | user_id | 顧客ID | BIGINT | - | NOT NULL | - | FK: market_customers.id |
+| 2 | user_id | 顧客ID | BIGINT UNSIGNED | - | NOT NULL | - | FK: market_customers.id（045 / 044 同型対策：market_customers.id が BIGINT UNSIGNED のため型を一致させる必要あり） |
 | 3 | subject | 件名 | VARCHAR | 100 | NOT NULL | - | 上限は `amazia.inquiry.subject-max-length` で config 化 |
 | 4 | status | ステータス | VARCHAR | 20 | NOT NULL | 'NEW' | NEW / IN_PROGRESS / DONE。遷移ルールは `amazia.inquiry.allowed-status-transitions` |
 | 5 | target_type | 対象種別 | VARCHAR | 20 | NULL | NULL | delivery / product / sales / NULL（汎用）。多態参照のため FK は張らない |
