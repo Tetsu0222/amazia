@@ -1540,6 +1540,12 @@ docker compose down
 - J-9：`PayloadHasher` ユーティリティクラス仕様化
 - J-10：`DigestNotificationDispatchJob` 起動間隔の config 化
 
+### 14-2-a. r7 候補追加要請（phase18 完了時 / 2026-05-09）
+phase18 の問い合わせ管理実装完了に伴い、phase17 r7 候補に以下を追加要請する（phase18 計画書 §10-6 / 設計書 RV-3 と整合）：
+- **`InquiryArchiveJob`**：`inquiries.status='DONE'` から N 日経過分を `inquiries_archive` 系へ年次移送。`OperationLogArchiveJob` / `ConsoleNotificationsArchiveJob` と同思想（H-10 / 1 年閾値想定）。
+- **`InquiryStaleAlertJob`**：`inquiries.status='NEW'` のまま N 日経過した問い合わせを WARN 通知（`subscription_tag='inquiry_alerts'`）。SES 送出対象になりサポート対応漏れを検知。
+- 上記 2 ジョブは phase17 既存の `BatchAlertNotifier.dispatch(...)` をそのまま利用可能（追加 API 不要）。実装の本体は phase17 r7 で受理されるまで保留（phase18 単独で完結する設計）。
+
 ### 14-3. SKU TX 構造的限界（H-6）
 `product_sku_stocks.quantity = 0` の SKU について、`InventoryConsistencyCheckJob` は不整合を検知できない（`0 = SUM(空集合) = 0` で偶然一致）。SKU TX に CHECK 制約を追加する将来対応までは構造的限界。Step 3-1 の TDD コメントに「将来 CHECK 追加時に期待値反転」を明記。
 

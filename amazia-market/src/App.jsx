@@ -17,6 +17,9 @@ import Checkout from './features/checkout/pages/Checkout';
 import CheckoutComplete from './features/checkout/pages/CheckoutComplete';
 import PurchaseHistory from './features/orders/pages/PurchaseHistory';
 import CartPage from './features/cart/pages/CartPage';
+import MyPageInquiryList from './features/inquiry/pages/MyPageInquiryList';
+import MyPageInquiryDetail from './features/inquiry/pages/MyPageInquiryDetail';
+import MyPageInquiryNew from './features/inquiry/pages/MyPageInquiryNew';
 
 function Layout() {
   return (
@@ -79,6 +82,30 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <CartPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mypage/inquiries"
+                element={
+                  <ProtectedRoute>
+                    <MyPageInquiryList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mypage/inquiries/new"
+                element={
+                  <ProtectedRoute>
+                    <MyPageInquiryNew />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mypage/inquiries/:id"
+                element={
+                  <ProtectedRoute>
+                    <MyPageInquiryDetail />
                   </ProtectedRoute>
                 }
               />

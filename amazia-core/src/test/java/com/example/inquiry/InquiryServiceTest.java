@@ -24,6 +24,8 @@ import com.example.market.customer.entity.Customer;
 import com.example.market.customer.repository.CustomerRepository;
 import com.example.notification.entity.ConsoleNotification;
 import com.example.notification.repository.ConsoleNotificationRepository;
+import com.example.operationlog.entity.OperationLog;
+import com.example.operationlog.repository.OperationLogRepository;
 import com.example.shared.config.TestAwsConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,6 +68,7 @@ class InquiryServiceTest {
     @Autowired private InquiryMessageRepository messageRepository;
     @Autowired private CustomerRepository customerRepository;
     @Autowired private ConsoleNotificationRepository consoleNotificationRepository;
+    @Autowired private OperationLogRepository operationLogRepository;
 
     private Long customerId;
     private Long otherCustomerId;
@@ -395,6 +398,78 @@ class InquiryServiceTest {
                 "2 回の返信通知が console_notifications に書き込まれているはず");
         assertEquals(1, suppressed,
                 "2 件目以降は payload_hash 一致で suppressed=TRUE になるはず");
+    }
+
+    // ============================================================
+    // OPLOG: operation_logs 記録（管理者操作のみ）
+    // ============================================================
+
+    @Test
+    void OPLOG1_管理者の通常返信は_action_reply_inquiry_と_admin_reply_プレフィックスで記録() {
+        Long inquiryId = createInquiryService.create(
+                new MarketCreateInquiryRequest("件名", "本文", null, null), customerId);
+        Long beforeCount = operationLogRepository.count();
+
+        Long messageId = replyInquiryService.reply(new ReplyInquiryCommand(
+                inquiryId, "admin_user", 1L, "管理者返信", false));
+
+        List<OperationLog> logs = operationLogRepository.findByTargetTypeAndTargetId("inquiries", inquiryId);
+        assertEquals(1, logs.size());
+        OperationLog log = logs.get(0);
+        assertEquals(1L, log.getUserId());
+        assertEquals("reply_inquiry", log.getAction());
+        assertEquals("ConsoleInquiryDetailPage", log.getScreenName());
+        assertTrue(log.getApiName().contains("messages"));
+        assertTrue(log.getComment().startsWith("[admin_reply]"));
+        assertTrue(log.getComment().contains("message_id=" + messageId));
+        assertEquals(beforeCount + 1, operationLogRepository.count());
+    }
+
+    @Test
+    void OPLOG2_管理者の内部メモは_action_add_internal_note_と_internal_note_プレフィックス() {
+        Long inquiryId = createInquiryService.create(
+                new MarketCreateInquiryRequest("件名", "本文", null, null), customerId);
+
+        Long messageId = replyInquiryService.reply(new ReplyInquiryCommand(
+                inquiryId, "admin_user", 1L, "内部メモ", true));
+
+        List<OperationLog> logs = operationLogRepository.findByTargetTypeAndTargetId("inquiries", inquiryId);
+        assertEquals(1, logs.size());
+        OperationLog log = logs.get(0);
+        assertEquals("add_internal_note", log.getAction());
+        assertTrue(log.getComment().startsWith("[internal_note]"));
+        assertTrue(log.getComment().contains("message_id=" + messageId));
+    }
+
+    @Test
+    void OPLOG3_顧客返信は_operation_logs_に記録されない() {
+        Long inquiryId = createInquiryService.create(
+                new MarketCreateInquiryRequest("件名", "本文", null, null), customerId);
+
+        replyInquiryService.reply(new ReplyInquiryCommand(
+                inquiryId, "market_customer", customerId, "顧客返信", false));
+
+        List<OperationLog> logs = operationLogRepository.findByTargetTypeAndTargetId("inquiries", inquiryId);
+        assertEquals(0, logs.size());
+    }
+
+    @Test
+    void OPLOG4_ステータス変更は_action_update_inquiry_status_と_status_change_プレフィックス_reason付き() {
+        Long inquiryId = createInquiryService.create(
+                new MarketCreateInquiryRequest("件名", "本文", null, null), customerId);
+
+        updateInquiryStatusService.update(new InquiryStatusMutationContext(
+                inquiryId, "IN_PROGRESS", "確認中", 7L));
+
+        List<OperationLog> logs = operationLogRepository.findByTargetTypeAndTargetId("inquiries", inquiryId);
+        assertEquals(1, logs.size());
+        OperationLog log = logs.get(0);
+        assertEquals(7L, log.getUserId());
+        assertEquals("update_inquiry_status", log.getAction());
+        assertTrue(log.getComment().contains("[status_change]"));
+        assertTrue(log.getComment().contains("旧:NEW"));
+        assertTrue(log.getComment().contains("新:IN_PROGRESS"));
+        assertTrue(log.getComment().contains("reason='確認中'"));
     }
 
     private static String sha256(String seed) {

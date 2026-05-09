@@ -322,3 +322,48 @@ Market 画面ルートと API の対応関係。
 | `/checkout?from=cart` | Checkout（カートモード） | カート明細を逐次 POST `/api/customer/orders/confirm`、完了後 DELETE `/api/customer/carts/me`（フェーズ16.5 追加） |
 | `/cart` | CartPage | GET / PUT / DELETE `/api/customer/carts/me/*`（フェーズ16.5 追加） |
 | `/customer/orders` | PurchaseHistory | GET `/api/customer/orders` |
+| `/mypage/inquiries` | MyPageInquiryList | GET `/api/customer/inquiries`（フェーズ18 追加） |
+| `/mypage/inquiries/new` | MyPageInquiryNew | POST `/api/customer/inquiries`（フェーズ18 追加） |
+| `/mypage/inquiries/:id` | MyPageInquiryDetail | GET `/api/customer/inquiries/:id`、POST `/api/customer/inquiries/:id/messages`（フェーズ18 追加） |
+
+---
+
+## フェーズ18: 問い合わせ管理
+
+設計書: [phase18_inquiry_management.md](../design/phase11_20/phase18_inquiry_management.md)（r3）
+
+Market 顧客は MarketSession Cookie + CSRF（POST のみ）で認証。Console 経由の Pass-through ではなく **React 直接 Core**（CloudFront `/api/customer/*` Behavior は phase13 §2.2 で構築済み）。`is_internal_note` は API DTO（`MarketCreateInquiryRequest` / `MarketReplyInquiryRequest`）から構造的に除外（RV-9 / Mass Assignment 防御）。
+
+### GET `/api/customer/inquiries`
+
+**説明**: 自分の問い合わせ一覧を取得（IDOR 対策で Service 層が `user_id = sessionCustomerId` を強制）。
+
+**クエリパラメータ**:
+- `page` (number, default=0)
+- `size` (number, default=20)
+
+**レスポンス**: Spring Page 形式（`{ content: [...], totalElements: N, ... }`）。各要素は `{ id, userId, userName, subject, status, targetType, targetId, targetLabel, createdAt, updatedAt }`。
+
+### GET `/api/customer/inquiries/:id`
+
+**説明**: 自分の問い合わせ詳細を取得。**内部メモ（`is_internal_note=true`）は除外**して `messages` 配列を返す。
+
+**レスポンス**: `{ id, ..., messages: [{ id, senderType, senderId, senderName, message, isInternalNote, createdAt }] }`。
+
+**異常系**: 他人の問い合わせ ID を指定すると 403、存在しない ID で 404。
+
+### POST `/api/customer/inquiries`
+
+**説明**: 新規問い合わせ作成。
+
+**リクエスト**: `{ subject (NotBlank, ≤100), message (NotBlank, ≤4000), targetType ('delivery'|'product'|'sales'|null), targetId (number|null) }`。`is_internal_note` フィールドは **DTO 自体に存在しない**（RV-9）。
+
+**異常系**: 文字数上限超過 422、`target_type='delivery'` で他顧客の delivery を指定 403、商品が `is_active=false` で 400。
+
+### POST `/api/customer/inquiries/:id/messages`
+
+**説明**: 自分の問い合わせへの返信を投稿。
+
+**リクエスト**: `{ message (NotBlank, ≤4000) }`。`is_internal_note` フィールドは **DTO 自体に存在しない**（Service 層は常に `false` で投入）。
+
+**通知連携**: 投稿時 phase17 `BatchAlertNotifier.dispatch('INFO', 'inquiry_alerts', ...)` が呼ばれ、Console の `console_notifications` に INSERT される（60 分以内同一 inquiry への連投は `payload_hash` 一致で suppressed=TRUE）。

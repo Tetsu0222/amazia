@@ -27,6 +27,8 @@ import InboundCreate              from '../features/inbound/pages/InboundCreate.
 import InboundStockImport         from '../features/inbound/pages/InboundStockImport.vue';
 import BatchManagementPage        from '../features/batch/pages/BatchManagementPage.vue';
 import BatchNotificationList      from '../features/batch/pages/BatchNotificationList.vue';
+import InquiryList                from '../features/inquiry/pages/InquiryList.vue';
+import InquiryDetail              from '../features/inquiry/pages/InquiryDetail.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -67,6 +69,10 @@ const routes = [
   { path: '/batch/executions',         redirect: { path: '/batch', query: { tab: 'executions' } } },
   { path: '/batch/manual',             redirect: { path: '/batch', query: { tab: 'manual' } } },
   { path: '/batch/notifications',      component: BatchNotificationList, meta: { requiresAuth: true } },
+
+  // フェーズ18 問い合わせ管理
+  { path: '/inquiries',                component: InquiryList,           meta: { requiresAuth: true } },
+  { path: '/inquiries/:id',            component: InquiryDetail,         meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

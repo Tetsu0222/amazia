@@ -43,9 +43,14 @@ export default function MyPage() {
       <Paper sx={{ p: 4 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5">マイページ</Typography>
-          <Button variant="outlined" onClick={() => navigate('/orders')}>
-            購入履歴を見る
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={() => navigate('/orders')}>
+              購入履歴を見る
+            </Button>
+            <Button variant="outlined" onClick={() => navigate('/mypage/inquiries')}>
+              問い合わせ
+            </Button>
+          </Stack>
         </Stack>
         <Divider sx={{ mb: 2 }} />
         <Stack spacing={1.5}>

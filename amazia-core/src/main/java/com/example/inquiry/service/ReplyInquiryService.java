@@ -9,6 +9,8 @@ import com.example.inquiry.exception.InquiryValidationException;
 import com.example.inquiry.repository.InquiryMessageRepository;
 import com.example.inquiry.repository.InquiryRepository;
 import com.example.inquiry.service.notification.InquiryNotificationDispatcher;
+import com.example.operationlog.entity.OperationLog;
+import com.example.operationlog.repository.OperationLogRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,16 +33,25 @@ public class ReplyInquiryService {
     private final InquiryRepository inquiryRepository;
     private final InquiryMessageRepository messageRepository;
     private final InquiryNotificationDispatcher notificationDispatcher;
+    private final OperationLogRepository operationLogRepository;
 
     @Value("${amazia.inquiry.message-max-length}")
     private int messageMaxLength;
 
+    @Value("${amazia.inquiry.operation-log-prefixes.admin-reply}")
+    private String adminReplyPrefix;
+
+    @Value("${amazia.inquiry.operation-log-prefixes.internal-note}")
+    private String internalNotePrefix;
+
     public ReplyInquiryService(InquiryRepository inquiryRepository,
                                InquiryMessageRepository messageRepository,
-                               InquiryNotificationDispatcher notificationDispatcher) {
+                               InquiryNotificationDispatcher notificationDispatcher,
+                               OperationLogRepository operationLogRepository) {
         this.inquiryRepository = inquiryRepository;
         this.messageRepository = messageRepository;
         this.notificationDispatcher = notificationDispatcher;
+        this.operationLogRepository = operationLogRepository;
     }
 
     @Transactional
@@ -80,7 +91,25 @@ public class ReplyInquiryService {
             notificationDispatcher.dispatchReplied(inquiry);
         }
 
+        // 管理者操作のみ operation_logs に記録（顧客返信は記録対象外）
+        if (SENDER_TYPE_ADMIN.equals(cmd.senderType())) {
+            recordOperationLog(cmd, saved.getId(), isInternalNote);
+        }
+
         return saved.getId();
+    }
+
+    private void recordOperationLog(ReplyInquiryCommand cmd, Long messageId, boolean isInternalNote) {
+        OperationLog opLog = new OperationLog();
+        opLog.setUserId(cmd.senderId());
+        opLog.setAction(isInternalNote ? "add_internal_note" : "reply_inquiry");
+        opLog.setTargetType("inquiries");
+        opLog.setTargetId(cmd.inquiryId());
+        opLog.setScreenName("ConsoleInquiryDetailPage");
+        opLog.setApiName("POST /api/console/inquiries/" + cmd.inquiryId() + "/messages");
+        String prefix = isInternalNote ? internalNotePrefix : adminReplyPrefix;
+        opLog.setComment(prefix + " message_id=" + messageId);
+        operationLogRepository.save(opLog);
     }
 
     private void validateMessage(String message) {

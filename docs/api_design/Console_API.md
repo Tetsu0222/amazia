@@ -974,3 +974,24 @@ PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_a
 | GET    | `/api/skus/{id}/prices/history`  | `App\Sku\Controller\ListSkuPriceHistoryController`                  | Core `GET /api/skus/{id}/prices/history`（`start_date DESC`） |
 
 **SKU UI との対応**：Console SKU 詳細モーダルの「価格管理」タブ 3 ブロック化（実装計画書 §6.5）が、上記 4 エンドポイントと既存 `/api/skus/{id}/prices`（GET/POST）を組み合わせて使う。
+
+---
+
+## フェーズ18（問い合わせ管理 Pass-through）
+
+設計書: [phase18_inquiry_management.md](../design/phase11_20/phase18_inquiry_management.md)（r3）
+
+すべて Core への Pass-through。`auth_user_id`（JWT 検証ミドルウェアが request に積む値）を Core に `X-User-Id` ヘッダで転送する。`operation_logs` の記録は Core 側 `ReplyInquiryService` / `UpdateInquiryStatusService` で完結（既存 phase14/15/17 と同方針）。ルート定義は `routes/api/Inquiry.php` に集約。
+
+| メソッド | パス | コントローラー | 中継先 | 備考 |
+|----|----|----|----|----|
+| GET   | `/api/console/inquiries/unread-count` | `App\Inquiry\Controller\GetUnreadInquiryCountController` | Core `GET /api/console/inquiries/unread-count` | ベルマーク用。`{ count: N }` |
+| GET   | `/api/console/inquiries`              | `App\Inquiry\Controller\ListInquiryController`           | Core `GET /api/console/inquiries`              | クエリ透過（`status`/`targetType`/`dateFrom`/`dateTo`/`userName`/`page`/`size`） |
+| GET   | `/api/console/inquiries/{id}`         | `App\Inquiry\Controller\GetInquiryController`            | Core `GET /api/console/inquiries/{id}`         | 内部メモを含む全件メッセージ |
+| POST  | `/api/console/inquiries/{id}/messages`| `App\Inquiry\Controller\ReplyInquiryController`          | Core `POST /api/console/inquiries/{id}/messages` | `message`（必須） / `isInternalNote`（任意 boolean）。文字数上限 422 |
+| PATCH | `/api/console/inquiries/{id}/status`  | `App\Inquiry\Controller\UpdateInquiryStatusController`   | Core `PATCH /api/console/inquiries/{id}/status` | `newStatus`（必須・enum） / `reason`（任意）。許容外ステータス 422 |
+
+**Vue SPA**：
+- サイドバーに `InquiryBellBadge`（30 秒ポーリング、タブ非表示時は停止 / `useVisibilityPolling` Composable）を組み込み、未対応件数バッジを表示。
+- 一覧画面 `/inquiries`（`InquiryList.vue`）と詳細画面 `/inquiries/{id}`（`InquiryDetail.vue`）。詳細画面ではステータス遷移ドロップダウンと返信フォーム（内部メモチェックボックス付き）を表示。
+- ポーリング間隔は `import.meta.env.VITE_INQUIRY_BELL_POLLING_INTERVAL_MS`（既定 30000ms）で上書き可能。
