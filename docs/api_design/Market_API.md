@@ -325,6 +325,8 @@ Market 画面ルートと API の対応関係。
 | `/mypage/inquiries` | MyPageInquiryList | GET `/api/customer/inquiries`（フェーズ18 追加） |
 | `/mypage/inquiries/new` | MyPageInquiryNew | POST `/api/customer/inquiries`（フェーズ18 追加） |
 | `/mypage/inquiries/:id` | MyPageInquiryDetail | GET `/api/customer/inquiries/:id`、POST `/api/customer/inquiries/:id/messages`（フェーズ18 追加） |
+| `/notices` | NoticeListPage | GET `/api/notices`、`/api/notice-categories`、`/api/customer/notices/{id}/read`（フェーズ19 追加） |
+| 全ページ共通ヘッダー | HeaderNotice | GET `/api/customer/notices/unread`、`/api/customer/notices/unread-count`（フェーズ19 追加） |
 
 ---
 
@@ -367,3 +369,77 @@ Market 顧客は MarketSession Cookie + CSRF（POST のみ）で認証。Console
 **リクエスト**: `{ message (NotBlank, ≤4000) }`。`is_internal_note` フィールドは **DTO 自体に存在しない**（Service 層は常に `false` で投入）。
 
 **通知連携**: 投稿時 phase17 `BatchAlertNotifier.dispatch('INFO', 'inquiry_alerts', ...)` が呼ばれ、Console の `console_notifications` に INSERT される（60 分以内同一 inquiry への連投は `payload_hash` 一致で suppressed=TRUE）。
+
+---
+
+## フェーズ19: お知らせ機能
+
+設計書: [phase19_notice_management.md](../design/phase11_20/phase19_notice_management.md)（r2）
+
+Market では以下の 6 エンドポイントを利用する。会員セッションがあれば `is_read` キーが付与され、未認証時は `is_read` キーが JSON から省略される（R19-9 / `Optional<Boolean>` + `@JsonInclude(NON_ABSENT)`）。`author` フィールドは Market 用 DTO に**コンパイル時から存在しない**（R19-11）。
+
+### GET `/api/notices`
+
+**説明**: 公開期間内 + 未削除のお知らせ一覧をページングで取得。並び順は Core 側で `category_id ASC, publish_start DESC, id DESC` 固定。
+
+**クエリパラメータ**:
+- `page` (number, 1始まり, default=1)
+- `per_page` (number, max=100, default=20)
+- `category_id` (number, optional) — 重要(=1) / 普通(=2)
+
+**レスポンス**: Spring Page 形式（`{ content: [...], totalElements: N, ... }`）。各要素は `{ id, subject, category: { id, code, label, displayOrder }, body, publishStart, publishEnd, updatedAt, isRead? }`。
+
+### GET `/api/notices/{id}`
+
+**説明**: お知らせ単件取得（公開期間内 + 未削除）。
+
+**レスポンス**: 上記単体オブジェクト。
+
+**異常系**: 公開期間外 / 論理削除済 / 存在しない id は 404。
+
+### GET `/api/notice-categories`
+
+**説明**: お知らせ分類マスタ一覧（認証不要）。`display_order` 昇順で `[{ id, code, label, displayOrder }, ...]` を返す。
+
+### POST `/api/customer/notices/{id}/read`
+
+**説明**: 既読登録。MarketSession + CSRF（`X-CSRF-Token`）必須。**冪等**：同一 (notice_id, market_customer_id) を複数回叩いても 200。
+
+**異常系**: 未ログインで 401、公開期間外 / 論理削除済 / 存在しない id で 404。
+
+### GET `/api/customer/notices/unread-count`
+
+**説明**: 未読数集計（会員セッション必須）。レスポンス：
+
+```json
+{ "data": { "important": 1, "normal": 3, "total": 4 } }
+```
+
+未存在 category は 0 で埋める。`HeaderNotice` / `useUnreadCount` Hook が 60 秒 Polling（`VITE_NOTICE_UNREAD_POLL_MS`）。
+
+**異常系**: 未ログインで 401。
+
+### GET `/api/customer/notices/unread`
+
+**説明**: ヘッダー表示用未読お知らせ取得。最大 `amazia.notice.header.max-items`（=10）件まで。並び順は `category_id ASC → publish_start DESC → id DESC`。
+
+**レスポンス**: `[{ id, subject, category, body, publishStart, publishEnd, updatedAt, isRead }, ...]`（`author` 含まず）。
+
+### React 構成
+
+| パス / コンポーネント | 役割 |
+|---|---|
+| `/notices`（[NoticeListPage.jsx](../../amazia-market/src/features/notice/components/NoticeListPage.jsx)） | 一覧 + タブフィルタ（すべて / 重要 / 普通） + ページング |
+| `<HeaderNotice />`（全ページ共通ヘッダー） | アコーディオン形式 + 5 秒ローテーション + 60 秒 Polling |
+| `<NoticeModal />` | 件名クリックでモーダル展開、開いた瞬間に未読なら markAsRead を発火、前後遷移ボタン |
+| `<UnreadBadge />` | 未読数バッジ（`count === 0` で非表示） |
+| `useUnreadCount` Hook | 未読数 Polling（既定 60 秒 / `VITE_NOTICE_UNREAD_POLL_MS`） |
+| `useHeaderNotices` Hook | ヘッダー用 Polling + ローテーション（既定 5 秒 / `VITE_NOTICE_HEADER_ROTATE_MS`）。Polling × ローテーション競合は「次の境界で切替」方式（R19-7）、未読 0 件への遷移のみ即時非表示化 |
+
+**XSS 対策**: 本文はプレーンテキスト保存 / React の自動エスケープに依存。改行のみ `<br>` 変換、`dangerouslySetInnerHTML` は使用しない。
+
+**Vitest テスト**:
+- [NoticeListPage.test.jsx](../../amazia-market/src/features/notice/components/NoticeListPage.test.jsx)（一覧表示 / タブ切替の category_id クエリ / 空状態 / モーダル展開時の markAsRead 発火）
+- [NoticeModal.test.jsx](../../amazia-market/src/features/notice/components/NoticeModal.test.jsx)（未読時 markAsRead / 既読時非発火 / XSS エスケープ / 前後ボタン活性制御）
+- [HeaderNotice.test.jsx](../../amazia-market/src/features/notice/components/HeaderNotice.test.jsx)（0 件・401 で非表示 / 件名表示 / 5 秒切替 fake timer）
+- [useUnreadCount.test.jsx](../../amazia-market/src/features/notice/hooks/useUnreadCount.test.jsx)（初回取得 / 401 authError / 60 秒 Polling 再取得）

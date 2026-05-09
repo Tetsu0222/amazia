@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "phaseX-11 Step 3 (PreToolUse) と Step 6-1 (PostToolUse)。詳細は docs/ai_context/hooks_inventory.md 参照。脱出ハッチは AMAZIA_TPL_HOOK_DISABLE=1（両 hook 共通）。",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \".claude/hooks/tpl_trigger.ps1\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \".claude/hooks/access_log_appender.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}

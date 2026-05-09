@@ -68,3 +68,9 @@ INSERT INTO shipping_methods (id, name, description) VALUES (2, 'konbini_pickup'
 INSERT INTO shipping_methods (id, name, description) VALUES (3, 'dropoff',        '置き配');
 
 INSERT INTO warehouses (id, name, description) VALUES (1, 'default', '全社単一倉庫');
+
+-- フェーズ19 マスタ（schema.sql と整合 / R19-1）
+-- 本番（schema.sql）は INSERT IGNORE で投入されるが、H2 は ddl-auto=create-drop でスキーマ
+-- を作り直すたびに空になる。テスト用マスタはここで明示的に seed する。
+INSERT INTO notice_categories (id, code, label, display_order) VALUES (1, 'important', '重要', 1);
+INSERT INTO notice_categories (id, code, label, display_order) VALUES (2, 'normal',    '普通', 2);

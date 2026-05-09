@@ -42,5 +42,10 @@
         <env name="INQUIRY_MESSAGE_MAX_LENGTH" value="4000"/>
         <env name="INQUIRY_LIST_PAGE_SIZE_CONSOLE" value="50"/>
         <env name="INQUIRY_BELL_POLLING_INTERVAL_MS" value="30000"/>
+        <!-- フェーズ19: お知らせ機能 テスト用既定値（規約 4-3） -->
+        <env name="NOTICE_CATEGORY_IMPORTANT_ID" value="1"/>
+        <env name="NOTICE_CATEGORY_NORMAL_ID" value="2"/>
+        <env name="NOTICE_SUBJECT_MAX_LENGTH" value="255"/>
+        <env name="NOTICE_BODY_MAX_LENGTH" value="10000"/>
     </php>
 </phpunit>

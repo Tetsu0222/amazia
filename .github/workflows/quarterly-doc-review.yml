@@ -1,0 +1,91 @@
+name: Quarterly Doc Review
+
+# phaseX-11 Step 6-2: AI コンテキストドキュメントの 3 ヶ月定期レビューを Issue 起票で起動。
+# Issue 通知を見た人間が Claude Code で /review-docs を呼び出してレビューを実施し、
+# 結果を docs/ai_context/_review_NNN.md として記録。
+#
+# 設計書: docs/design/phaseX/phaseX-11_doc_driven_layering.md §Step 6-2
+# 初回実行予定: 2026-08-09（cron 上は四半期初頭で十分なので近接日に発火）
+
+on:
+  schedule:
+    # 1, 4, 7, 10 月の 9 日 00:00 UTC = 09:00 JST。3 ヶ月ごとの起点。
+    - cron: '0 0 9 1,4,7,10 *'
+  workflow_dispatch:  # 手動実行も許可
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  open-review-issue:
+    name: Open quarterly doc review issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Open issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date();
+            const yyyy = today.getUTCFullYear();
+            const mm = String(today.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(today.getUTCDate()).padStart(2, '0');
+            const ymd = `${yyyy}-${mm}-${dd}`;
+
+            const title = `[Doc Review] ${ymd} 四半期 AI コンテキストレビュー`;
+
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'doc-review,quarterly'
+            });
+
+            const body = [
+              `phaseX-11 Step 6-2 の 3 ヶ月定期レビュー時期です。`,
+              ``,
+              `## 実施手順`,
+              ``,
+              `1. 本リポジトリをローカルにクローンして Claude Code で開く`,
+              `2. 次のコマンドで skill を呼び出し（NNN は既存 \`docs/ai_context/_review_*.md\` の最大番号 +1）：`,
+              `   \`\`\``,
+              `   /review-docs <NNN>`,
+              `   \`\`\``,
+              `3. 出力された \`docs/ai_context/_review_NNN.md\` を確認・修正して PR を出す`,
+              `4. PR マージ後、本 Issue にレビュー結果ファイルへのリンクをコメントしてクローズ`,
+              ``,
+              `## レビュー対象`,
+              ``,
+              `- \`docs/ai_context/_access_log.md\` および \`_access_log_archive_*.md\` から参照頻度の低いファイルを抽出`,
+              `- \`docs/troubles/\` の直近 3 ヶ月の更新分から TPL の陳腐化チェック`,
+              `- \`CLAUDE.md\` の行数増加チェック（80 行以下が phaseX-11 Step 2 の合格ライン）`,
+              `- Hook / skill / データ化 3 レイヤーの費用対効果点検`,
+              ``,
+              `## 参考`,
+              ``,
+              `- 設計書: [docs/design/phaseX/phaseX-11_doc_driven_layering.md](../tree/main/docs/design/phaseX/phaseX-11_doc_driven_layering.md) §Step 6-2`,
+              `- skill: [.claude/commands/review-docs.md](../tree/main/.claude/commands/review-docs.md)`,
+              `- 起点 workflow: \`.github/workflows/quarterly-doc-review.yml\``,
+              ``,
+              `自動起票: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+
+            if (existing.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['doc-review', 'quarterly']
+              });
+              core.notice(`Quarterly review issue opened: ${title}`);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing[0].number,
+                body: `次回トリガー: ${ymd}（前回の Issue が未クローズのためリマインドのみ）`
+              });
+              core.notice(`Existing open issue found: #${existing[0].number} — added reminder comment`);
+            }

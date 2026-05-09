@@ -1,0 +1,45 @@
+name: Verify Data Rules
+
+# phaseX-11 Step 5: 文書ベースのルールをデータ化したファイルと、実コードの整合を CI で検証する。
+# 現状は REQUIRES_NEW クラス一覧のみ。phaseX-12 以降で対象拡張予定。
+#
+# トリガー: 関連ファイルが変わる PR と、push（main / phaseX-* / phase16+）。
+# 軽量（grep + diff のみ）なので always run でも秒で終わる想定。
+
+on:
+  pull_request:
+    paths:
+      - 'amazia-core/src/main/**/*.java'
+      - 'ops/test/requires_new_classes.txt'
+      - 'ops/test/verify_requires_new_classes.sh'
+      - '.github/workflows/verify-data-rules.yml'
+  push:
+    branches:
+      - main
+      - 'phaseX-**'
+      - 'phase**'
+    paths:
+      - 'amazia-core/src/main/**/*.java'
+      - 'ops/test/requires_new_classes.txt'
+      - 'ops/test/verify_requires_new_classes.sh'
+      - '.github/workflows/verify-data-rules.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  requires-new-classes:
+    name: Verify REQUIRES_NEW classes list
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run verification
+        run: bash ops/test/verify_requires_new_classes.sh
+      - name: Failure hint
+        if: failure()
+        run: |
+          echo "::error::REQUIRES_NEW クラス一覧と本番コードが乖離しています。"
+          echo "::error::詳細は上記ログ参照。docs/ai_context/prompt_templates.md#tpl-009 と"
+          echo "::error::ops/test/requires_new_classes.txt の冒頭コメントに従って対処してください。"

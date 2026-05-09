@@ -29,6 +29,8 @@ import BatchManagementPage        from '../features/batch/pages/BatchManagementP
 import BatchNotificationList      from '../features/batch/pages/BatchNotificationList.vue';
 import InquiryList                from '../features/inquiry/pages/InquiryList.vue';
 import InquiryDetail              from '../features/inquiry/pages/InquiryDetail.vue';
+import NoticeList                 from '../features/notice/pages/NoticeList.vue';
+import NoticeForm                 from '../features/notice/pages/NoticeForm.vue';
 
 const routes = [
   { path: '/login',                    component: LoginPage,                meta: { public: true } },
@@ -73,6 +75,11 @@ const routes = [
   // フェーズ18 問い合わせ管理
   { path: '/inquiries',                component: InquiryList,           meta: { requiresAuth: true } },
   { path: '/inquiries/:id',            component: InquiryDetail,         meta: { requiresAuth: true } },
+
+  // フェーズ19 お知らせ管理（静的ルートを動的ルートより先に並べる / test_insights カテゴリ2）
+  { path: '/notices',                  component: NoticeList,            meta: { requiresAuth: true } },
+  { path: '/notices/create',           component: NoticeForm,            meta: { requiresAuth: true } },
+  { path: '/notices/:id/edit',         component: NoticeForm,            meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

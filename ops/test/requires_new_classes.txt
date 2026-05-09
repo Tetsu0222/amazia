@@ -1,0 +1,26 @@
+# Amazia Core で `@Transactional(propagation = Propagation.REQUIRES_NEW)` を使う本番クラス一覧
+#
+# 1 行 1 クラス（単純クラス名） / # 始まりはコメント / 空行は無視
+# 出典: amazia-core/src/main/** の grep 結果（phaseX-11 Step 5 で導入、2026-05-09）
+#
+# 本一覧は ops/test/verify_requires_new_classes.sh が CI で grep 結果と diff し、
+# 新規クラスの追加 / 既存クラスの削除を検知する。データ化前は TPL-009 本文に列挙されていたが、
+# 文章ベースだと更新漏れで実体と乖離する（Step 5 着手時に 3 クラス → 6 クラスの乖離が発覚）。
+#
+# 追加・削除時の運用：
+# - amazia-core で REQUIRES_NEW を新規付与 / 削除したら同 PR で本ファイルも更新
+# - 該当クラスは `@SpringBootTest` 系テストで「ロールバックを貫通する書き込み」を行うため、
+#   テスト分離（cleanup.sql / 自テスト所有 ID フィルタ）の対象に含める
+# - 詳細は docs/ai_context/prompt_templates.md#tpl-009 を参照
+#
+# 関連:
+# - TPL-009（件数アサーションを伴うテスト追加・改修時）
+# - AP-009（テスト分離不足 + 単発 PR で類似クラス見落とし）
+# - test_insights.md カテゴリ 7-2
+
+FaultInjectionLogger
+DigestDispatchService
+BatchAlertNotifier
+DeliveryStatusTransitionService
+BatchExecutionRecorder
+TriggerBatchManualService

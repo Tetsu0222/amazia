@@ -483,6 +483,56 @@ erDiagram
 
 ---
 
+## 10. Core お知らせ機能（フェーズ19）
+
+```mermaid
+erDiagram
+    users {
+        BIGINT id PK
+    }
+
+    market_customers {
+        BIGINT id PK
+    }
+
+    notice_categories {
+        BIGINT id PK
+        VARCHAR code
+        VARCHAR label
+        INT display_order
+    }
+
+    notices {
+        BIGINT id PK
+        VARCHAR subject
+        BIGINT category_id FK
+        TEXT body
+        BIGINT author_id FK
+        DATETIME publish_start
+        DATETIME publish_end
+        DATETIME deleted_at
+    }
+
+    notice_reads {
+        BIGINT id PK
+        BIGINT notice_id FK
+        BIGINT market_customer_id FK
+        DATETIME read_at
+    }
+
+    notice_categories ||--o{ notices         : "1:N（category_id）"
+    users             ||--o{ notices         : "1:N（author_id / 投稿者）"
+    notices           ||--o{ notice_reads    : "1:N（CASCADE DELETE しない / 履歴維持）"
+    market_customers  ||--o{ notice_reads    : "1:N（market_customer_id）"
+```
+
+> - **R19-12 カーディナリティ**：`notice_categories` は本フェーズでは {important, normal} の 2 件のみ。`notices` / `notice_reads` は会員数 × お知らせ数で増えるため、ヘッダー未読集計クエリは `LEFT JOIN notice_reads ... NOT EXISTS` で 1 クエリに集約する（N+1 回避）。
+> - **論理削除と参照履歴**：`notices.deleted_at IS NOT NULL` でも `notice_reads` は CASCADE DELETE しない。過去既読履歴を将来要件で参照可能にしておくため。
+> - **CHECK / FK の二重防御**：`notices.publish_start <= publish_end` は本番 MySQL で物理担保。H2 テスト環境は `ddl-auto=create-drop` で CHECK 反映されないため、Service 層 `NoticePeriodValidator` が 422 を返すことで同等担保（test_insights カテゴリ7-2）。
+> - **投稿者非表示**：Market 側レスポンス DTO は `NoticeMarketDto`（`author` フィールドなし）と分離し、コンパイル時に投稿者情報の漏洩を防ぐ（R19-11）。
+
+---
+
 ## テーブル一覧
 
 ### Core システム（認証・認可）— フェーズ11
@@ -577,6 +627,14 @@ erDiagram
 |------------|--------|------|------------|
 | inquiries | 問い合わせ親 | Market 顧客から登録された 1 件の問い合わせ（件名 + ステータス + 対象多態） | フェーズ18 |
 | inquiry_messages | 問い合わせスレッドメッセージ | 顧客／管理者の往復メッセージ。`is_internal_note=TRUE` で管理者間共有メモ | フェーズ18 |
+
+### Core システム（お知らせ機能）— フェーズ19
+
+| テーブル名 | 論理名 | 用途 | 追加フェーズ |
+|------------|--------|------|------------|
+| notice_categories | お知らせ分類マスタ | important / normal の 2 件初期投入。`code` で UNIQUE | フェーズ19 |
+| notices | お知らせ本体 | Console 投稿・公開期間で Market に閲覧させる。`deleted_at` で論理削除 | フェーズ19 |
+| notice_reads | お知らせ既読履歴 | (notice_id, market_customer_id) UNIQUE。論理削除時も維持（参照履歴） | フェーズ19 |
 
 ---
 

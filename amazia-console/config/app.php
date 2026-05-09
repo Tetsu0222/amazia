@@ -128,5 +128,6 @@ return [
     'sales'    => require __DIR__.'/app/Sales.php',
     'delivery' => require __DIR__.'/app/Delivery.php',
     'inquiry'  => require __DIR__.'/app/Inquiry.php',
+    'notice'   => require __DIR__.'/app/Notice.php',
 
 ];

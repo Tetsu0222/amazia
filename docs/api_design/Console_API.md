@@ -995,3 +995,34 @@ PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_a
 - サイドバーに `InquiryBellBadge`（30 秒ポーリング、タブ非表示時は停止 / `useVisibilityPolling` Composable）を組み込み、未対応件数バッジを表示。
 - 一覧画面 `/inquiries`（`InquiryList.vue`）と詳細画面 `/inquiries/{id}`（`InquiryDetail.vue`）。詳細画面ではステータス遷移ドロップダウンと返信フォーム（内部メモチェックボックス付き）を表示。
 - ポーリング間隔は `import.meta.env.VITE_INQUIRY_BELL_POLLING_INTERVAL_MS`（既定 30000ms）で上書き可能。
+
+---
+
+## フェーズ19（お知らせ管理 Pass-through）
+
+設計書: [phase19_notice_management.md](../design/phase11_20/phase19_notice_management.md)（r2）
+
+Core `/api/notices` 系を `/api/admin/notices` 経由でラップし、`auth_user_id`（JWT 検証ミドルウェアが request に積む値）を Core に `X-User-Id` ヘッダで転送する。`operation_logs` の記録は Core 側 `CreateNoticeService` / `UpdateNoticeService` / `DeleteNoticeService` で完結（R19-3 / R19-4。Console 自身は `operation_logs` に書き込まない）。ルート定義は `routes/api/Notice.php` に集約。
+
+| メソッド | パス | コントローラー | 中継先 | 備考 |
+|----|----|----|----|----|
+| GET    | `/api/admin/notices`         | `App\Notice\Controller\ListNoticeController`   | Core `GET /api/notices`         | クエリ透過：`page`（1始まり） / `per_page`（最大 100、既定 20） / `category_id` / `include_unpublished` / `include_deleted` |
+| GET    | `/api/admin/notices/{id}`    | `App\Notice\Controller\GetNoticeController`    | Core `GET /api/notices/{id}`    | クエリ透過：`include_unpublished` / `include_deleted` |
+| POST   | `/api/admin/notices`         | `App\Notice\Controller\CreateNoticeController` | Core `POST /api/notices`        | `StoreNoticeRequest` で `subject` / `categoryId` / `body` / `publishStart` / `publishEnd` を検証。Core への送信前に時分秒補完（`YYYY-MM-DD` → `YYYY-MM-DDT00:00:00` / `YYYY-MM-DDT23:59:59`）を行う（R19-2 / R19-5） |
+| PUT    | `/api/admin/notices/{id}`    | `App\Notice\Controller\UpdateNoticeController` | Core `PUT /api/notices/{id}`    | `UpdateNoticeRequest`（`StoreNoticeRequest` と同形）。Core 410 をそのまま透過 |
+| DELETE | `/api/admin/notices/{id}`    | `App\Notice\Controller\DeleteNoticeController` | Core `DELETE /api/notices/{id}` | 204 No Content / 既に削除済は 410 を透過 |
+| GET    | `/api/notice-categories`     | `App\Notice\Controller\GetNoticeCategoriesController` | Core `GET /api/notice-categories` | 認証不要マスタ取得（Console SPA からは auth.jwt 配下経由で叩く） |
+
+**FormRequest**：
+
+- `App\Notice\Request\StoreNoticeRequest` / `App\Notice\Request\UpdateNoticeRequest`
+- 件名・本文の上限は `config('app.notice.subject_max_length')` / `config('app.notice.body_max_length')`、`categoryId` の許容値は `config('app.notice.categories.important_id')` / `normal_id` で config 駆動（規約 4-1）。
+- `publishEnd` には `after_or_equal:publishStart` を適用。
+
+**Vue SPA**：
+
+- 一覧画面 `/notices`（`NoticeList.vue`）：分類フィルタ・「未公開を含む」「削除済を含む」の切替・新規作成ボタン・行ごとの編集／削除アクション。
+- 編集／作成画面 `/notices/create` / `/notices/:id/edit`（`NoticeForm.vue`）：件名・分類・本文・公開開始日・公開終了日。Core 422 / 410 を `message` トーストで表示。
+- サイドバーメニュー `App.vue` に「お知らせ管理」リンクを追加。
+- ルート登録順序：静的 `/notices/create` を動的 `/notices/:id/edit` の前に並べる（test_insights カテゴリ2）。
+- **Vitest 適用外**：本フェーズ時点で Console SPA は Vitest 未導入。計画書 §3-3-2 の Vue コンポーネントテスト要求は対象外とし、Pass-through の挙動は PHPUnit の Feature テスト（`tests/Feature/Notice/NoticeProxyTest.php` / 17 テスト）で担保する。UI は手動 E2E（Step D）でゴールデンパス確認。

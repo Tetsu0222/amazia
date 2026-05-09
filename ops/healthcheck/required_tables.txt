@@ -69,3 +69,8 @@ console_notifications_archive
 # 問い合わせ管理（フェーズ18）
 inquiries
 inquiry_messages
+
+# お知らせ機能（フェーズ19）
+notice_categories
+notices
+notice_reads

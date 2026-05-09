@@ -29,6 +29,7 @@
           <a-menu-item key="/inquiries">
             <InquiryBellBadge />
           </a-menu-item>
+          <a-menu-item key="/notices">お知らせ管理</a-menu-item>
           <a-menu-item v-if="isAdmin" key="/users">社員管理</a-menu-item>
           <a-menu-divider />
           <a-menu-item key="__logout">ログアウト</a-menu-item>

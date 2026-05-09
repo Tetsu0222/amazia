@@ -28,4 +28,5 @@ Route::middleware('auth.jwt')->group(function () {
     require __DIR__.'/api/Inbound.php';
     require __DIR__.'/api/Batch.php';
     require __DIR__.'/api/Inquiry.php';
+    require __DIR__.'/api/Notice.php';
 });

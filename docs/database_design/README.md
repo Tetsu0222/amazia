@@ -97,6 +97,14 @@
 | [TBL_inquiries.md](TBL_inquiries.md) | inquiries | 問い合わせ親 | Core |
 | [TBL_inquiry_messages.md](TBL_inquiry_messages.md) | inquiry_messages | 問い合わせスレッドメッセージ | Core |
 
+### Core システム（お知らせ機能）※フェーズ19追加
+
+| ファイル名 | テーブル名 | 論理名 | 所属システム |
+|------------|------------|--------|------------|
+| [TBL_notice_categories.md](TBL_notice_categories.md) | notice_categories | お知らせ分類マスタ | Core |
+| [TBL_notices.md](TBL_notices.md) | notices | お知らせ本体 | Core |
+| [TBL_notice_reads.md](TBL_notice_reads.md) | notice_reads | お知らせ既読履歴 | Core |
+
 ### Console システム（Laravel 標準）
 
 | ファイル名 | テーブル名 | 論理名 | 所属システム |

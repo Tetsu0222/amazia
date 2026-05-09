@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# 個人用環境変数（チーム共有値は .env.test 等にコミット）
+.env
+.env.local
+.env.development.local
+.env.production.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

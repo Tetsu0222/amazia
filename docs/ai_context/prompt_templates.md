@@ -192,6 +192,11 @@ AP-* に該当する典型的な落とし穴を着手前に予防できる。
 
 ### TPL-007: フェーズ完了確認時
 
+> **🔧 skill 化済み（phaseX-11 Step 4）：**
+> 運用上は slash command [`/check-phase-completion <フェーズ番号>`](../../.claude/commands/check-phase-completion.md) を呼び出してください。
+> 本テンプレ本文は AP-007 ⇄ TPL-007 の双方向リンク用の参照点として残置。
+> 内容を変更する場合は skill 側を正本とし、本文は薄く同期する（[skills_inventory.md](skills_inventory.md) §運用ルール参照）。
+
 **予防する AP：** [AP-007 設計書の機能を部分実装で完了報告](ai_collaboration_antipatterns.md#ap-007-設計書の機能を部分実装で完了報告)
 
 **いつ使うか：** フェーズの完了報告（design/phase*.md のステータスを「完了」にする）をする前。
@@ -255,7 +260,7 @@ AP-* に該当する典型的な落とし穴を着手前に予防できる。
 >    - No（`@DataJpaTest` / 純粋単体）→ 以下チェック対象外
 > 2. 検証対象テーブルへ書き込む他テストが他に何件あるか grep で列挙
 >    - 特に `@Transactional(propagation = Propagation.REQUIRES_NEW)` 経由の書き込み
->    - 既知の REQUIRES_NEW 経由クラス：`FaultInjectionLogger` / `BatchAlertNotifier` / `BatchExecutionRecorder`
+>    - 既知の REQUIRES_NEW 経由クラス一覧は [`ops/test/requires_new_classes.txt`](../../ops/test/requires_new_classes.txt) を参照（phaseX-11 Step 5 でデータ化、CI で実コードと差分検証）。txt と本番コードに乖離が無いことは `verify-data-rules.yml` で常時担保される
 > 3. それらの残置がロールバックを貫通するか
 >    - 貫通する場合 → クラスレベル `@Transactional` だけでは分離不十分
 >    - cleanup.sql + クラスレベル `@Sql(BEFORE_TEST_METHOD)` を検討（[test_insights.md カテゴリ 7-2](test_insights.md) の規約参照）

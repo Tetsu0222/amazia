@@ -1612,3 +1612,86 @@ CSRF 保護対象（POST のみ）。Cookie ベース認証は `MarketSessionAut
 | 400 | `InquiryValidationException` | 件名/本文の長さ上限超過、target_type 未知値、target_pair NULL 違反、Service 層での内部メモ拒否（market_customer + isInternalNote=true） |
 | 403 | `ForbiddenInquiryAccessException` | 他顧客の inquiry / target 資源（delivery / sales）への不正アクセス |
 | 404 | `InquiryNotFoundException` | inquiries / 関連エンティティが見つからない |
+
+---
+
+## お知らせ機能（フェーズ19）
+
+設計書: [phase19_notice_management.md](../design/phase11_20/phase19_notice_management.md)（r2）
+
+DTO クラスを Console 用 / Market 用で**物理的に分離**することにより、投稿者情報（`author`）の Market 漏洩をコンパイル時に保証する（R19-11）。`is_read` キーは Market 認証時のみ含め、未認証 / Console 時は JSON から省略する（`Optional<Boolean>` + `@JsonInclude(Include.NON_ABSENT)` / R19-9）。
+
+`operation_logs` 書き込みは **Core Service が直接行う**（R19-3 / R19-4）。Console は `X-User-Id` ヘッダで actor を渡すのみ。
+
+### Console / 共通系（X-User-Id ヘッダ）
+
+CSRF 保護なし（Console JWT 検証は Console / Laravel 側で完了済み前提）。書き込み系の actor は `X-User-Id` ヘッダで渡す。
+
+| メソッド | パス | サービス | 備考 |
+|----|----|----|----|
+| GET  | `/api/notice-categories` | `GetNoticeCategoriesService.findAll` | 認証不要。`display_order` 昇順で全件 |
+| POST | `/api/notices` | `CreateNoticeService.create` | `X-User-Id` 必須。201 を返す。`operation_logs(action='create_notice')` 自動記録 |
+| PUT  | `/api/notices/{id}` | `UpdateNoticeService.update` | `X-User-Id` 必須。論理削除済は 410 Gone。`operation_logs(action='update_notice')` 自動記録 |
+| DELETE | `/api/notices/{id}` | `DeleteNoticeService.delete` | `X-User-Id` 必須。`deleted_at = NOW()` で論理削除。2 回目以降は 410。`operation_logs(action='delete_notice')` 自動記録 |
+| GET  | `/api/notices/{id}` | `GetNoticeService.getById` | 視点判定：`X-User-Id` あり → Console、Market セッション → Market 認証、無 → 未認証。Console のみ `include_unpublished` / `include_deleted` を解釈 |
+| GET  | `/api/notices` | `ListNoticeService.list` | ページング（`page` 1 始まり / `per_page` 既定 20・最大 100）。並び順 `category_id ASC, publish_start DESC, id DESC`。`category_id` フィルタ任意 |
+
+### Market（MarketSession Cookie + CSRF）
+
+CSRF 保護対象（POST のみ）。`MarketSessionAuthFilter` が `ATTR_CUSTOMER_ID` を立て、`MarketCsrfFilter` が `/api/customer/` 配下の状態変更系で X-CSRF-Token を検証する。GET は SAFE_METHODS のため CSRF スキップ、ただし会員セッションは必須。
+
+| メソッド | パス | サービス | 備考 |
+|----|----|----|----|
+| GET  | `/api/customer/notices/unread-count` | `GetUnreadCountService.count` | レスポンス `{ "data": { "important": N, "normal": M, "total": N+M } }`。未存在 category は 0 で埋める |
+| GET  | `/api/customer/notices/unread` | `GetUnreadHeaderNoticesService.findUnread` | ヘッダー表示用。最大 `amazia.notice.header.max-items`（=10）件まで。並び順は同上 |
+| POST | `/api/customer/notices/{id}/read` | `MarkAsReadService.markAsRead` | 冪等。同一 (notice, customer) の 2 回目以降も 200。公開期間外 / 論理削除済 / 存在しない id は 404 |
+
+### レスポンス DTO 構造（R19-9 / R19-11）
+
+**`NoticeMarketDto`**（Market / 未認証 / ヘッダー API）：
+
+```json
+{
+  "id": 123,
+  "subject": "メンテナンスのお知らせ",
+  "category": { "id": 2, "code": "normal", "label": "普通", "displayOrder": 2 },
+  "body": "...",
+  "publishStart": "2026-05-09T00:00:00",
+  "publishEnd": "2026-05-15T23:59:59",
+  "updatedAt": "2026-05-09T10:23:00",
+  "isRead": false
+}
+```
+
+- `author` フィールドは**存在しない**（クラス定義レベルで保証）
+- `isRead` は会員セッション時のみ。未認証時はキー自体が JSON から消える（`NON_ABSENT`）
+
+**`NoticeConsoleDto`**（Console / X-User-Id 経由）：
+
+```json
+{
+  "id": 123,
+  "subject": "メンテナンスのお知らせ",
+  "category": { ... },
+  "body": "...",
+  "publishStart": "...",
+  "publishEnd": "...",
+  "createdAt": "...",
+  "updatedAt": "...",
+  "deletedAt": null,
+  "author": { "id": 5, "name": "管理者太郎" },
+  "publishState": "公開中"
+}
+```
+
+- `publishState` は `未公開` / `公開中` / `終了` / `削除済` のいずれかを Service が算出
+- `deletedAt` は論理削除済のとき NOT NULL
+
+### 例外マッピング（GlobalExceptionHandler / `ResponseStatusException` 経由）
+
+| HTTP | 発生条件 |
+|------|--------|
+| 401 | Market 系 API で `MarketSessionAuthFilter` が `ATTR_CUSTOMER_ID` を立てていないとき（未ログイン） |
+| 404 | 公開期間外 / 論理削除済 / 存在しない notice_id（Market 視点）。Console 視点で `include_*=false` のときも同様 |
+| 410 | Console から論理削除済 notice の更新・削除を行ったとき |
+| 422 | `publish_start > publish_end`（Service 二重防御）/ subject / body 上限超過 / 存在しない `category_id` / 存在しない `X-User-Id`（actor 不在） |

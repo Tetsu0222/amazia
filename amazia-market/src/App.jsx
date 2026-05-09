@@ -13,6 +13,7 @@ import { AuthProvider } from './features/customer/context/AuthContext';
 import { CartProvider } from './features/cart/context/CartContext';
 import ProtectedRoute from './features/customer/components/ProtectedRoute';
 import AppHeader from './components/AppHeader';
+import HeaderNotice from './features/notice/components/HeaderNotice';
 import Checkout from './features/checkout/pages/Checkout';
 import CheckoutComplete from './features/checkout/pages/CheckoutComplete';
 import PurchaseHistory from './features/orders/pages/PurchaseHistory';
@@ -20,11 +21,13 @@ import CartPage from './features/cart/pages/CartPage';
 import MyPageInquiryList from './features/inquiry/pages/MyPageInquiryList';
 import MyPageInquiryDetail from './features/inquiry/pages/MyPageInquiryDetail';
 import MyPageInquiryNew from './features/inquiry/pages/MyPageInquiryNew';
+import NoticeListPage from './features/notice/components/NoticeListPage';
 
 function Layout() {
   return (
     <>
       <AppHeader />
+      <HeaderNotice />
       <Outlet />
     </>
   );
@@ -109,6 +112,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* フェーズ19: お知らせ一覧（認証不要・閲覧時に Cookie があれば既読状態を反映） */}
+              <Route path="/notices" element={<NoticeListPage />} />
             </Route>
           </Routes>
           </CartProvider>

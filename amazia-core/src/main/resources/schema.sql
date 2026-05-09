@@ -876,3 +876,72 @@ SELECT u.id, 'inquiry_alerts', TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
  WHERE u.role_id IN (
        SELECT id FROM roles WHERE code IN ('admin', 'senior_admin', 'eternal_advisor')
  );
+
+-- ============================================================================
+-- フェーズ19: お知らせ機能（設計書 phase19_notice_management.md r2）
+--   - notice_categories（分類マスタ）/ notices（本体）/ notice_reads（既読管理）
+--   - PK 型ポリシー（R19-1）：本テーブル群 PK / FK は BIGINT、users / market_customers
+--     を参照する FK は BIGINT UNSIGNED で揃える（044 / 045 と同型対策）。
+--   - H2 互換（test_insights カテゴリ7-2）：
+--       * `ON UPDATE CURRENT_TIMESTAMP` は使わず JPA @PreUpdate で更新
+--       * `CHECK (publish_start <= publish_end)` は H2 / MySQL 双方で通る構文
+--       * INDEX はインライン宣言ではなく `CREATE INDEX IF NOT EXISTS` で別文化
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- フェーズ19 Step A-1: notice_categories（分類マスタ / 設計書 §DB 設計）
+--   important / normal の 2 件を INSERT IGNORE で初期投入。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS notice_categories (
+    id            BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    code          VARCHAR(20) NOT NULL,
+    label         VARCHAR(50) NOT NULL,
+    display_order INT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_notice_categories_code UNIQUE (code)
+);
+INSERT IGNORE INTO notice_categories (id, code, label, display_order) VALUES
+    (1, 'important', '重要', 1),
+    (2, 'normal',    '普通', 2);
+
+-- ----------------------------------------------------------------------------
+-- フェーズ19 Step A-2: notices（お知らせ本体 / 設計書 §DB 設計）
+--   - publish_start <= publish_end は CHECK で物理担保（Service 二重防御）。
+--   - deleted_at NULL = アクティブ、NOT NULL = 論理削除済（YAGNI / deleted_flag 廃止）。
+--   - author_id は users.id (BIGINT UNSIGNED) を参照。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS notices (
+    id            BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    subject       VARCHAR(255) NOT NULL,
+    category_id   BIGINT NOT NULL,
+    body          TEXT NOT NULL,
+    author_id     BIGINT UNSIGNED NOT NULL,
+    publish_start DATETIME NOT NULL,
+    publish_end   DATETIME NOT NULL,
+    deleted_at    DATETIME NULL,
+    created_at    DATETIME NOT NULL,
+    updated_at    DATETIME NOT NULL,
+    CONSTRAINT fk_notices_category FOREIGN KEY (category_id) REFERENCES notice_categories(id),
+    CONSTRAINT fk_notices_author   FOREIGN KEY (author_id)   REFERENCES users(id),
+    CONSTRAINT chk_notices_publish_period CHECK (publish_start <= publish_end)
+);
+CREATE INDEX IF NOT EXISTS idx_notices_publish_period ON notices (publish_start, publish_end);
+CREATE INDEX IF NOT EXISTS idx_notices_category_id    ON notices (category_id);
+CREATE INDEX IF NOT EXISTS idx_notices_deleted_at     ON notices (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_notices_author_id      ON notices (author_id);
+
+-- ----------------------------------------------------------------------------
+-- フェーズ19 Step A-3: notice_reads（既読管理 / 設計書 §DB 設計）
+--   - (notice_id, market_customer_id) UNIQUE で重複既読を物理担保。
+--   - お知らせ論理削除時も notice_reads は維持（参照履歴 / CASCADE DELETE 不採用）。
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS notice_reads (
+    id                  BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    notice_id           BIGINT NOT NULL,
+    market_customer_id  BIGINT UNSIGNED NOT NULL,
+    read_at             DATETIME NOT NULL,
+    created_at          DATETIME NOT NULL,
+    CONSTRAINT uk_notice_reads_notice_customer UNIQUE (notice_id, market_customer_id),
+    CONSTRAINT fk_notice_reads_notice   FOREIGN KEY (notice_id)          REFERENCES notices(id),
+    CONSTRAINT fk_notice_reads_customer FOREIGN KEY (market_customer_id) REFERENCES market_customers(id)
+);
+CREATE INDEX IF NOT EXISTS idx_notice_reads_market_customer_id ON notice_reads (market_customer_id);
