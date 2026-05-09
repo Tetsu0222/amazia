@@ -139,6 +139,7 @@ operation_logs テーブルの作成が失敗。`continue-on-error=true` で WAR
 **出典：**
 - メイン: [docs/troubles/044_operation_logs_table_missing_users_id_unsigned_drift.md](../troubles/044_operation_logs_table_missing_users_id_unsigned_drift.md)
 - 関連: [045_sales_return_table_missing_users_id_unsigned_drift.md](../troubles/045_sales_return_table_missing_users_id_unsigned_drift.md), [049_password_histories_table_missing_in_schema_sql.md](../troubles/049_password_histories_table_missing_in_schema_sql.md)
+- 関連（H2 と本番 RDBMS の挙動差を見過ごした類例）: [027_workflow_test_h2_schema_and_json_payload.md 派生①](../troubles/027_workflow_test_h2_schema_and_json_payload.md) — `@Lob String` × MySQL JSON カラムの CHARACTER SET binary 検証差
 
 ---
 

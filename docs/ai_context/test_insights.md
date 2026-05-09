@@ -135,13 +135,15 @@
   - または schema.sql を H2/MySQL 両対応に書き直す（インライン INDEX を `CREATE INDEX IF NOT EXISTS` に分離など）
 
 ### JSON 列の Hibernate マッピング
-- `String` フィールドに `@Column(columnDefinition = "JSON")` を付けると、保存時に文字列リテラルとして二重エスケープされ、`ObjectMapper.readValue` が失敗する
-- JSON として扱うなら `@JdbcTypeCode(SqlTypes.JSON)` か `AttributeConverter` を使う。単純なテキスト保存で良いなら `@Lob` で十分
+- `String` フィールドに `@Column(columnDefinition = "JSON")` を付けると、Hibernate のバージョン／JDBC ドライバの組合せによっては保存時に文字列リテラルとして二重エスケープされる事例があった（027 で観測）。Hibernate 6.4 + MySQL Connector/J 8.3 の現組合せでは再発しないことを派生①で確認済
+- 一方で `@Lob String` を MySQL の JSON カラムに使うと、Connector/J が **CHARACTER SET 'binary'** で値を送るため MySQL が `ER_INVALID_JSON_CHARSET (3144)` で拒否する（**027 派生①**で本番のみ顕在化、CI 緑のまま 500）
+- 現時点の安全解は `@Column(nullable = false, columnDefinition = "json")` で **`@Lob` を付けず**、Hibernate に utf8mb4 で送らせること。`@JdbcTypeCode(SqlTypes.JSON)` か `AttributeConverter` も選択肢
 
 ### テスト観点
 - [ ] フェーズ追加で `schema.sql` / `application-{profile}.properties` を変更した場合、必ずローカルで `mvn test` を流してから push する
 - [ ] JSON 列に保存した payload が読み取り側で `ObjectMapper.readValue` できるかを実テストで通す（往復検証）
 - [ ] 過去に Phase 11 でも同種の ApplicationContext 失敗（76b2dd23 / a3c565cc）があり、Phase 導入時の H2 互換性は再発パターンとして要警戒
+- [ ] **JSON カラムを持つ Entity の追加／変更時は、本番 MySQL に対する INSERT スモーク（curl でも可）を 1 回踏む**（H2 は JSON の文字セット検証を持たないため CI 緑では本番安全性を保証できない — 027 派生①の教訓）
 
 ### Entity と本番 MySQL の NOT NULL 制約乖離（038 起因）
 - H2 + `ddl-auto=create-drop` のテストは Entity から都度スキーマ生成するため、本番 MySQL に残る旧 NOT NULL 制約は再現されない

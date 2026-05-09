@@ -47,7 +47,7 @@
 | 024 | [SSM Failed 時のエラー出力が空](024_ssm_failed_no_error_output.md) | デプロイ Failed 時に stderr のみ取得していて根本原因が掴めない | ✅ 解決済 | - | ✅ 済 |
 | 025 | [SSM 自動リカバリ直後 Pending 滞留](025_ssm_pending_after_recovery.md) | EC2 stop/start 直後の Online 検知が早すぎて send-command が Pending のまま落ちる | ✅ 解決済 | - | ✅ 済 |
 | 026 | [SSM ゾンビOnline (Undeliverable)](026_ssm_zombie_online_undeliverable.md) | PingStatus=Online でも MGS セッション死亡で Undeliverable になる事象。カナリア方式で検知 | ✅ 解決済 | - | ✅ 済 |
-| 027 | [フェーズ12 ワークフロー導入で CI 全滅](027_workflow_test_h2_schema_and_json_payload.md) | schema.sql の MySQL 専用構文 + payload の JSON 列が H2 テストで爆発・連鎖失敗 | ✅ 解決済 | - | ✅ 済 |
+| 027 | [フェーズ12 ワークフロー導入で CI 全滅](027_workflow_test_h2_schema_and_json_payload.md) | schema.sql の MySQL 専用構文 + payload の JSON 列が H2 テストで爆発・連鎖失敗。**派生①(2026-05-09)：027 で採用した `@Lob String` が本番 MySQL JSON カラムで CHARACTER SET 'binary' エラー(3144) を返し申請API が 500。`columnDefinition="json"` に修正** | ✅ 解決済 + 派生①✅解決済 | - | ✅ 済 |
 | 028 | [CD 中の SSM 配信不能 → コンテナクラッシュループ](028_cd_ssm_undeliverable_then_container_crashloop.md) | CD 中断 + EC2 stop/start 後に compose の残骸でコンテナが restart loop、SSM カナリアも InProgress 滞留 | ✅ 解決済 | - | ✅ 済 |
 | 029 | [docker compose plugin 消失 + users スキーマ齟齬](029_compose_plugin_lost_and_users_schema_drift.md) | systemd の compose 起動が exit 125、users 業務カラム欠落で Spring が data.sql 失敗、SSM 応答阻害も連鎖 | ✅ 解決済 | - | ✅ 済 |
 | 030 | [HTTPS化を CloudFront + desec.io 1ドメイン構成で実装](030_https_via_cloudfront_duckdns_single_domain.md) | フェーズ11 §3 ALB 案を無料枠完走方針と整合させるため CloudFront + desec.io（www サブドメイン）に切替・本番 HTTPS で主要動作確認まで完了 | ✅ 解決済 | - | ✅ 済 |

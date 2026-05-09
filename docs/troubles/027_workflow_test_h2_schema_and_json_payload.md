@@ -1,7 +1,7 @@
 # 027: フェーズ12 ワークフロー導入で CI（amazia-core テスト）が全滅
 
 ## ステータス
-✅ 解決済（2026-05-05）
+✅ 解決済（2026-05-05）／追加修正 ✅ 解決済（2026-05-09・派生①）
 
 ## 発症箇所
 GitHub Actions `Deploy to EC2` ワークフロー
@@ -90,5 +90,55 @@ org.h2.jdbc.JdbcSQLNonTransientException: 不明なデータ型: "IDX_WORKFLOW_S
 |------|------|
 | MySQL 拡張構文の混入 | `schema.sql` を書くときは「H2 でも動くか」を必ず確認する。最低限 `CREATE TABLE` 内の `INDEX` 句は別ステートメント `CREATE INDEX` に分離するか、テストプロファイルから `schema-locations` を空にして除外する。 |
 | プロファイル分離 | テスト環境(H2) と本番(MySQL) でロードする SQL を `application-{profile}.properties` の `spring.sql.init.schema-locations` で明示的に分ける。 |
-| エンティティの JSON 列扱い | `String` フィールドに `columnDefinition = "JSON"` を付けない。JSON 値として扱いたいなら専用の `@JdbcTypeCode(SqlTypes.JSON)` か、自前の `AttributeConverter`、または素直に `@Lob` で TEXT 保存にする。 |
+| エンティティの JSON 列扱い | `String` フィールドに `columnDefinition = "JSON"` を付けない。JSON 値として扱いたいなら専用の `@JdbcTypeCode(SqlTypes.JSON)` か、自前の `AttributeConverter`、または素直に `@Lob` で TEXT 保存にする。 ※**「`@Lob` で TEXT 保存」案は本番 MySQL の JSON カラムでは別の罠（CHARACTER SET binary）を踏むことが派生①で判明。下記「派生① 追記」を必ず参照。** |
 | ローカル門番 | フェーズ追加コミット前に必ず `mvn -pl amazia-core test` を実行する（CLAUDE.md「フェーズ完了の定義」と整合）。 |
+
+---
+
+## 派生①: 本番 MySQL で `@Lob String` → JSON カラム保存が 3144 で 500 になる（2026-05-09）
+
+### 発症箇所
+- 本番 `POST /api/workflows`（Console 経由 `/console/api/workflows` も同根）
+- 2026-05-09T04:32:13Z に管理コンソールから「価格変更」申請を投げた瞬間に 500 を返却
+
+### 症状
+レスポンス：
+```json
+{"timestamp":"2026-05-09T04:32:13.094+00:00","status":500,"error":"Internal Server Error","path":"/api/workflows"}
+```
+Core ログ（SSM 経由で取得）：
+```
+SQL Error: 3144, SQLState: 22001
+Data truncation: Cannot create a JSON value from a string with CHARACTER SET 'binary'.
+[insert into workflow_requests (... payload ...) values (?, ...)]
+org.springframework.dao.DataIntegrityViolationException
+  → com.mysql.cj.jdbc.exceptions.MysqlDataTruncation
+```
+
+### 根本原因
+027 修正で `WorkflowRequest.payload` を `@Lob @Column(nullable = false) String` に変更したが、MySQL Connector/J 8.x は `@Lob String` を **CHARACTER SET 'binary'** で送るバインドモードを使う。MySQL の JSON カラムは値が `utf8mb4` でないと `JSON_VALID()` が成立せず、`ER_INVALID_JSON_CHARSET (3144)` を返す。
+
+H2 はこの検証を持たないためテストでは検知できなかった。
+
+### なぜ CI で検知できなかったか
+- テストは H2(`ddl-auto=create-drop`)で動き、JSON 型の文字セット検証が存在しない
+- 027 の再発防止表で「`@Lob` で TEXT 保存にする」を推奨していたが、本番 MySQL JSON カラムとの組み合わせを未検証のまま採用
+- 本番疎通テストが CI に組み込まれておらず、Phase 12 デプロイ後に「申請」を実機で叩くまで気付かなかった
+
+### 修正内容
+`amazia-core/src/main/java/com/example/workflow/entity/WorkflowRequest.java`
+- `@Lob` を削除し、`@Column(nullable = false, columnDefinition = "json")` に変更
+- これで Hibernate は LONGVARCHAR 経路でなく VARCHAR 系として `utf8mb4` で値をバインドし、MySQL は JSON として正常受領
+- `ddl-auto=none` の本番では `columnDefinition` は DDL に効かず、H2 + create-drop でも H2 は `"json"` 型を VARCHAR 互換に解釈するため二重エスケープは再発しない（`mvn -Dtest='Workflow*Test'` 13/13 成功で確認）
+
+### 再発防止
+| 観点 | 対策 |
+|------|------|
+| `@Lob` × MySQL JSON 列 | エンティティの `String` フィールドに `@Lob` を付けない。MySQL Connector/J が CHARACTER SET binary で送るため JSON カラムと相性が悪い。`columnDefinition="json"` を素直に明示する。 |
+| 027 再発防止表の更新 | 027「再発防止」表で示した `@Lob` 推奨は誤誘導だった。同表に派生①参照の注記を追記。今後 027 を参照する人は派生①も合わせて読む。 |
+| 本番疎通スモーク | 実装・運用パターン的に新規エンドポイントは「本番デプロイ後に1回手で叩く」では不足。少なくとも Console UI から申請までを通す手順を `phaseN_implementation_plan.md` の「フェーズ完了の定義」チェックボックスに含める。 |
+
+### AI協働観点
+- AI の判断ミス：027 修正時、`@Lob` 採用が MySQL JSON カラムで動くかを確認しないまま「素直に `@Lob` で TEXT 保存」を推奨した。MySQL Connector/J の文字セット挙動の知識が浅かった
+- 人間が止めるべきだった点：027 の修正後に H2 テスト緑だけで本番マージしており、「JSON 列に対する本番 INSERT のスモーク」を踏まずに済ませてしまった
+- 該当アンチパターン：AP-001（H2 と本番 RDBMS の挙動差をテスト不足のまま見過ごす同型再発）。AP-001 の出典欄に本派生を追加。
