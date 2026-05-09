@@ -57,7 +57,13 @@ public class DigestNotificationDispatchJob extends AbstractBatchJob {
         this.dispatchService = dispatchService;
     }
 
-    @Scheduled(fixedRateString = "${amazia.batch.notifications.digest-interval-ms:300000}")
+    // 053: initialDelay 未指定だと context 起動完了直後に initial tick が走り、
+    // テスト fixture / 起動直後の手動 run と BatchJobLockRegistry を競合する。
+    // initial tick を fixedRate 1 周期ぶん後ろにずらすことで競合を回避する
+    // （本番運用でも「起動直後の認証・DB 起動が落ち着く前に dispatch を走らせる」リスクが減る）。
+    @Scheduled(
+            fixedRateString = "${amazia.batch.notifications.digest-interval-ms:300000}",
+            initialDelayString = "${amazia.batch.notifications.digest-interval-ms:300000}")
     public void scheduledRun() {
         run("scheduler");
     }

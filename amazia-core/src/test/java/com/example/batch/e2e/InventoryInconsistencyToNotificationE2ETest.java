@@ -148,7 +148,14 @@ class InventoryInconsistencyToNotificationE2ETest {
     }
 
     private long persistAdminWithSubscription(String email) {
-        Role admin = roleRepository.findByCode("admin").orElseThrow();
+        // 052: 共有 H2 + context 切替 + random 順序の組合せで "admin" が一瞬空になるケース
+        // への自衛（クラス @Transactional は REQUIRES_NEW 貫通検証のため付けられない）。
+        Role admin = roleRepository.findByCode("admin").orElseGet(() -> {
+            Role r = new Role();
+            r.setCode("admin");
+            r.setName("管理者");
+            return roleRepository.save(r);
+        });
         User u = new User();
         u.setEmail(email);
         u.setName("E2E-1 admin");

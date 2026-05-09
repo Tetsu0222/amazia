@@ -43,7 +43,10 @@ import static org.mockito.Mockito.verify;
  */
 @SpringBootTest(properties = {
         "amazia.batch.notifications.digest-enabled=true",
-        "amazia.batch.rate-limit.suppression-minutes=60"
+        "amazia.batch.rate-limit.suppression-minutes=60",
+        // 053: @Scheduled 初期 tick とテスト fixture / 手動 run の競合を避けるため
+        // テスト期間中は scheduled tick が発火しないよう間隔を 24h に延ばす（initialDelay 防御の二重化）。
+        "amazia.batch.notifications.digest-interval-ms=86400000"
 })
 @Import(TestAwsConfig.class)
 @ActiveProfiles("test")
