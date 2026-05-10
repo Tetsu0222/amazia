@@ -301,11 +301,19 @@ erDiagram
         BIGINT shipping_status_id FK
     }
 
+    shipping_lead_times {
+        BIGINT id PK
+        BIGINT shipping_method_id FK
+        VARCHAR prefecture
+        INT lead_time_days
+    }
+
     shipping_methods ||--o{ sales : "1:N（phase15 r5 で FK 有効化）"
     shipping_methods ||--o{ deliveries : "1:N"
     shipping_statuses ||--o{ deliveries : "1:N"
     address ||--o{ deliveries : "1:N"
     sales ||--|| deliveries : "1:1（UNIQUE sales_id）"
+    shipping_methods ||--o{ shipping_lead_times : "1:N（phaseX-5）"
     products ||--o{ inventories : "1:N"
     warehouses ||--o{ inventories : "1:N"
     products ||--o{ inbounds : "1:N"
@@ -597,6 +605,7 @@ erDiagram
 | inventories | 商品×倉庫の現在在庫 | 並行運用書き込み正本（販売・入荷・返品復元から同期更新） | フェーズ15 |
 | inbounds | 商品入荷ヘッダ | 入荷数量・倉庫・入荷日のヘッダ管理 | フェーズ15 |
 | deliveries | 配送実体 | 注文確定と同時に sales 1:1 で生成。配送ステータス遷移・追跡番号管理 | フェーズ15 |
+| shipping_lead_times | 都道府県別リードタイムマスタ | 47都道府県 × 3配送方法 = 141行。`DeliveryScheduleService.calculate(...)` から参照、未登録は config フォールバック | フェーズX-5 |
 
 ### Core システム（カート機能）— フェーズ16.5
 

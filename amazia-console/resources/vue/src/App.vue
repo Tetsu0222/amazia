@@ -21,6 +21,7 @@
           <a-menu-item key="/preorders">予約管理</a-menu-item>
           <a-menu-item key="/sales-returns">返品管理</a-menu-item>
           <a-menu-item key="/delivery">配送管理</a-menu-item>
+          <a-menu-item v-if="isApprover" key="/shipping-lead-times">リードタイムマスタ</a-menu-item>
           <a-menu-item key="/inbound">入荷管理</a-menu-item>
           <a-menu-item key="/operation-logs">操作履歴</a-menu-item>
           <a-menu-item key="/workflows">ワークフロー</a-menu-item>
@@ -63,6 +64,7 @@ const currentPath   = computed(() => {
   return route.path;
 });
 const isAdmin       = computed(() => authStore.isAdmin);
+const isApprover    = computed(() => authStore.isApprover);
 
 function onMenuClick({ key }) {
   if (key === '__logout') {

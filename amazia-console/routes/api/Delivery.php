@@ -12,3 +12,8 @@ Route::patch('/deliveries/{id}/tracking-code',   \App\Delivery\Controller\Regist
 
 // 配送方法マスタ
 Route::get('/shipping-methods', \App\Delivery\Controller\ListShippingMethodController::class);
+
+// フェーズX-5：都道府県別リードタイムマスタ
+Route::get(  '/shipping-lead-times',       \App\Delivery\Controller\ListShippingLeadTimeController::class);
+Route::get(  '/shipping-lead-times/{id}',  \App\Delivery\Controller\GetShippingLeadTimeController::class);
+Route::patch('/shipping-lead-times/{id}',  \App\Delivery\Controller\UpdateShippingLeadTimeController::class);

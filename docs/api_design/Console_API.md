@@ -914,6 +914,56 @@ PATCH 系は `config('app.auth.approver_roles')`（supervisor / admin / senior_a
 
 ---
 
+## 都道府県別リードタイムマスタ API（フェーズX-5追加）
+
+GET / PATCH ともに `approver_roles`（supervisor 以上）のみ。user ロールは 403。`operation_logs` 記録は Core 側 Service が担当（Console は中継のみ）。
+
+### リードタイム一覧取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/shipping-lead-times` |
+| 認証 | approver_roles |
+| コントローラー | `App\Delivery\Controller\ListShippingLeadTimeController` |
+| 中継先 | Core `GET /api/shipping-lead-times[?shippingMethodId=N]` |
+
+`shippingMethodId` クエリは Core にそのまま渡す。
+
+---
+
+### リードタイム詳細取得
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | GET |
+| パス | `/api/shipping-lead-times/{id}` |
+| 認証 | approver_roles |
+| コントローラー | `App\Delivery\Controller\GetShippingLeadTimeController` |
+| 中継先 | Core `GET /api/shipping-lead-times/{id}` |
+
+---
+
+### リードタイム更新
+
+| 項目 | 内容 |
+|------|------|
+| メソッド | PATCH |
+| パス | `/api/shipping-lead-times/{id}` |
+| 認証 | approver_roles |
+| コントローラー | `App\Delivery\Controller\UpdateShippingLeadTimeController` |
+| 中継先 | Core `PATCH /api/shipping-lead-times/{id}`（X-User-Id ヘッダ付与） |
+
+**リクエストボディ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|-----|------|------|
+| leadTimeDays | int | ○ | リードタイム日数。`required\|integer\|min:0`。負数や非数値は 422 |
+
+`leadTimeDays = 0` は許容（無効化運用）。
+
+---
+
 ## 入荷管理 API（フェーズ15追加）
 
 ### 入荷一覧

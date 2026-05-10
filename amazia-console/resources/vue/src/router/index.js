@@ -22,6 +22,7 @@ import SalesReturnList            from '../features/salesReturn/pages/SalesRetur
 import OperationLogList           from '../features/operationLog/pages/OperationLogList.vue';
 import DeliveryList               from '../features/delivery/pages/DeliveryList.vue';
 import DeliveryDetail             from '../features/delivery/pages/DeliveryDetail.vue';
+import ShippingLeadTimeList       from '../features/delivery/pages/ShippingLeadTimeList.vue';
 import InboundList                from '../features/inbound/pages/InboundList.vue';
 import InboundCreate              from '../features/inbound/pages/InboundCreate.vue';
 import InboundStockImport         from '../features/inbound/pages/InboundStockImport.vue';
@@ -65,6 +66,10 @@ const routes = [
   { path: '/inbound/import',           component: InboundStockImport,  meta: { requiresAuth: true } },
   { path: '/delivery',                 component: DeliveryList,        meta: { requiresAuth: true } },
   { path: '/delivery/:id',             component: DeliveryDetail,      meta: { requiresAuth: true } },
+
+  // フェーズX-5 都道府県別リードタイムマスタ（approver_roles 限定）
+  { path: '/shipping-lead-times',      component: ShippingLeadTimeList,
+    meta: { requiresAuth: true, roles: ['supervisor', 'admin', 'senior_admin', 'eternal_advisor'] } },
 
   // フェーズ17 バッチ管理（実行履歴・手動起動はタブ切り替え。手動タブは admin 相当のみ表示）
   { path: '/batch',                    component: BatchManagementPage,   meta: { requiresAuth: true } },

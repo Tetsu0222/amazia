@@ -45,6 +45,7 @@
 | market_customers | N:1 | 住所所有者（Market 顧客） |
 | sales | 1:N | 配送先として参照される売上レコード |
 | deliveries | 1:N | 配送実体（phase15 r5：`deliveries.shipping_address_id` から参照） |
+| shipping_lead_times | 参照のみ（厳密一致） | phaseX-5：`address.prefecture` を `shipping_lead_times.prefecture` と厳密一致でリードタイム引当（不一致時は config フォールバック） |
 
 ## 設計上の注意
 

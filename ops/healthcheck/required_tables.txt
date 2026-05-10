@@ -50,6 +50,7 @@ warehouses
 inventories
 inbounds
 deliveries
+shipping_lead_times
 
 # カート機能
 carts

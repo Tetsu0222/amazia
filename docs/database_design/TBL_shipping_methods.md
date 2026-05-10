@@ -47,7 +47,7 @@ schema.sql で `INSERT IGNORE` により以下を投入する。
 - レコードは Console 画面からの登録対象ではなく、schema.sql 起動時のシード投入のみで管理する。
 - ID 値は `application.properties > amazia.delivery.shipping-methods.*-id` および Console `config('delivery.shipping_methods.*_id')` と整合させる（規約 4-1 / RRRR-8）。
 - `sales.shipping_method_id` への FK 制約は phase14 r1 時点で保留され、phase15 r5 のマイグレーションで有効化される（schema.sql 末尾 `ALTER TABLE sales ADD CONSTRAINT fk_sales_shipping_method ...`）。
-- 配送方法別のリードタイム（日数）は `application.properties > amazia.delivery.lead-time-days.*` で管理する。都道府県別リードタイムは phaseX-5（マスタ化）で切り出し。
+- 配送方法別のリードタイム（日数）は `application.properties > amazia.delivery.lead-time-days.*` で管理する（フォールバック値）。都道府県別リードタイムは phaseX-5 で `shipping_lead_times` マスタとして実装済（[TBL_shipping_lead_times.md](TBL_shipping_lead_times.md)）。
 
 ## マイグレーションファイル
 

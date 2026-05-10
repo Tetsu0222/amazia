@@ -68,6 +68,7 @@
 | [TBL_inventories.md](TBL_inventories.md) | inventories | 商品×倉庫の現在在庫（並行運用書き込み正本） | Core |
 | [TBL_inbounds.md](TBL_inbounds.md) | inbounds | 商品入荷ヘッダ | Core |
 | [TBL_deliveries.md](TBL_deliveries.md) | deliveries | 配送実体（注文確定と同時に sales 1:1 で生成） | Core |
+| [TBL_shipping_lead_times.md](TBL_shipping_lead_times.md) | shipping_lead_times | 都道府県別リードタイムマスタ（フェーズX-5） | Core |
 
 ### Core システム（カート機能）※フェーズ16.5追加
 
