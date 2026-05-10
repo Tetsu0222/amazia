@@ -6,9 +6,11 @@ name: Weekly Test Random Order
 # 失敗時は Issue を自動起票し、同タイトル Open Issue があればコメント追加で重複起票を防ぐ。
 
 on:
-  schedule:
-    # 毎週月曜 03:00 JST = 18:00 UTC 日曜
-    - cron: '0 18 * * 0'
+  # ポートフォリオクローズに伴い定期実行を停止（2026-05-11）。
+  # 必要時は workflow_dispatch で手動実行可能。再開時は schedule のコメントを外す。
+  # schedule:
+  #   # 毎週月曜 03:00 JST = 18:00 UTC 日曜
+  #   - cron: '0 18 * * 0'
   workflow_dispatch:  # 手動実行も許可
 
 permissions:
